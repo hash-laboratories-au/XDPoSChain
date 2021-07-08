@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/XDPoS"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -1320,4 +1321,73 @@ func TestLargeReorgTrieGC(t *testing.T) {
 			t.Fatalf("competitor %d: competing chain state missing", i)
 		}
 	}
+}
+
+func TestForkAt450(t *testing.T) {
+	full := true
+	db, blockchain, err := newCanonical(ethash.NewFaker(), 450, full)
+	if err != nil {
+		t.Fatal("could not make new canonical", err)
+	}
+	defer blockchain.Stop()
+	_, blockchain2, err := newCanonical(ethash.NewFaker(), 449, full)
+	if err != nil {
+		t.Fatal("could not make new canonical", err)
+	}
+	defer blockchain2.Stop()
+	blockChainB := makeBlockChain(blockchain2.CurrentBlock(), 1, ethash.NewFaker(), db, forkSeed)
+	if len(blockChainB) == 0 {
+		t.Fatal("fork length is 0!")
+	}
+	if err := blockchain2.InsertBlock(blockChainB[0]); err != nil {
+		t.Fatalf("failed to insert forking chain: %v", err)
+	}
+	if blockchain.GetBlockByNumber(449).Hash() != blockchain2.GetBlockByNumber(449).Hash() {
+		t.Fatalf("block differs at 449")
+	}
+	if blockchain.GetBlockByNumber(450).Hash() == blockchain2.GetBlockByNumber(450).Hash() {
+		t.Fatalf("block same at 500")
+	}
+	// TODO: change consensus to XDPoS.
+	// TODO: get XDPoS.getSnapshot()
+}
+
+func TestNewXDPoS(t *testing.T) {
+	_, _, _ = newXDPoSCanonical(0, true)
+}
+
+// newCanonical creates a chain database, and injects a deterministic canonical
+// chain. Depending on the full flag, if creates either a full block chain or a
+// header only chain.
+func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
+	// Initialize a fresh chain with only a genesis block
+	gspec := new(Genesis)
+	db, _ := ethdb.NewMemDatabase()
+	genesis := gspec.MustCommit(db)
+
+	config := params.XDPoSConfig{
+		Period:              2,
+		Epoch:               900,
+		Reward:              250,
+		RewardCheckpoint:    900,
+		Gap:                 450,
+		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+	}
+	engine := XDPoS.New(&config, db)
+
+	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
+	// Create and inject the requested chain
+	if n == 0 {
+		return db, blockchain, nil
+	}
+	if full {
+		// Full block-chain requested
+		blocks := makeBlockChain(genesis, n, engine, db, canonicalSeed)
+		_, err := blockchain.InsertChain(blocks)
+		return db, blockchain, err
+	}
+	// Header-only chain requested
+	headers := makeHeaderChain(genesis.Header(), n, engine, db, canonicalSeed)
+	_, err := blockchain.InsertHeaderChain(headers, 1)
+	return db, blockchain, err
 }

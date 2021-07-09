@@ -1399,17 +1399,21 @@ func TestXDPoS450(t *testing.T) {
 		block = b
 	}
 
-	t.Logf("Inserting a longer chain forking at 449...")
+	t.Logf("Inserting a longer chain forking at 450...")
 	block449 := blockchain.GetBlockByNumber(449)
 	blockExtra := "aaaa0100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101"
 
 	block450CoinBase := "0x2220000000000000000000000000000000000450"
-	block450 := createXDPoSTestBlock(block449.Hash().Hex(),
+	block = createXDPoSTestBlock(block449.Hash().Hex(),
 		UncleHash, TxHash, ReceiptHash, Root,
-		block450CoinBase, blockExtra, 105, 451, 451,
+		block450CoinBase, blockExtra, 105, 450, 450,
 	)
+	err = blockchain.InsertBlock(block)
+	if err != nil {
+		t.Fatalf("%v at %d", err, 450)
+	}
 
-	if blockchain.GetBlockByNumber(450).Header().Coinbase.Hex() != block450.Header().Coinbase.Hex() {
+	if blockchain.GetBlockByNumber(450).Header().Coinbase.Hex() == block.Header().Coinbase.Hex() {
 		t.Fatalf("Canonical chain 450 should keep the old 450 block, new insert should remain as uncle")
 	}
 

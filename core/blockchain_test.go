@@ -1445,6 +1445,29 @@ func TestXDPoS450(t *testing.T) {
 	}
 }
 
+func TestXDPoSNormalCanonical(t *testing.T) {
+	var err error
+	_, blockchain, _ := newXDPoSCanonical(0, true)
+	UncleHash := "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"
+	TxHash := "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+	ReceiptHash := "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+	Root := "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+	block := blockchain.Genesis()
+	t.Logf("Inserting 455 blocks...")
+	for i := 1; i <= 455; i++ {
+		blockCoinBase := fmt.Sprintf("0x1110000000000000000000000000000000000%3d", i)
+		extra := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101"
+		b := createXDPoSTestBlock(block.Hash().Hex(),
+			UncleHash, TxHash, ReceiptHash, Root,
+			blockCoinBase, extra, 105, i, i,
+		)
+		err = blockchain.InsertBlock(b)
+		if err != nil {
+			t.Fatalf("%v at %d", err, i)
+		}
+		block = b
+	}
+}
 func createXDPoSTestBlock(ParentHash, UncleHash, TxHash, ReceiptHash, Root, Coinbase, extraSubstring string, Difficulty, Number, Time int) *types.Block {
 	extraByte, _ := hex.DecodeString(extraSubstring)
 	header := types.Header{

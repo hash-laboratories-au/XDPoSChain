@@ -1425,34 +1425,6 @@ func TestXDPoS450(t *testing.T) {
 	_ = blockchain.InsertBlock(block451)
 }
 
-// func TestNewBlock(t *testing.T) {
-// 	db, _ := ethdb.NewMemDatabase()
-// 	config := params.XDPoSConfig{
-// 		Period:              2,
-// 		Epoch:               900,
-// 		Reward:              250,
-// 		RewardCheckpoint:    900,
-// 		Gap:                 450,
-// 		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
-// 	}
-// 	engine := XDPoS.New(&config, db)
-
-// 	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
-// 	b := createXDPoSTestBlock("0x0000000000000000000000000000000000000000000000000000000000000000",
-// 		"0x0000000000000000000000000000000000000000000000000000000000000000",
-// 		"0x0000000000000000000000000000000000000000",
-// 		"00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-// 		1,
-// 		0,
-// 		1,
-// 	)
-// 	err := blockchain.InsertBlock(b)
-// 	if err != nil {
-// 		t.Fatalf("Err genesis")
-// 	}
-// 	// t.Logf("%+v", b)
-// }
-
 func createXDPoSTestBlock(ParentHash, UncleHash, TxHash, ReceiptHash, Root, Coinbase, extraSubstring string, Difficulty, Number, Time int) *types.Block {
 	extraByte, _ := hex.DecodeString(extraSubstring)
 	header := types.Header{

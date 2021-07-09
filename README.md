@@ -1,9 +1,7 @@
-## XinFin 
+## XinFin Test
 
-Blockchain for decentralized applications, token issuance and integration
+Put the code inside the GOPATH
 
-Website Resource : https://xinFin.org
+Run `go get -u ./...`
 
-XinFin Mainet URL: http://XinFin.network/ 
-
-XinFin TestNet/Apothem URL: http://apothem.network/
+Run `go test -v github.com/ethereum/go-ethereum/core -run XDPoS450`

@@ -1354,49 +1354,119 @@ func TestForkAt450(t *testing.T) {
 }
 
 func TestNewXDPoS(t *testing.T) {
-	_, bc, _ := newXDPoSCanonical(1, true)
-	block := bc.GetBlockByNumber(0)
+	_, blockchain, _ := newXDPoSCanonical(0, true)
+	// t.Logf("is chainConfig.XDPoS=nil? %t", blockchain.chainConfig.XDPoS == nil)
+	block := blockchain.GetBlockByNumber(0)
 	t.Logf("%+v", block)
-}
-func TestNewBlock(t *testing.T) {
-	db, _ := ethdb.NewMemDatabase()
-	config := params.XDPoSConfig{
-		Period:              2,
-		Epoch:               900,
-		Reward:              250,
-		RewardCheckpoint:    900,
-		Gap:                 450,
-		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
-	}
-	engine := XDPoS.New(&config, db)
-
-	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
-	b := toBlock("0x0000000000000000000000000000000000000000000000000000000000000000",
-		"0x0000000000000000000000000000000000000000000000000000000000000000",
+	b := createXDPoSTestBlock(blockchain.Genesis().Hash().Hex(),
+		"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
 		"0x0000000000000000000000000000000000000000",
-		"00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		"d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
+		105,
 		1,
-		0,
 		1,
 	)
 	err := blockchain.InsertBlock(b)
 	if err != nil {
-		t.Fatalf("Err genesis")
+		t.Fatalf("%v", err)
 	}
-	// t.Logf("%+v", b)
+	t.Logf("%v", blockchain.GetBlockByNumber(1))
+
+}
+func TestXDPoS450(t *testing.T) {
+	_, blockchain, _ := newXDPoSCanonical(0, true)
+	block := blockchain.Genesis()
+	// t.Logf("%+v", block)
+	for i := 1; i <= 450; i++ {
+		b := createXDPoSTestBlock(block.Hash().Hex(),
+			"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+			"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"0x0000000000000000000000000000000000000000",
+			"d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
+			105,
+			i,
+			i,
+		)
+		err := blockchain.InsertBlock(b)
+		if err != nil {
+			t.Fatalf("%v at %d", err, i)
+		}
+		block = b
+	}
+	block449 := blockchain.GetBlockByNumber(449)
+	block450 := createXDPoSTestBlock(block449.Hash().Hex(),
+		"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x0000000000000000000000000000000000000000",
+		"aaaa0100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
+		105,
+		450,
+		450,
+	)
+	_ = blockchain.InsertBlock(block450)
+	block451 := createXDPoSTestBlock(block450.Hash().Hex(),
+		"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x0000000000000000000000000000000000000000",
+		"aaaa0100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
+		105,
+		451,
+		451,
+	)
+	_ = blockchain.InsertBlock(block451)
 }
 
-func toBlock(ParentHash, UncleHash, Coinbase, extraSubstring string, Difficulty, Number, Time int) *types.Block {
+// func TestNewBlock(t *testing.T) {
+// 	db, _ := ethdb.NewMemDatabase()
+// 	config := params.XDPoSConfig{
+// 		Period:              2,
+// 		Epoch:               900,
+// 		Reward:              250,
+// 		RewardCheckpoint:    900,
+// 		Gap:                 450,
+// 		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+// 	}
+// 	engine := XDPoS.New(&config, db)
+
+// 	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
+// 	b := createXDPoSTestBlock("0x0000000000000000000000000000000000000000000000000000000000000000",
+// 		"0x0000000000000000000000000000000000000000000000000000000000000000",
+// 		"0x0000000000000000000000000000000000000000",
+// 		"00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+// 		1,
+// 		0,
+// 		1,
+// 	)
+// 	err := blockchain.InsertBlock(b)
+// 	if err != nil {
+// 		t.Fatalf("Err genesis")
+// 	}
+// 	// t.Logf("%+v", b)
+// }
+
+func createXDPoSTestBlock(ParentHash, UncleHash, TxHash, ReceiptHash, Root, Coinbase, extraSubstring string, Difficulty, Number, Time int) *types.Block {
 	extraByte, _ := hex.DecodeString(extraSubstring)
 	header := types.Header{
-		ParentHash: common.HexToHash(ParentHash),
-		UncleHash:  common.HexToHash(UncleHash),
-		Coinbase:   common.HexToAddress(Coinbase),
-		Difficulty: big.NewInt(int64(Difficulty)),
-		Number:     big.NewInt(int64(Number)),
-		GasLimit:   21000,
-		Time:       big.NewInt(int64(Time)),
-		Extra:      extraByte,
+		ParentHash:  common.HexToHash(ParentHash),
+		UncleHash:   common.HexToHash(UncleHash),
+		TxHash:      common.HexToHash(TxHash),
+		ReceiptHash: common.HexToHash(ReceiptHash),
+		Root:        common.HexToHash(Root),
+		Coinbase:    common.HexToAddress(Coinbase),
+		Difficulty:  big.NewInt(int64(Difficulty)),
+		Number:      big.NewInt(int64(Number)),
+		GasLimit:    21000,
+		Time:        big.NewInt(int64(Time)),
+		Extra:       extraByte,
 	}
 	// block := types.Block{
 	// 	header:       &header,
@@ -1418,7 +1488,7 @@ func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
 	db, _ := ethdb.NewMemDatabase()
 	genesis := gspec.MustCommit(db)
 
-	config := params.XDPoSConfig{
+	XDPoSConfig := params.XDPoSConfig{
 		Period:              2,
 		Epoch:               900,
 		Reward:              250,
@@ -1426,9 +1496,16 @@ func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
 		Gap:                 450,
 		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
 	}
-	engine := XDPoS.New(&config, db)
-
-	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
+	engine := XDPoS.New(&XDPoSConfig, db)
+	config := &params.ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &params.XDPoSConfig{
+		Period:              2,
+		Epoch:               900,
+		Reward:              250,
+		RewardCheckpoint:    900,
+		Gap:                 450,
+		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+	}}
+	blockchain, _ := NewBlockChain(db, nil, config, engine, vm.Config{})
 	// Create and inject the requested chain
 	if n == 0 {
 		return db, blockchain, nil

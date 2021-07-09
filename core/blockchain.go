@@ -1419,22 +1419,24 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 	stats.processed++
 	stats.usedGas += result.usedGas
 	stats.report(types.Blocks{block}, 0, bc.stateCache.TrieDB().Size())
-	// E.g. when aa73 (7350) inserted, this branch is not visited, since status==SideStatTy 
-	// E.g. when its child (7351), this branch is visited 
 	if status == CanonStatTy && bc.chainConfig.XDPoS != nil {
 		// epoch block
 		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
 			CheckpointCh <- 1
 		}
-		// E.g. when its child (7351), this branch is not visited
 		// prepare set of masternodes for the next epoch
 		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-			err := bc.UpdateM1()
-			if err != nil {
-				log.Error("Error when update masternodes set. Stopping node", "err", err)
-				os.Exit(1)
-			}
+			fmt.Printf("UpdateM1() called at block number %d hash %x\n", block.NumberU64(), block.Hash())
+			// err := bc.UpdateM1()
+			// if err != nil {
+			// 	log.Error("Error when update masternodes set. Stopping node", "err", err)
+			// 	os.Exit(1)
+			// }
+		} else {
+			fmt.Printf("UpdateM1() NOT called at block number %d hash %x\n", block.NumberU64(), block.Hash())
 		}
+	} else {
+		fmt.Printf("UpdateM1() NOT called at block number %d hash %x\n", block.NumberU64(), block.Hash())
 	}
 	// Append a single chain head event if we've progressed the chain
 	if status == CanonStatTy && bc.CurrentBlock().Hash() == block.Hash() {

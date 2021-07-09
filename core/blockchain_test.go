@@ -1379,7 +1379,7 @@ func TestNewXDPoS(t *testing.T) {
 func TestXDPoS450(t *testing.T) {
 	_, blockchain, _ := newXDPoSCanonical(0, true)
 	block := blockchain.Genesis()
-	// t.Logf("%+v", block)
+	t.Logf("Inserting 450 blocks...")
 	for i := 1; i <= 450; i++ {
 		b := createXDPoSTestBlock(block.Hash().Hex(),
 			"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -1398,31 +1398,33 @@ func TestXDPoS450(t *testing.T) {
 		}
 		block = b
 	}
-	block449 := blockchain.GetBlockByNumber(449)
-	block450 := createXDPoSTestBlock(block449.Hash().Hex(),
-		"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		"0x0000000000000000000000000000000000000000",
-		"aaaa0100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
-		105,
-		450,
-		450,
-	)
-	_ = blockchain.InsertBlock(block450)
-	block451 := createXDPoSTestBlock(block450.Hash().Hex(),
-		"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		"0x0000000000000000000000000000000000000000",
-		"aaaa0100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
-		105,
-		451,
-		451,
-	)
-	_ = blockchain.InsertBlock(block451)
+	t.Logf("Inserting a longer chain forking at 449...")
+	block = blockchain.GetBlockByNumber(449)
+	for i := 450; i <= 455; i++ {
+		b := createXDPoSTestBlock(block.Hash().Hex(),
+			"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+			"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+			"0x0000000000000000000000000000000000000000",
+			"aaaa0100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
+			105,
+			i,
+			i,
+		)
+		err := blockchain.InsertBlock(b)
+		if err != nil {
+			t.Fatalf("%v at %d", err, i)
+		}
+		block = b
+	}
+	t.Logf("Canonical chain is:")
+	currHeader := blockchain.CurrentHeader()
+	for i := 0; i < 10; i++ {
+		t.Logf("\tBlock number %d hash %x", currHeader.Number.Uint64(), currHeader.Hash())
+		currHeader = blockchain.GetHeaderByHash(currHeader.ParentHash)
+	}
+	t.Logf("\t...")
 }
 
 func createXDPoSTestBlock(ParentHash, UncleHash, TxHash, ReceiptHash, Root, Coinbase, extraSubstring string, Difficulty, Number, Time int) *types.Block {
@@ -1447,7 +1449,7 @@ func createXDPoSTestBlock(ParentHash, UncleHash, TxHash, ReceiptHash, Root, Coin
 	return block
 }
 
-// newCanonical creates a chain database, and injects a deterministic canonical
+// newXDPoSCanonical creates a chain database, and injects a deterministic canonical
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
 func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {

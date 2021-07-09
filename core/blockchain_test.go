@@ -17,6 +17,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -1353,7 +1354,55 @@ func TestForkAt450(t *testing.T) {
 }
 
 func TestNewXDPoS(t *testing.T) {
-	_, _, _ = newXDPoSCanonical(0, true)
+	_, bc, _ := newXDPoSCanonical(1, true)
+	block := bc.GetBlockByNumber(0)
+	t.Logf("%+v", block)
+}
+func TestNewBlock(t *testing.T) {
+	db, _ := ethdb.NewMemDatabase()
+	config := params.XDPoSConfig{
+		Period:              2,
+		Epoch:               900,
+		Reward:              250,
+		RewardCheckpoint:    900,
+		Gap:                 450,
+		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+	}
+	engine := XDPoS.New(&config, db)
+
+	blockchain, _ := NewBlockChain(db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
+	b := toBlock("0x0000000000000000000000000000000000000000000000000000000000000000",
+		"0x0000000000000000000000000000000000000000000000000000000000000000",
+		"0x0000000000000000000000000000000000000000",
+		"00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		1,
+		0,
+		1,
+	)
+	err := blockchain.InsertBlock(b)
+	if err != nil {
+		t.Fatalf("Err genesis")
+	}
+	// t.Logf("%+v", b)
+}
+
+func toBlock(ParentHash, UncleHash, Coinbase, extraSubstring string, Difficulty, Number, Time int) *types.Block {
+	extraByte, _ := hex.DecodeString(extraSubstring)
+	header := types.Header{
+		ParentHash: common.HexToHash(ParentHash),
+		UncleHash:  common.HexToHash(UncleHash),
+		Coinbase:   common.HexToAddress(Coinbase),
+		Difficulty: big.NewInt(int64(Difficulty)),
+		Number:     big.NewInt(int64(Number)),
+		GasLimit:   21000,
+		Time:       big.NewInt(int64(Time)),
+		Extra:      extraByte,
+	}
+	// block := types.Block{
+	// 	header:       &header,
+	// }
+	block := types.NewBlockWithHeader(&header)
+	return block
 }
 
 // newCanonical creates a chain database, and injects a deterministic canonical
@@ -1362,6 +1411,10 @@ func TestNewXDPoS(t *testing.T) {
 func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
 	// Initialize a fresh chain with only a genesis block
 	gspec := new(Genesis)
+	// change genesis fields
+	extraByte, _ := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	gspec.ExtraData = extraByte
+	gspec.Difficulty = big.NewInt(105)
 	db, _ := ethdb.NewMemDatabase()
 	genesis := gspec.MustCommit(db)
 

@@ -52,7 +52,7 @@ import (
 
 var (
 	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
-	CheckpointCh     = make(chan int)
+	CheckpointCh     = make(chan int, 1)
 	ErrNoGenesis     = errors.New("Genesis not found in chain")
 )
 
@@ -1219,9 +1219,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.processed++
 		stats.usedGas += usedGas
 		stats.report(chain, i, bc.stateCache.TrieDB().Size())
-		if status == CanonStatTy && bc.chainConfig.XDPoS != nil {
+		if bc.chainConfig.XDPoS != nil {
 			// epoch block
-			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
+			if status == CanonStatTy && (chain[i].NumberU64()%bc.chainConfig.XDPoS.Epoch) == 0 {
 				CheckpointCh <- 1
 			}
 			// prepare set of masternodes for the next epoch
@@ -1419,24 +1419,19 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 	stats.processed++
 	stats.usedGas += result.usedGas
 	stats.report(types.Blocks{block}, 0, bc.stateCache.TrieDB().Size())
-	if status == CanonStatTy && bc.chainConfig.XDPoS != nil {
+	if bc.chainConfig.XDPoS != nil {
 		// epoch block
-		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
+		if status == CanonStatTy && (block.NumberU64()%bc.chainConfig.XDPoS.Epoch) == 0 {
 			CheckpointCh <- 1
 		}
 		// prepare set of masternodes for the next epoch
 		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-			fmt.Printf("UpdateM1() called at block number %d hash %x\n", block.NumberU64(), block.Hash())
-			// err := bc.UpdateM1()
-			// if err != nil {
-			// 	log.Error("Error when update masternodes set. Stopping node", "err", err)
-			// 	os.Exit(1)
-			// }
-		} else {
-			fmt.Printf("UpdateM1() NOT called at block number %d hash %x\n", block.NumberU64(), block.Hash())
+			err := bc.UpdateM1()
+			if err != nil {
+				log.Error("Error when update masternodes set. Stopping node", "err", err)
+				os.Exit(1)
+			}
 		}
-	} else {
-		fmt.Printf("UpdateM1() NOT called at block number %d hash %x\n", block.NumberU64(), block.Hash())
 	}
 	// Append a single chain head event if we've progressed the chain
 	if status == CanonStatTy && bc.CurrentBlock().Hash() == block.Hash() {

@@ -1417,7 +1417,7 @@ func TestXDPoS450(t *testing.T) {
 		t.Fatalf("Canonical chain 450 should keep the old 450 block, new insert should remain as uncle")
 	}
 
-	for i := 451; i <= 455; i++ {
+	for i := 451; i <= 902; i++ {
 		blockCoinBase := fmt.Sprintf("0x2220000000000000000000000000000000000%3d", i)
 		b := createXDPoSTestBlock(block.Hash().Hex(),
 			UncleHash, TxHash, ReceiptHash, Root,
@@ -1432,7 +1432,12 @@ func TestXDPoS450(t *testing.T) {
 	t.Logf("Canonical chain is:")
 	currHeader := blockchain.CurrentHeader()
 	for i := 0; i < 10; i++ {
-		t.Logf("\tBlock number %d hash %x", currHeader.Number.Uint64(), currHeader.Hash())
+		if currHeader.Number.Uint64() == 900 {
+			extraSuffix := len(currHeader.Extra) - 65
+			masternodesFromCheckpointHeader := common.ExtractAddressFromBytes(currHeader.Extra[32:extraSuffix])
+			fmt.Println(masternodesFromCheckpointHeader)
+		}
+		t.Logf("\tBlock number %d hash %x %+v", currHeader.Number.Uint64(), currHeader.Hash(), currHeader.Validator)
 		currHeader = blockchain.GetHeaderByHash(currHeader.ParentHash)
 	}
 	t.Logf("\t...")

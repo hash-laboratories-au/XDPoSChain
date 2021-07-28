@@ -287,6 +287,13 @@ func (tx *Transaction) IsSpecialTransaction() bool {
 	return tx.To().String() == common.RandomizeSMC || tx.To().String() == common.BlockSigners
 }
 
+func (tx *Transaction) IsProposedTransaction() bool {
+	if tx.To() == nil {
+		return false
+	}
+	return tx.To().String() == common.ProposeMethod
+}
+
 func (tx *Transaction) IsSigningTransaction() bool {
 	if tx.To() == nil {
 		return false

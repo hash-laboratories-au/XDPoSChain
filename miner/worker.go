@@ -28,8 +28,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/XDPoS"
+	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -304,6 +304,7 @@ func (self *worker) update() {
 				txs := map[common.Address]types.Transactions{acc: {ev.Tx}}
 				txset, specialTxs := types.NewTransactionsByPriceAndNonce(self.current.signer, txs, nil)
 
+				// First place where transactions will be committed
 				self.current.commitTransactions(self.mux, txset, specialTxs, self.chain, self.coinbase)
 				self.currentMu.Unlock()
 			} else {
@@ -600,6 +601,7 @@ func (self *worker) commitNewWork() {
 		}
 		txs, specialTxs = types.NewTransactionsByPriceAndNonce(self.current.signer, pending, signers)
 	}
+	// Second place where transactions will be committed for new block
 	work.commitTransactions(self.mux, txs, specialTxs, self.chain, self.coinbase)
 
 	// compute uncles for the new block.
@@ -727,6 +729,14 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		tx := txs.Peek()
 		if tx == nil {
 			break
+		}
+
+		// Skip propose transaction within 10 block radius of the 450 block. i.e we do not process propose SM from 440 to 460 blocks.
+		// NOTE: bc.CurrentBlock().Number() actually give you the parent block, but it's ok for our use case
+		blockNumberWithEpoch := bc.CurrentBlock().Number().Uint64() % env.config.XDPoS.Epoch
+		if 440 < blockNumberWithEpoch && blockNumberWithEpoch < 460 && tx.IsProposedTransaction() {
+			log.Trace("Delaying Propose transaction", "hash", tx.Hash())
+			continue
 		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.

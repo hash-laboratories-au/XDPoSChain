@@ -287,11 +287,18 @@ func (tx *Transaction) IsSpecialTransaction() bool {
 	return tx.To().String() == common.RandomizeSMC || tx.To().String() == common.BlockSigners
 }
 
-func (tx *Transaction) IsProposedTransaction() bool {
+func (tx *Transaction) IsProposedOrResignTransaction() bool {
 	if tx.To() == nil {
 		return false
 	}
-	return tx.To().String() == common.ProposeMethod
+	b := (tx.To().String() == common.MasternodeVotingSMC)
+
+	if !b {
+		return b
+	}
+
+	method := common.ToHex(tx.Data()[0:4])
+	return (method == common.ProposeMethod) || (method == common.ResignMethod)
 }
 
 func (tx *Transaction) IsSigningTransaction() bool {

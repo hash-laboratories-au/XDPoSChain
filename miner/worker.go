@@ -734,7 +734,8 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		// Skip propose transaction within 10 block radius of the 450 block. i.e we do not process propose SM from 440 to 460 blocks.
 		// NOTE: bc.CurrentBlock().Number() actually give you the parent block, but it's ok for our use case
 		blockNumberWithEpoch := bc.CurrentBlock().Number().Uint64() % env.config.XDPoS.Epoch
-		if 440 < blockNumberWithEpoch && blockNumberWithEpoch < 460 && tx.IsProposedTransaction() {
+		isVotingTransaction, _ := tx.IsVotingTransaction()
+		if 440 < blockNumberWithEpoch && blockNumberWithEpoch < 460 && isVotingTransaction {
 			log.Trace("Delaying Propose transaction", "hash", tx.Hash())
 			continue
 		}

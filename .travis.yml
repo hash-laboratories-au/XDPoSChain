@@ -24,7 +24,7 @@ jobs:
       env:
         - GO111MODULE=on
       script:
-        - go run build/ci.go test -coverage $TEST_PACKAGES
+        - go run build/ci.go test -v -coverage $TEST_PACKAGES
     
     - stage: build
       os: linux
@@ -33,7 +33,7 @@ jobs:
       env:
         - GO111MODULE=on
       script:
-        - go run build/ci.go test -coverage $TEST_PACKAGES
+        - go run build/ci.go test -v -coverage $TEST_PACKAGES
 
     - stage: build
       if: type = pull_request
@@ -44,6 +44,6 @@ jobs:
       env:
         - GO111MODULE=on
       script:
-        - go run build/ci.go test -coverage $TEST_PACKAGES
+        - go run build/ci.go test -v -coverage $TEST_PACKAGES
 
     

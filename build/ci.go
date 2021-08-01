@@ -223,7 +223,7 @@ func doTest(cmdline []string) {
 		verbose  = flag.Bool("v", false, "Whether to log verbosely")
 	)
 	flag.CommandLine.Parse(cmdline)
-
+	fmt.Printf("Running tests with command line %v \n", cmdline)
 	// Configure the toolchain.
 	tc := build.GoToolchain{GOARCH: *arch, CC: *cc}
 	if *dlgo {
@@ -246,6 +246,7 @@ func doTest(cmdline []string) {
 	if len(flag.CommandLine.Args()) > 0 {
 		packages = flag.CommandLine.Args()
 	}
+	fmt.Printf("Running tests for %v \n", packages)
 	gotest.Args = append(gotest.Args, packages...)
 	build.MustRun(gotest)
 }

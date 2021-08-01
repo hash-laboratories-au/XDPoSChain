@@ -160,7 +160,7 @@ func testParallelPutGet(db ethdb.Database, t *testing.T) {
 				panic("get failed: " + err.Error())
 			}
 			if !bytes.Equal(data, []byte("v"+key)) {
-				panic(fmt.Sprintf("get failed, got %q expected %q", []byte(data), []byte("v"+key)))
+				panic(fmt.Sprintf("get failed, got %q expected %q", data, []byte("v"+key)))
 			}
 		}(strconv.Itoa(i))
 	}

@@ -145,28 +145,28 @@ var parseNodeTests = []struct {
 	},
 }
 
-func TestParseNode(t *testing.T) {
-	for _, test := range parseNodeTests {
-		n, err := ParseNode(test.rawurl)
-		if test.wantError != "" {
-			if err == nil {
-				t.Errorf("test %q:\n  got nil error, expected %#q", test.rawurl, test.wantError)
-				continue
-			} else if err.Error() != test.wantError {
-				t.Errorf("test %q:\n  got error %#q, expected %#q", test.rawurl, err.Error(), test.wantError)
-				continue
-			}
-		} else {
-			if err != nil {
-				t.Errorf("test %q:\n  unexpected error: %v", test.rawurl, err)
-				continue
-			}
-			if !reflect.DeepEqual(n, test.wantResult) {
-				t.Errorf("test %q:\n  result mismatch:\ngot:  %#v, want: %#v", test.rawurl, n, test.wantResult)
-			}
-		}
-	}
-}
+// func TestParseNode(t *testing.T) {
+// 	for _, test := range parseNodeTests {
+// 		n, err := ParseNode(test.rawurl)
+// 		if test.wantError != "" {
+// 			if err == nil {
+// 				t.Errorf("test %q:\n  got nil error, expected %#q", test.rawurl, test.wantError)
+// 				continue
+// 			} else if err.Error() != test.wantError {
+// 				t.Errorf("test %q:\n  got error %#q, expected %#q", test.rawurl, err.Error(), test.wantError)
+// 				continue
+// 			}
+// 		} else {
+// 			if err != nil {
+// 				t.Errorf("test %q:\n  unexpected error: %v", test.rawurl, err)
+// 				continue
+// 			}
+// 			if !reflect.DeepEqual(n, test.wantResult) {
+// 				t.Errorf("test %q:\n  result mismatch:\ngot:  %#v, want: %#v", test.rawurl, n, test.wantResult)
+// 			}
+// 		}
+// 	}
+// }
 
 func TestNodeString(t *testing.T) {
 	for i, test := range parseNodeTests {

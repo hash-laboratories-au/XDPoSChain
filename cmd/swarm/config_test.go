@@ -232,7 +232,7 @@ func TestFileOverrides(t *testing.T) {
 	}
 
 	if info.HiveParams.CallInterval != 6000000000 {
-		t.Fatalf("Expected HiveParams CallInterval to be %d, got %d", uint64(6000000000), uint64(info.HiveParams.CallInterval))
+		t.Fatalf("Expected HiveParams CallInterval to be %d, got %d", uint64(6000000000), info.HiveParams.CallInterval)
 	}
 
 	if info.Swap.Params.Strategy.AutoCashInterval != 600*time.Second {
@@ -444,7 +444,7 @@ func TestCmdLineOverridesFile(t *testing.T) {
 	}
 
 	if info.HiveParams.CallInterval != 6000000000 {
-		t.Fatalf("Expected HiveParams CallInterval to be %d, got %d", uint64(6000000000), uint64(info.HiveParams.CallInterval))
+		t.Fatalf("Expected HiveParams CallInterval to be %d, got %d", uint64(6000000000), info.HiveParams.CallInterval)
 	}
 
 	if info.Swap.Params.Strategy.AutoCashInterval != 600*time.Second {

@@ -27,7 +27,7 @@ import (
 func (Address) Generate(rand *rand.Rand, size int) reflect.Value {
 	var id Address
 	for i := 0; i < len(id); i++ {
-		id[i] = byte(uint8(rand.Intn(255)))
+		id[i] = uint8(rand.Intn(255))
 	}
 	return reflect.ValueOf(id)
 }

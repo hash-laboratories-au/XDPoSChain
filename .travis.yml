@@ -24,7 +24,8 @@ jobs:
       env:
         - GO111MODULE=on
       script:
-        - make all && go run build/ci.go test -v -coverage $TEST_PACKAGES
+        - go run build/ci.go install
+        - go run build/ci.go test -v -coverage $TEST_PACKAGES
     
     # - stage: build
     #   os: linux

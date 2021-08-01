@@ -22,7 +22,7 @@ jobs:
       dist: bionic
       go: 1.16.x
       env:
-        - GO111MODULE=on
+        - GO111MODULE=auto
       script:
         - go run build/ci.go install
         - go run build/ci.go test -v -coverage $TEST_PACKAGES

@@ -4,16 +4,16 @@ sudo: false
 jobs:
   include:
     # This builder only tests code linters on latest version of Go
-    # - stage: lint
-    #   os: linux
-    #   dist: bionic
-    #   go: 1.16.x
-    #   env:
-    #     - lint
-    #   git:
-    #     submodules: false # avoid cloning ethereum/tests
-    #   script:
-    #     - go run build/ci.go lint
+    - stage: lint
+      os: linux
+      dist: bionic
+      go: 1.16.x
+      env:
+        - lint
+      git:
+        submodules: false # avoid cloning ethereum/tests
+      script:
+        - go run build/ci.go lint
 
     # These builders run the tests
     - stage: build
@@ -24,16 +24,15 @@ jobs:
       env:
         - GO111MODULE=auto
       script:
-        - go run build/ci.go install
         - go run build/ci.go test -v -coverage $TEST_PACKAGES
     
-    # - stage: build
-    #   os: linux
-    #   dist: bionic
-    #   go: 1.15.x
-    #   env:
-    #     - GO111MODULE=on
-    #   script:
-    #     - go run build/ci.go test -v -coverage $TEST_PACKAGES
+    - stage: build
+      os: linux
+      dist: bionic
+      go: 1.15.x
+      env:
+        - GO111MODULE=auto
+      script:
+        - go run build/ci.go test -v -coverage $TEST_PACKAGES
 
     

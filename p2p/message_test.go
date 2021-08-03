@@ -49,6 +49,31 @@ func ExampleMsgPipe() {
 	// msg: 5, 0101
 }
 
+func ExampleMsgPipe1() {
+	type newBlockData struct {
+		a int
+	}
+	rw1, rw2 := MsgPipe()
+
+	b := newBlockData{a: 10}
+	go func() {
+		Send(rw1, 8, &b)
+		rw1.Close()
+	}()
+
+	for {
+		msg, err := rw2.ReadMsg()
+		if err != nil {
+			break
+		}
+		var data newBlockData
+		msg.Decode(&data)
+		fmt.Printf("msg: %d, %d\n", msg.Code, data.a)
+	}
+	// Output:
+	// msg: 8, 10
+}
+
 func TestMsgPipeUnblockWrite(t *testing.T) {
 loop:
 	for i := 0; i < 100; i++ {

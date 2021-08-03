@@ -299,13 +299,13 @@ func (w *wizard) makeGenesis() {
 		contractBackend.ForEachStorageAt(ctx, multiSignWalletTeamAddr, nil, f)
 		// Team balance.
 		balance := big.NewInt(0) // 20 billion
-        balance.Add(balance, big.NewInt(30*1000*1000))
-        balance.Mul(balance, big.NewInt(1000000000000000000))
-        subBalance := big.NewInt(0) // i * 50k
-        subBalance.Add(subBalance, big.NewInt(int64(len(signers))*10*1000*1000))
-        subBalance.Mul(subBalance, big.NewInt(1000000000000000000))
-        balance.Sub(balance, subBalance) // 12m - i * 50k
-        genesis.Alloc[common.HexToAddress(common.TeamAddr)] = core.GenesisAccount{
+		balance.Add(balance, big.NewInt(30*1000*1000))
+		balance.Mul(balance, big.NewInt(1000000000000000000))
+		subBalance := big.NewInt(0) // i * 50k
+		subBalance.Add(subBalance, big.NewInt(int64(len(signers))*10*1000*1000))
+		subBalance.Mul(subBalance, big.NewInt(1000000000000000000))
+		balance.Sub(balance, subBalance) // 12m - i * 50k
+		genesis.Alloc[common.HexToAddress(common.TeamAddr)] = core.GenesisAccount{
 			Balance: balance,
 			Code:    code,
 			Storage: storage,
@@ -314,7 +314,7 @@ func (w *wizard) makeGenesis() {
 		fmt.Println()
 		fmt.Println("What is swap wallet address for fund 37.47Billion XDC?")
 		swapAddr := *w.readAddress()
-		baseBalance := big.NewInt(0) // 14.5Billion 
+		baseBalance := big.NewInt(0) // 14.5Billion
 		baseBalance.Add(baseBalance, big.NewInt(3747*1000*1000*10))
 		baseBalance.Mul(baseBalance, big.NewInt(1000000000000000000))
 		genesis.Alloc[swapAddr] = core.GenesisAccount{

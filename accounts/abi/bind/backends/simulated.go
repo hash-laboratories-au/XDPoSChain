@@ -112,11 +112,13 @@ func (b *SimulatedBackend) rollback() {
 func (b *SimulatedBackend) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	//fmt.Println("debug ", b.blockchain.CurrentBlock().Number(), blockNumber, contract)
 
 	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
+	//fmt.Println(statedb, contract)
 	return statedb.GetCode(contract), nil
 }
 
@@ -253,6 +255,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call ethereum.CallMs
 		b.pendingState.RevertToSnapshot(snapshot)
 
 		if err != nil || failed {
+			fmt.Println(err, failed)
 			return false
 		}
 		return true
@@ -269,6 +272,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call ethereum.CallMs
 	// Reject the transaction as invalid if it still fails at the highest allowance
 	if hi == cap {
 		if !executable(hi) {
+			fmt.Println(123)
 			return 0, errGasEstimationFailed
 		}
 	}

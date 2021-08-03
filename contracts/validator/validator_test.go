@@ -18,6 +18,7 @@ package validator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -39,10 +40,12 @@ var (
 	acc2Key, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
 	acc3Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	acc4Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee04aefe388d1e14474d32c45c72ce7b7a")
+	acc5Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee04aefe388d1e14474d32c45c72ce7b7b")
 	acc1Addr   = crypto.PubkeyToAddress(acc1Key.PublicKey)
 	acc2Addr   = crypto.PubkeyToAddress(acc2Key.PublicKey)
 	acc3Addr   = crypto.PubkeyToAddress(acc3Key.PublicKey)
 	acc4Addr   = crypto.PubkeyToAddress(acc4Key.PublicKey)
+	acc5Addr   = crypto.PubkeyToAddress(acc5Key.PublicKey)
 )
 
 func TestValidator(t *testing.T) {
@@ -95,6 +98,7 @@ func TestRewardBalance(t *testing.T) {
 	// validatorAddr, _, baseValidator, err := contract.DeployXDCValidator(transactOpts, contractBackend, big.NewInt(50000), big.NewInt(99), big.NewInt(100), big.NewInt(100))
 	validatorCap := new(big.Int)
 	validatorCap.SetString("50000000000000000000000", 10)
+	fmt.Println(3)
 	validatorAddr, _, baseValidator, err := contractValidator.DeployXDCValidator(
 		transactOpts,
 		contractBackend,
@@ -110,13 +114,19 @@ func TestRewardBalance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
+	fmt.Println(4)
+
 	contractBackend.Commit()
+	fmt.Println(5)
 
 	// Propose master node acc3Addr.
 	opts := bind.NewKeyedTransactor(acc4Key)
 	opts.Value = new(big.Int).SetUint64(50000)
+	fmt.Println(6)
 	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
-	acc4Validator.Propose(acc3Addr)
+	fmt.Println(7)
+
+	// acc4Validator.Propose(acc3Addr)
 	contractBackend.Commit()
 
 	totalVote := 0
@@ -175,9 +185,107 @@ func TestRewardBalance(t *testing.T) {
 		t.Errorf("reward total %v - %v", totalReward, afterReward)
 	}
 
+	candidates, err := acc4Validator.GetCandidates()
+	if err != nil {
+		t.Fatalf("can't get candidates: %v", err)
+	}
+	for _, it := range candidates {
+		cap, _ := acc4Validator.GetCandidateCap(it)
+		t.Log("candidate", it.String(), "cap", cap)
+		owner, _ := acc4Validator.GetCandidateOwner(it)
+		t.Log("candidate", it.String(), "validator owner", owner.String())
+	}
+
 }
 
-func GetRewardBalancesRate(foudationWalletAddr common.Address, masterAddr common.Address, totalReward *big.Int, validator *contractValidator.XDCalidator) (map[common.Address]*big.Int, error) {
+func TestPropose(t *testing.T) {
+	contractBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
+		acc1Addr: {Balance: new(big.Int).SetUint64(10000000)},
+		acc2Addr: {Balance: new(big.Int).SetUint64(10000000)},
+		acc4Addr: {Balance: new(big.Int).SetUint64(10000000)},
+	})
+
+	transactOpts := bind.NewKeyedTransactor(acc1Key)
+
+	// validatorAddr, _, baseValidator, err := contract.DeployXDCValidator(transactOpts, contractBackend, big.NewInt(50000), big.NewInt(99), big.NewInt(100), big.NewInt(100))
+	validatorCap := new(big.Int)
+	validatorCap.SetString("50000000000000000000000", 10)
+	validatorAddr, _, _, err := contractValidator.DeployXDCValidator(
+		transactOpts,
+		contractBackend,
+		[]common.Address{addr},
+		[]*big.Int{validatorCap},
+		addr,
+		big.NewInt(50000),
+		big.NewInt(1),
+		big.NewInt(99),
+		big.NewInt(100),
+		big.NewInt(100),
+	)
+
+	validator5Addr, _, _, err := contractValidator.DeployXDCValidator(
+		transactOpts,
+		contractBackend,
+		[]common.Address{acc5Addr},
+		[]*big.Int{validatorCap},
+		acc5Addr,
+		big.NewInt(50000),
+		big.NewInt(1),
+		big.NewInt(99),
+		big.NewInt(100),
+		big.NewInt(100),
+	)
+
+	if err != nil {
+		t.Fatalf("can't deploy root registry: %v", err)
+	}
+	contractBackend.Commit()
+
+	// Propose master node acc3Addr.
+	opts := bind.NewKeyedTransactor(acc4Key)
+	opts.Value = new(big.Int).SetUint64(50000)
+	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
+	//tx, err := acc4Validator.Propose(acc3Addr)
+	//fmt.Println("tx", tx, "err", err)
+	//if err != nil {
+	//	t.Fatalf("fail to propose: %v", err)
+	//}
+	//acc44Validator, _ := NewValidator(opts, validator5Addr, contractBackend)
+	//_, err = acc4Validator.Propose(acc5Addr)
+	//if err != nil {
+	//	t.Fatalf("fail to propose: %v", err)
+	//}
+	contractBackend.Commit()
+	fmt.Println("acc3Addr", common.Address(acc3Addr).Hex())
+	fmt.Println("acc5Addr", common.Address(acc5Addr).Hex())
+	fmt.Println("validatorAddr", common.Address(validatorAddr).Hex())
+	fmt.Println("validator5Addr", common.Address(validator5Addr).Hex())
+
+	candidates, err := acc4Validator.GetCandidates()
+	if err != nil {
+		t.Fatalf("can't get candidates: %v", err)
+	}
+	for _, it := range candidates {
+		cap, _ := acc4Validator.GetCandidateCap(it)
+		t.Log("candidate", it.String(), "cap", cap)
+		owner, _ := acc4Validator.GetCandidateOwner(it)
+		t.Log("candidate", it.String(), "validator owner", owner.String())
+	}
+	/*
+		candidates, err = acc44Validator.GetCandidates()
+		if err != nil {
+			t.Fatalf("can't get candidates: %v", err)
+		}
+		for _, it := range candidates {
+			cap, _ := acc44Validator.GetCandidateCap(it)
+			t.Log("candidate", it.String(), "cap", cap)
+			owner, _ := acc44Validator.GetCandidateOwner(it)
+			t.Log("candidate", it.String(), "validator owner", owner.String())
+		}
+	*/
+}
+
+func GetRewardBalancesRate(foudationWalletAddr common.Address, masterAddr common.Address, totalReward *big.Int, validator *contractValidator.XDCValidator) (map[common.Address]*big.Int, error) {
 	owner := GetCandidatesOwnerBySigner(validator, masterAddr)
 	balances := make(map[common.Address]*big.Int)
 	rewardMaster := new(big.Int).Mul(totalReward, new(big.Int).SetInt64(common.RewardMasterPercent))

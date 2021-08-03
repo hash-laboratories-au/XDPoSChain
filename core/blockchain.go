@@ -143,7 +143,7 @@ type BlockChain struct {
 
 	badBlocks   *lru.Cache // Bad block cache
 	IPCEndpoint string
-	Client      *ethclient.Client // Global ipc client instance.
+	Client      bind.ContractBackend // Global ipc client instance.
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -1220,15 +1220,24 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.usedGas += usedGas
 		stats.report(chain, i, bc.stateCache.TrieDB().Size())
 		if bc.chainConfig.XDPoS != nil {
-			// epoch block
-			if status == CanonStatTy && (chain[i].NumberU64()%bc.chainConfig.XDPoS.Epoch) == 0 {
-				CheckpointCh <- 1
-			}
-			// prepare set of masternodes for the next epoch
-			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-				err := bc.UpdateM1()
-				if err != nil {
-					log.Crit("Error when update masternodes set. Stopping node", "err", err)
+			if status == CanonStatTy {
+				// epoch block
+				if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
+					CheckpointCh <- 1
+				}
+				// prepare set of masternodes for the next epoch
+				if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+					err := bc.UpdateM1()
+					if err != nil {
+						log.Crit("Error when update masternodes set. Stopping node", "err", err)
+					}
+				}
+			} else {
+				if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+					// copy from canon block signer
+					if err != nil {
+						log.Crit("Error when update masternodes set. Stopping node", "err", err)
+					}
 				}
 			}
 		}
@@ -1811,7 +1820,7 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // Get current IPC Client.
-func (bc *BlockChain) GetClient() (*ethclient.Client, error) {
+func (bc *BlockChain) GetClient() (bind.ContractBackend, error) {
 	if bc.Client == nil {
 		// Inject ipc client global instance.
 		client, err := ethclient.Dial(bc.IPCEndpoint)
@@ -1836,7 +1845,8 @@ func (bc *BlockChain) UpdateM1() error {
 	if err != nil {
 		return err
 	}
-	addr := common.HexToAddress(common.MasternodeVotingSMC)
+	// TODO
+	addr := common.HexToAddress("xdc35658f7b2a9E7701e65E7a654659eb1C481d1dC5")
 	validator, err := contractValidator.NewXDCValidator(addr, client)
 	if err != nil {
 		return err
@@ -1867,6 +1877,7 @@ func (bc *BlockChain) UpdateM1() error {
 		log.Info("Ordered list of masternode candidates")
 		for _, m := range ms {
 			log.Info("", "address", m.Address.String(), "stake", m.Stake)
+			fmt.Println(m.Address.String(), m.Stake)
 		}
 		// update masternodes
 		log.Info("Updating new set of masternodes")

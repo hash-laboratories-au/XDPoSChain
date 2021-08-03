@@ -1434,13 +1434,13 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 			CheckpointCh <- 1
 		}
 		// prepare set of masternodes for the next epoch
-		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-			err := bc.UpdateM1()
-			if err != nil {
-				log.Error("Error when update masternodes set. Stopping node", "err", err)
-				os.Exit(1)
-			}
+		//if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+		err := bc.UpdateM1()
+		if err != nil {
+			log.Error("Error when update masternodes set. Stopping node", "err", err)
+			os.Exit(1)
 		}
+		//}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if status == CanonStatTy && bc.CurrentBlock().Hash() == block.Hash() {
@@ -1877,7 +1877,7 @@ func (bc *BlockChain) UpdateM1() error {
 		log.Info("Ordered list of masternode candidates")
 		for _, m := range ms {
 			log.Info("", "address", m.Address.String(), "stake", m.Stake)
-			fmt.Println(m.Address.String(), m.Stake)
+			fmt.Println("Candidates Address:", m.Address.String(), m.Stake)
 		}
 		// update masternodes
 		log.Info("Updating new set of masternodes")

@@ -245,11 +245,11 @@ func TestPropose(t *testing.T) {
 	opts := bind.NewKeyedTransactor(acc4Key)
 	opts.Value = new(big.Int).SetUint64(50000)
 	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
-	//tx, err := acc4Validator.Propose(acc3Addr)
-	//fmt.Println("tx", tx, "err", err)
-	//if err != nil {
-	//	t.Fatalf("fail to propose: %v", err)
-	//}
+	tx, err := acc4Validator.Propose(acc3Addr)
+	fmt.Println("tx", tx, "err", err)
+	if err != nil {
+		t.Fatalf("fail to propose: %v", err)
+	}
 	//acc44Validator, _ := NewValidator(opts, validator5Addr, contractBackend)
 	//_, err = acc4Validator.Propose(acc5Addr)
 	//if err != nil {

@@ -210,7 +210,7 @@ func TestPropose(t *testing.T) {
 	// validatorAddr, _, baseValidator, err := contract.DeployXDCValidator(transactOpts, contractBackend, big.NewInt(50000), big.NewInt(99), big.NewInt(100), big.NewInt(100))
 	validatorCap := new(big.Int)
 	validatorCap.SetString("50000000000000000000000", 10)
-	validatorAddr, _, _, err := contractValidator.DeployXDCValidator(
+	validatorAddress, _, _, err := contractValidator.DeployXDCValidator(
 		transactOpts,
 		contractBackend,
 		[]common.Address{addr},
@@ -222,44 +222,25 @@ func TestPropose(t *testing.T) {
 		big.NewInt(100),
 		big.NewInt(100),
 	)
-
-	validator5Addr, _, _, err := contractValidator.DeployXDCValidator(
-		transactOpts,
-		contractBackend,
-		[]common.Address{acc5Addr},
-		[]*big.Int{validatorCap},
-		acc5Addr,
-		big.NewInt(50000),
-		big.NewInt(1),
-		big.NewInt(99),
-		big.NewInt(100),
-		big.NewInt(100),
-	)
-
 	if err != nil {
-		t.Fatalf("can't deploy root registry: %v", err)
+		t.Fatalf("fail to deploy xdc validator: %v", err)
 	}
+
 	contractBackend.Commit()
 
 	// Propose master node acc3Addr.
 	opts := bind.NewKeyedTransactor(acc4Key)
 	opts.Value = new(big.Int).SetUint64(50000)
-	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
+	acc4Validator, _ := NewValidator(opts, validatorAddress, contractBackend)
 	tx, err := acc4Validator.Propose(acc3Addr)
 	fmt.Println("tx", tx, "err", err)
 	if err != nil {
 		t.Fatalf("fail to propose: %v", err)
 	}
-	//acc44Validator, _ := NewValidator(opts, validator5Addr, contractBackend)
-	//_, err = acc4Validator.Propose(acc5Addr)
-	//if err != nil {
-	//	t.Fatalf("fail to propose: %v", err)
-	//}
+
 	contractBackend.Commit()
 	fmt.Println("acc3Addr", common.Address(acc3Addr).Hex())
-	fmt.Println("acc5Addr", common.Address(acc5Addr).Hex())
-	fmt.Println("validatorAddr", common.Address(validatorAddr).Hex())
-	fmt.Println("validator5Addr", common.Address(validator5Addr).Hex())
+	fmt.Println("validatorAddress", common.Address(validatorAddress).Hex())
 
 	candidates, err := acc4Validator.GetCandidates()
 	if err != nil {
@@ -271,18 +252,6 @@ func TestPropose(t *testing.T) {
 		owner, _ := acc4Validator.GetCandidateOwner(it)
 		t.Log("candidate", it.String(), "validator owner", owner.String())
 	}
-	/*
-		candidates, err = acc44Validator.GetCandidates()
-		if err != nil {
-			t.Fatalf("can't get candidates: %v", err)
-		}
-		for _, it := range candidates {
-			cap, _ := acc44Validator.GetCandidateCap(it)
-			t.Log("candidate", it.String(), "cap", cap)
-			owner, _ := acc44Validator.GetCandidateOwner(it)
-			t.Log("candidate", it.String(), "validator owner", owner.String())
-		}
-	*/
 }
 
 func GetRewardBalancesRate(foudationWalletAddr common.Address, masterAddr common.Address, totalReward *big.Int, validator *contractValidator.XDCValidator) (map[common.Address]*big.Int, error) {

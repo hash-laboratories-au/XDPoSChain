@@ -76,7 +76,7 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 	transactOpts := bind.NewKeyedTransactor(acc1Key)
 	validatorCap := new(big.Int)
 	validatorCap.SetString("50000000000000000000000", 10)
-	validatorAddr, validator, err := validator.DeployValidator(transactOpts, contractBackend, []common.Address{acc3Addr}, []*big.Int{validatorCap}, acc3Addr)
+	validatorAddr, _, err := validator.DeployValidator(transactOpts, contractBackend, []common.Address{acc3Addr}, []*big.Int{validatorCap}, acc3Addr)
 	if err != nil {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
@@ -106,44 +106,7 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 	acc4Validator.Propose(acc3Addr)
 
 	contractBackend.Commit()
-	/*
-		totalVote := 0
-		type logCap struct {
-			Addr    string
-			Balance int
-		}
-		acc1Opts := bind.NewKeyedTransactor(acc1Key)
-		acc2Opts := bind.NewKeyedTransactor(acc2Key)
-		//acc4Opts := bind.NewKeyedTransactor(acc4Key)
 
-		accounts := []*bind.TransactOpts{acc1Opts, acc2Opts}
-		logCaps := make(map[int]*logCap)
-		for i := 0; i <= 10; i++ {
-			rand.Seed(time.Now().UTC().UnixNano())
-			randIndex := rand.Intn(len(accounts))
-			randCap := rand.Intn(10) * 100
-			if randCap <= 0 {
-				randCap = 1000
-			}
-			totalVote += randCap
-			accounts[randIndex].Value = new(big.Int).SetInt64(int64(randCap))
-			validator, err := validator.NewValidator(accounts[randIndex], validatorAddr, contractBackend)
-			if err != nil {
-				t.Fatalf("can't get current validator: %v", err)
-			}
-			 (acc3Addr)
-			contractBackend.Commit()
-			logCaps[i] = &logCap{accounts[randIndex].From.String(), randCap}
-		}
-		fmt.Println("totalVote", totalVote, logCaps[1])
-		callOpts := new(bind.CallOpts)
-		voters, err := baseValidator.GetVoters(callOpts, acc3Addr)
-		fmt.Println(voters, err)
-		for _, voter := range voters {
-			voteCap, _ := baseValidator.GetVoterCap(callOpts, acc3Addr, voter)
-			fmt.Println(voter.Hash().Hex(), voteCap)
-		}
-	*/
 	return contractBackend
 
 }

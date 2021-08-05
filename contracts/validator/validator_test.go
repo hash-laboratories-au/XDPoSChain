@@ -18,7 +18,6 @@ package validator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -98,7 +97,6 @@ func TestRewardBalance(t *testing.T) {
 	// validatorAddr, _, baseValidator, err := contract.DeployXDCValidator(transactOpts, contractBackend, big.NewInt(50000), big.NewInt(99), big.NewInt(100), big.NewInt(100))
 	validatorCap := new(big.Int)
 	validatorCap.SetString("50000000000000000000000", 10)
-	fmt.Println(3)
 	validatorAddr, _, baseValidator, err := contractValidator.DeployXDCValidator(
 		transactOpts,
 		contractBackend,
@@ -114,15 +112,14 @@ func TestRewardBalance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
-
 	contractBackend.Commit()
 
 	// Propose master node acc3Addr.
 	opts := bind.NewKeyedTransactor(acc4Key)
 	opts.Value = new(big.Int).SetUint64(50000)
 	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
+	acc4Validator.Propose(acc3Addr)
 
-	// acc4Validator.Propose(acc3Addr)
 	contractBackend.Commit()
 
 	totalVote := 0
@@ -192,62 +189,6 @@ func TestRewardBalance(t *testing.T) {
 		t.Log("candidate", it.String(), "validator owner", owner.String())
 	}
 
-}
-
-func TestPropose(t *testing.T) {
-	contractBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
-		acc1Addr: {Balance: new(big.Int).SetUint64(10000000)},
-		acc2Addr: {Balance: new(big.Int).SetUint64(10000000)},
-		acc4Addr: {Balance: new(big.Int).SetUint64(10000000)},
-	})
-
-	transactOpts := bind.NewKeyedTransactor(acc1Key)
-
-	// validatorAddr, _, baseValidator, err := contract.DeployXDCValidator(transactOpts, contractBackend, big.NewInt(50000), big.NewInt(99), big.NewInt(100), big.NewInt(100))
-	validatorCap := new(big.Int)
-	validatorCap.SetString("50000000000000000000000", 10)
-	validatorAddress, _, _, err := contractValidator.DeployXDCValidator(
-		transactOpts,
-		contractBackend,
-		[]common.Address{addr},
-		[]*big.Int{validatorCap},
-		addr,
-		big.NewInt(50000),
-		big.NewInt(1),
-		big.NewInt(99),
-		big.NewInt(100),
-		big.NewInt(100),
-	)
-	if err != nil {
-		t.Fatalf("fail to deploy xdc validator: %v", err)
-	}
-
-	contractBackend.Commit()
-
-	// Propose master node acc3Addr.
-	opts := bind.NewKeyedTransactor(acc4Key)
-	opts.Value = new(big.Int).SetUint64(50000)
-	acc4Validator, _ := NewValidator(opts, validatorAddress, contractBackend)
-	tx, err := acc4Validator.Propose(acc3Addr)
-	fmt.Println("tx", tx, "err", err)
-	if err != nil {
-		t.Fatalf("fail to propose: %v", err)
-	}
-
-	contractBackend.Commit()
-	fmt.Println("acc3Addr", common.Address(acc3Addr).Hex())
-	fmt.Println("validatorAddress", common.Address(validatorAddress).Hex())
-
-	candidates, err := acc4Validator.GetCandidates()
-	if err != nil {
-		t.Fatalf("can't get candidates: %v", err)
-	}
-	for _, it := range candidates {
-		cap, _ := acc4Validator.GetCandidateCap(it)
-		t.Log("candidate", it.String(), "cap", cap)
-		owner, _ := acc4Validator.GetCandidateOwner(it)
-		t.Log("candidate", it.String(), "validator owner", owner.String())
-	}
 }
 
 func GetRewardBalancesRate(foudationWalletAddr common.Address, masterAddr common.Address, totalReward *big.Int, validator *contractValidator.XDCValidator) (map[common.Address]*big.Int, error) {

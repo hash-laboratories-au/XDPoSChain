@@ -253,7 +253,6 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call ethereum.CallMs
 		b.pendingState.RevertToSnapshot(snapshot)
 
 		if err != nil || failed {
-			fmt.Println(err, failed)
 			return false
 		}
 		return true

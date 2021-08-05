@@ -154,7 +154,6 @@ func (c *BoundContract) Call(opts *CallOpts, result interface{}, method string, 
 			if code, err = c.caller.CodeAt(ctx, c.address, nil); err != nil {
 				return err
 			} else if len(code) == 0 {
-				fmt.Println("this one 157", code, c.address)
 				return ErrNoCode
 			}
 		}

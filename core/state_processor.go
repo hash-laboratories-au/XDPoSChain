@@ -17,7 +17,6 @@
 package core
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 
@@ -151,7 +150,6 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
 	// Apply the transaction to the current state (included in the env)
-	fmt.Println("msg:", msg.Gas(), msg.GasPrice(), msg.Value())
 	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
 		return nil, 0, err

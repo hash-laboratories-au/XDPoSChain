@@ -242,9 +242,6 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts))
 		b.header.Bloom = CreateBloom(receipts)
-		if receipts[0].Status == 111 {
-			b.header.ReceiptHash = common.HexToHash("51cfedaec0025c46bfce48d2091c584063fca2680be42258f1db5c88b30d209d")
-		}
 	}
 
 	if len(uncles) == 0 {

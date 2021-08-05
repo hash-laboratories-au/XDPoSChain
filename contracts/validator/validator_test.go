@@ -114,17 +114,13 @@ func TestRewardBalance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
-	fmt.Println(4)
 
 	contractBackend.Commit()
-	fmt.Println(5)
 
 	// Propose master node acc3Addr.
 	opts := bind.NewKeyedTransactor(acc4Key)
 	opts.Value = new(big.Int).SetUint64(50000)
-	fmt.Println(6)
 	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
-	fmt.Println(7)
 
 	// acc4Validator.Propose(acc3Addr)
 	contractBackend.Commit()

@@ -1011,6 +1011,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	} else {
 		status = SideStatTy
 	}
+	fmt.Println("batch write")
 	if err := batch.Write(); err != nil {
 		return NonStatTy, err
 	}
@@ -1025,6 +1026,8 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		engine.CacheSigner(block.Header().Hash(), block.Transactions())
 	}
 	bc.futureBlocks.Remove(block.Hash())
+	fmt.Println("status ", status, bc.chainConfig.XDPoS)
+
 	return status, nil
 }
 

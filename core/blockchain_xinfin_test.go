@@ -96,9 +96,9 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 
 func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
 	block := createXDPoSTestBlock(parentBlock.Hash().Hex(),
-		blockCoinBase, 105, blockNum, blockNum, nil, 0,
+		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
 		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		common.HexToHash("c99c095e53ff1afe3b86750affd13c7550a2d24d51fb8e41b3c3ef2ea8274bcc"),
+		common.HexToHash("7fbb8ccbb5cccdadabca11ca50a0fc6ce8ba2146f3b9f5a5694bc2cad08f31ab"),
 	)
 	err := blockchain.InsertBlock(block)
 	if err != nil {
@@ -108,14 +108,14 @@ func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, par
 }
 
 func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction, t *testing.T) *types.Block {
-	state, err := blockchain.State()
-	root := state.IntermediateRoot(true)
+	//state, err := blockchain.State()
+	//root := state.IntermediateRoot(true)
 	block := createXDPoSTestBlock(parentBlock.Hash().Hex(),
 		blockCoinBase, 105, blockNum, blockNum, txs, 26032,
 		"51cfedaec0025c46bfce48d2091c584063fca2680be42258f1db5c88b30d209d",
-		root,
+		common.HexToHash("56652c1956cef026c56100ae9a4084bdd172e144a5227df2efa55137323ea391"),
 	)
-	err = blockchain.InsertBlock(block)
+	err := blockchain.InsertBlock(block)
 	if err != nil {
 		t.Fatalf("%v at %d", err, blockNum)
 	}
@@ -204,6 +204,8 @@ func TestPropose(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println("validator balance", state.GetBalance(common.HexToAddress("35658f7b2a9E7701e65E7a654659eb1C481d1dC5")))
+	fmt.Println("account1 balance", state.GetBalance(acc1Addr))
+	fmt.Println("account2 balance", state.GetBalance(acc2Addr))
 	fmt.Println("account3 balance", state.GetBalance(acc3Addr))
 	fmt.Println("account4 balance", state.GetBalance(acc4Addr))
 
@@ -303,6 +305,7 @@ func newXDPoSCanonical(n int) (ethdb.Database, *BlockChain, error) {
 		Alloc: GenesisAlloc{
 			acc1Addr: {Balance: accountBalance},
 			acc2Addr: {Balance: accountBalance},
+			acc3Addr: {Balance: accountBalance},
 			acc4Addr: {Balance: accountBalance},
 		},
 	}

@@ -36,6 +36,18 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+var (
+	acc1Key, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+	acc2Key, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
+	acc3Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	acc4Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee04aefe388d1e14474d32c45c72ce7b7a")
+	acc1Addr   = crypto.PubkeyToAddress(acc1Key.PublicKey)
+	acc2Addr   = crypto.PubkeyToAddress(acc2Key.PublicKey)
+	acc3Addr   = crypto.PubkeyToAddress(acc3Key.PublicKey)
+	acc4Addr   = crypto.PubkeyToAddress(acc4Key.PublicKey)
+	chainID    = int64(1337)
+)
+
 // Test fork of length N starting from block i
 func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, comparator func(td1, td2 *big.Int)) {
 	// Copy old chain up to #i into a new db
@@ -1356,8 +1368,8 @@ func TestForkAt450(t *testing.T) {
 func TestNewXDPoS(t *testing.T) {
 	_, blockchain, _ := newXDPoSCanonical(0, true)
 	// t.Logf("is chainConfig.XDPoS=nil? %t", blockchain.chainConfig.XDPoS == nil)
-	block := blockchain.GetBlockByNumber(0)
-	t.Logf("%+v", block)
+	// block := blockchain.GetBlockByNumber(0)
+	// t.Logf("%+v", block)
 	b := createXDPoSTestBlock(blockchain.Genesis().Hash().Hex(),
 		"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
 		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
@@ -1373,8 +1385,36 @@ func TestNewXDPoS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	t.Logf("%v", blockchain.GetBlockByNumber(1))
+	// t.Logf("%v", blockchain.GetBlockByNumber(1))
 
+}
+func TestNewBlockWithTx(t *testing.T) {
+	_, blockchain, _ := newXDPoSCanonical(0, true)
+	state, err := blockchain.State()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	fmt.Println("Root1: ", state.IntermediateRoot(true).Hex())
+	fmt.Println("Nonce1: ", state.GetNonce(acc4Addr))
+	b := createXDPoSTestBlockWithOneTx(blockchain, blockchain.Genesis().Hash().Hex(),
+		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		"0x0000000000000000000000000000000000000000",
+		"d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101",
+		105,
+		1,
+		1,
+		*toyTx(t),
+	)
+	err = blockchain.InsertBlock(b)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	state, err = blockchain.State()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	fmt.Println("Root2: ", state.IntermediateRoot(true).Hex())
+	fmt.Println("Nonce2: ", state.GetNonce(acc4Addr))
 }
 func TestXDPoS450(t *testing.T) {
 	var err error
@@ -1490,6 +1530,39 @@ func createXDPoSTestBlock(ParentHash, UncleHash, TxHash, ReceiptHash, Root, Coin
 	return block
 }
 
+func createXDPoSTestBlockWithOneTx(bc *BlockChain, ParentHash, Root, Coinbase, extraSubstring string, Difficulty, Number, Time int, Tx types.Transaction) *types.Block {
+	extraByte, _ := hex.DecodeString(extraSubstring)
+	header := types.Header{
+		ParentHash:  common.HexToHash(ParentHash),
+		UncleHash:   common.HexToHash("00"),
+		TxHash:      common.HexToHash("00"),
+		ReceiptHash: common.HexToHash("00"),
+		Root:        common.HexToHash(Root),
+		Coinbase:    common.HexToAddress(Coinbase),
+		Difficulty:  big.NewInt(int64(Difficulty)),
+		Number:      big.NewInt(int64(Number)),
+		GasLimit:    21000,
+		GasUsed:     21000,
+		Time:        big.NewInt(int64(Time)),
+		Extra:       extraByte,
+	}
+	gp := new(GasPool).AddGas(header.GasLimit)
+	state, err := bc.State()
+	if err != nil {
+		fmt.Printf("%v when creating block", err)
+	}
+	usedGas := uint64(0)
+	receipt, _, err := ApplyTransaction(bc.hc.config, bc, &header.Coinbase, gp, state, &header, &Tx, &usedGas, vm.Config{})
+	if err != nil {
+		fmt.Printf("%v when creating block", err)
+	}
+	header.GasUsed = usedGas
+	root := state.IntermediateRoot(true)
+	header.Root = root
+	block := types.NewBlock(&header, []*types.Transaction{&Tx}, nil, []*types.Receipt{receipt})
+	return block
+}
+
 // newXDPoSCanonical creates a chain database, and injects a deterministic canonical
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
@@ -1528,4 +1601,20 @@ func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
 	headers := makeHeaderChain(genesis.Header(), n, engine, db, canonicalSeed)
 	_, err := blockchain.InsertHeaderChain(headers, 1)
 	return db, blockchain, err
+}
+
+func toyTx(t *testing.T) *types.Transaction {
+	data := []byte{}
+	gasPrice := big.NewInt(int64(0))
+	gasLimit := uint64(21000)
+	amount := big.NewInt(int64(0))
+	nonce := uint64(0)
+	to := acc3Addr
+	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signedTX
 }

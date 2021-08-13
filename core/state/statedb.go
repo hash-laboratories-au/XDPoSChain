@@ -535,11 +535,16 @@ func (self *StateDB) GetRefund() uint64 {
 func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 	for addr := range s.stateObjectsDirty {
 		stateObject := s.stateObjects[addr]
+		//ss, _ := json.MarshalIndent(stateObject, "", "\t")
+		//fmt.Println(ss)
 		if stateObject.suicided || (deleteEmptyObjects && stateObject.empty()) {
 			s.deleteStateObject(stateObject)
+			//fmt.Println("deleteStateObject")
 		} else {
+			//fmt.Println("before updateStateObject", s.trie.Hash().Hex(), "stateObject", stateObject.address.Hex())
 			stateObject.updateRoot(s.db)
 			s.updateStateObject(stateObject)
+			//fmt.Println("after updateStateObject", s.trie.Hash().Hex())
 		}
 	}
 	// Invalidate journal because reverting across transactions is not allowed.

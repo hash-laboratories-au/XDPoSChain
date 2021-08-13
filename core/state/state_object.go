@@ -106,12 +106,17 @@ type Account struct {
 
 // newObject creates a state object.
 func newObject(db *StateDB, address common.Address, data Account, onDirty func(addr common.Address)) *stateObject {
+	if address.Hex() == "xdc2dc379A654b8d14d24C162CC81Ff07851d0a0b84" {
+		panic(1)
+	}
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
 	if data.CodeHash == nil {
 		data.CodeHash = emptyCodeHash
 	}
+	fmt.Println("Create New Object", "address", address.Hex(), "addrHash", crypto.Keccak256Hash(address[:]).Hex(), "data.Root", data.Root.Hex())
+
 	return &stateObject{
 		db:            db,
 		address:       address,

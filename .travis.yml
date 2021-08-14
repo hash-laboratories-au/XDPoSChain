@@ -38,4 +38,4 @@ jobs:
     
     - stage: deploy
       script:
-        - ./build/denet.sh
+        - ./build/devet.sh

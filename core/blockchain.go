@@ -1011,7 +1011,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	} else {
 		status = SideStatTy
 	}
-	fmt.Println("batch write")
 	if err := batch.Write(); err != nil {
 		return NonStatTy, err
 	}
@@ -1026,7 +1025,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		engine.CacheSigner(block.Header().Hash(), block.Transactions())
 	}
 	bc.futureBlocks.Remove(block.Hash())
-	fmt.Println("status ", status, bc.chainConfig.XDPoS)
 
 	return status, nil
 }
@@ -1442,6 +1440,7 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 		//if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
 		err := bc.UpdateM1()
 		if err != nil {
+			fmt.Println("updateM1", err)
 			log.Error("Error when update masternodes set. Stopping node", "err", err)
 			os.Exit(1)
 		}
@@ -1842,6 +1841,7 @@ func (bc *BlockChain) GetClient() (bind.ContractBackend, error) {
 }
 
 func (bc *BlockChain) UpdateM1() error {
+	fmt.Println("bc.CurrentHeader()", bc.CurrentHeader())
 	if bc.Config().XDPoS == nil {
 		return ErrNotXDPoS
 	}
@@ -1866,6 +1866,7 @@ func (bc *BlockChain) UpdateM1() error {
 	var ms []XDPoS.Masternode
 	for _, candidate := range candidates {
 		v, err := validator.GetCandidateCap(opts, candidate)
+		fmt.Println("Candidates Address:", candidate.Hex(), v)
 		if err != nil {
 			return err
 		}
@@ -1884,10 +1885,10 @@ func (bc *BlockChain) UpdateM1() error {
 		log.Info("Ordered list of masternode candidates")
 		for _, m := range ms {
 			log.Info("", "address", m.Address.String(), "stake", m.Stake)
-			fmt.Println("Candidates Address:", m.Address.String(), m.Stake)
 		}
 		// update masternodes
 		log.Info("Updating new set of masternodes")
+		return nil
 		// get block header
 		header := bc.CurrentHeader()
 		var maxMasternodes int

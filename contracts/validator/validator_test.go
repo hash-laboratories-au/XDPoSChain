@@ -18,6 +18,7 @@ package validator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -90,8 +91,8 @@ func TestRewardBalance(t *testing.T) {
 		acc4Addr: {Balance: new(big.Int).SetUint64(10000000)},
 	})
 	acc1Opts := bind.NewKeyedTransactor(acc1Key)
-	acc2Opts := bind.NewKeyedTransactor(acc2Key)
-	accounts := []*bind.TransactOpts{acc1Opts, acc2Opts}
+	//acc2Opts := bind.NewKeyedTransactor(acc2Key)
+	accounts := []*bind.TransactOpts{acc1Opts}
 	transactOpts := bind.NewKeyedTransactor(acc1Key)
 
 	// validatorAddr, _, baseValidator, err := contract.DeployXDCValidator(transactOpts, contractBackend, big.NewInt(50000), big.NewInt(99), big.NewInt(100), big.NewInt(100))
@@ -118,9 +119,14 @@ func TestRewardBalance(t *testing.T) {
 	opts := bind.NewKeyedTransactor(acc4Key)
 	opts.Value = new(big.Int).SetUint64(50000)
 	acc4Validator, _ := NewValidator(opts, validatorAddr, contractBackend)
-	acc4Validator.Propose(acc3Addr)
+	//acc4Validator.Propose(acc3Addr)
+	// tx, err := acc4Validator.Propose(acc3Addr)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// fmt.Println(tx)
 
-	contractBackend.Commit()
+	//contractBackend.Commit()
 
 	totalVote := 0
 	type logCap struct {
@@ -128,10 +134,10 @@ func TestRewardBalance(t *testing.T) {
 		Balance int
 	}
 	logCaps := make(map[int]*logCap)
-	for i := 0; i <= 10; i++ {
+	for i := 0; i <= 0; i++ {
 		rand.Seed(time.Now().UTC().UnixNano())
 		randIndex := rand.Intn(len(accounts))
-		randCap := rand.Intn(10) * 1000
+		randCap := 500
 		if randCap <= 0 {
 			randCap = 1000
 		}
@@ -141,7 +147,11 @@ func TestRewardBalance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("can't get current validator: %v", err)
 		}
-		validator.Vote(acc3Addr)
+		tx, err := validator.Vote(acc3Addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Println(tx)
 		contractBackend.Commit()
 		logCaps[i] = &logCap{accounts[randIndex].From.String(), randCap}
 	}

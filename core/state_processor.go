@@ -17,7 +17,6 @@
 package core
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 
@@ -168,7 +167,6 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common
 	// based on the eip phase, we're passing wether the root touch-delete accounts.
 	receipt := types.NewReceipt(root, failed, *usedGas)
 	receipt.TxHash = tx.Hash()
-	fmt.Println("receipt.TxHash", receipt.TxHash.Hex())
 	receipt.GasUsed = gas
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To() == nil {

@@ -18,9 +18,9 @@ package core_test
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
-	"strconv"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/XDPoS"
 	"github.com/ethereum/go-ethereum/contracts/validator"
+	contractValidator "github.com/ethereum/go-ethereum/contracts/validator/contract"
 	"github.com/ethereum/go-ethereum/core"
 	. "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -59,7 +60,7 @@ var (
 	chainID    = int64(1337)
 )
 
-func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
+func getCommonBackend(t *testing.T) (common.Address, *backends.SimulatedBackend) {
 
 	fmt.Println("acc1Addr", acc1Addr.Hash().Hex())
 	fmt.Println("acc2Addr", acc2Addr.Hash().Hex())
@@ -72,38 +73,90 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 		acc3Addr: {Balance: new(big.Int).SetUint64(10000000000)},
 		acc4Addr: {Balance: new(big.Int).SetUint64(10000000000)},
 	})
-	contractBackend.Commit()
+	//contractBackend.Commit()
 
 	transactOpts := bind.NewKeyedTransactor(acc1Key)
 	validatorCap3 := new(big.Int)
-	validatorCap3.SetString("20000000000000000000000003", 10)
+	validatorCap3.SetString("50000000000000000000000", 10)
 	validatorCap4 := new(big.Int)
 	validatorCap4.SetString("20000000000000000000000004", 10)
-	validatorAddr, _, err := validator.DeployValidator(transactOpts, contractBackend, []common.Address{acc3Addr, acc4Addr}, []*big.Int{validatorCap3, validatorCap4}, acc1Addr)
+	/*
+		validatorAddr, _, err := validator.DeployValidator(
+			transactOpts, contractBackend,
+			[]common.Address{acc3Addr, acc4Addr},
+			[]*big.Int{validatorCap3, validatorCap4},
+			acc3Addr,
+		)
+	*/
+	validatorAddr, _, _, err := contractValidator.DeployXDCValidator(
+		transactOpts,
+		contractBackend,
+		[]common.Address{acc3Addr, acc4Addr},
+		[]*big.Int{validatorCap3, validatorCap4},
+		acc3Addr,
+		big.NewInt(50000),
+		big.NewInt(1),
+		big.NewInt(99),
+		big.NewInt(100),
+		big.NewInt(100),
+	)
+	if err != nil {
+		t.Fatalf("can't deploy root registry: %v", err)
+	}
 	fmt.Println("validatorAddr: ", validatorAddr.Hex())
 	if err != nil {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
 	contractBackend.Commit()
 
-	opts := bind.NewKeyedTransactor(acc4Key)
-	opts.Value = new(big.Int).SetUint64(10000)
-	acc4Validator, _ := validator.NewValidator(opts, validatorAddr, contractBackend)
-	acc4Validator.Propose(acc3Addr)
+	//opts := bind.NewKeyedTransactor(acc4Key)
+	//opts.Value = new(big.Int).SetUint64(10000)
+	//acc4Validator, _ := validator.NewValidator(opts, validatorAddr, contractBackend)
+	//acc4Validator.Propose(acc3Addr)
 
-	contractBackend.Commit()
+	//contractBackend.Commit()
 
-	return contractBackend
+	return validatorAddr, contractBackend
 
 }
 
-func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
+func insertBlock0(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
 	block := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),
 		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
 		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		common.HexToHash("7fbb8ccbb5cccdadabca11ca50a0fc6ce8ba2146f3b9f5a5694bc2cad08f31ab"),
+		common.HexToHash("d596671ee88adb9b14be44eaca0e94929bad42ac476bb04db1c15a3021ddd49a"),
+	)
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		t.Fatalf("%v at %d", err, blockNum)
+	}
+	return block
+}
+
+func insertBlock1(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
+	block := createXDPoSTestBlock(
+		blockchain,
+		parentBlock.Hash().Hex(),
+		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
+		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		common.HexToHash("d596671ee88adb9b14be44eaca0e94929bad42ac476bb04db1c15a3021ddd49a"),
+	)
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		t.Fatalf("%v at %d", err, blockNum)
+	}
+	return block
+}
+
+func insertBlockAfter(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
+	block := createXDPoSTestBlock(
+		blockchain,
+		parentBlock.Hash().Hex(),
+		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
+		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		common.HexToHash("964a1ff2dddbd5fee9ac5e5442473fe01000bbe8c422819bc5227debc23a63ab"),
 	)
 	err := blockchain.InsertBlock(block)
 	if err != nil {
@@ -118,9 +171,9 @@ func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, 
 	block := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),
-		blockCoinBase, 105, blockNum, blockNum, txs, txs[0].Gas(),
-		"51cfedaec0025c46bfce48d2091c584063fca2680be42258f1db5c88b30d209d",
-		common.HexToHash("56652c1956cef026c56100ae9a4084bdd172e144a5227df2efa55137323ea391"),
+		blockCoinBase, 105, blockNum, blockNum*10, txs, txs[0].Gas(),
+		"64c9ee68988c98c83550fa66a2b196ed07cf4bfef7bb1d93a0a736acc51cb36d",
+		common.HexToHash("6a8cc62c446d8a3be0d371dfb21a5bde0a08db4b4e4d69c0b44e0e893e27029d"),
 	)
 	err := blockchain.InsertBlock(block)
 	if err != nil {
@@ -152,11 +205,11 @@ func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, 
 */
 func transferTx(t *testing.T) *types.Transaction {
 	data := []byte{}
-	gasPrice := big.NewInt(int64(0))
+	gasPrice := big.NewInt(int64(1))
 	gasLimit := uint64(21000)
-	amount := big.NewInt(int64(1))
+	amount := big.NewInt(int64(999))
 	nonce := uint64(0)
-	to := acc3Addr
+	to := common.HexToAddress("35658f7b2a9E7701e65E7a654659eb1C481d1dC5")
 	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
 
 	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
@@ -167,34 +220,60 @@ func transferTx(t *testing.T) *types.Transaction {
 }
 
 func voteTX(t *testing.T) *types.Transaction {
-	data := []byte("0x6dd7d8ea00000000000000000000000071562b71999873db5b286df957af199ec94617f7")
-	gasPrice := big.NewInt(int64(2500))
-	gasLimit := uint64(2000000)
-	amountInt, _ := strconv.ParseInt("10000000000000000000000000", 10, 64)
-	amount := big.NewInt(amountInt)
+	data := common.Hex2Bytes("6dd7d8ea00000000000000000000000071562b71999873db5b286df957af199ec94617f7")
+	gasPrice := big.NewInt(int64(1))
+	gasLimit := uint64(22680)
+	amountInt := new(big.Int)
+	amount, ok := amountInt.SetString("500", 10)
+	if !ok {
+		t.Fatal("big int init failed")
+	}
 	nonce := uint64(0)
 	to := common.HexToAddress("0x35658f7b2a9e7701e65e7a654659eb1c481d1dc5")
+	fmt.Println("to", to.Hex())
 	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	ss, _ := json.MarshalIndent(tx, "", "\t")
+	fmt.Println(string(ss))
 
 	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
 	if err != nil {
 		t.Fatal(err)
 	}
+	s, _ := json.MarshalIndent(signedTX, "", "\t")
+	fmt.Println(string(s))
+
 	return signedTX
 }
-
-func proposeTX(t *testing.T) *types.Transaction {
-	data, err := hex.DecodeString("012679510000000000000000000000000d3ab14bbad3d99f4203bd7a11acb94882050e7e")
+func voteFun(validatorAddr common.Address, contractBackend *backends.SimulatedBackend, t *testing.T) {
+	acc1Opts := bind.NewKeyedTransactor(acc1Key)
+	acc1Opts.Value = new(big.Int).SetInt64(int64(500))
+	validator, err := validator.NewValidator(acc1Opts, validatorAddr, contractBackend)
+	if err != nil {
+		t.Fatalf("can't get current validator: %v", err)
+	}
+	tx, err := validator.Vote(acc3Addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Data: ", data)
-	gasPrice := big.NewInt(int64(2500))
+	fmt.Println(tx)
+	contractBackend.Commit()
+}
+
+func proposeTX(t *testing.T) *types.Transaction {
+	data := common.Hex2Bytes("012679510000000000000000000000000d3ab14bbad3d99f4203bd7a11acb94882050e7e")
+	//data := []byte{}
+	fmt.Println("data", string(data[:]))
+	gasPrice := big.NewInt(int64(0))
 	gasLimit := uint64(22680)
-	amountInt, _ := strconv.ParseInt("10000000000000000000000824", 10, 64)
-	amount := big.NewInt(amountInt)
+
+	amountInt := new(big.Int)
+	amount, ok := amountInt.SetString("11000000000000000000000000", 10)
+	if !ok {
+		t.Fatal("big int init failed")
+	}
 	nonce := uint64(0)
-	to := common.HexToAddress("0x35658f7b2a9e7701e65e7a654659eb1c481d1dc5")
+	to := common.HexToAddress("xdc35658f7b2a9e7701e65e7a654659eb1c481d1dc5")
 	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
 
 	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
@@ -204,10 +283,11 @@ func proposeTX(t *testing.T) *types.Transaction {
 	return signedTX
 }
 func TestPropose(t *testing.T) {
-	_, blockchain, _ := newXDPoSCanonical(0)
+	//_, blockchain, _ := newXDPoSCanonical(0)
 
-	backend := getCommonBackend(t)
-
+	//validatorAddr, backend := getCommonBackend(t)
+	_, backend := getCommonBackend(t)
+	blockchain := backend.GetBlockChain()
 	state, _ := blockchain.State()
 	fmt.Println("account1 balance", state.GetBalance(acc1Addr))
 	fmt.Println("account2 balance", state.GetBalance(acc2Addr))
@@ -215,69 +295,44 @@ func TestPropose(t *testing.T) {
 	fmt.Println("account4 balance", state.GetBalance(acc4Addr))
 	blockchain.Client = backend
 	block := blockchain.Genesis()
-	for i := 1; i < 10; i++ {
-		blockCoinBase := fmt.Sprintf("0x1110000000000000000000000000000000000%3d", i)
-		b := insertBlock(blockchain, i, blockCoinBase, block, t)
+	for i := 1; i <= 2; i++ {
+		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
+		fmt.Println(blockCoinBase)
+		var b *types.Block
+		if i == 1 {
+			b = insertBlock0(blockchain, i, blockCoinBase, block, t)
+		} else {
+			b = insertBlock1(blockchain, i, blockCoinBase, block, t)
+		}
 		block = b
 	}
-	t.Logf("Inserting block with propose at 10...")
-	block10CoinBase := "0x2220000000000000000000000000000000000010"
-	tx := proposeTX(t)
+	t.Logf("Inserting block with propose at 3...")
+	block3CoinBase := "0x2220000000000000000000000000000000000003"
+	tx := voteTX(t)
+	block = insertBlockTxs(blockchain, 3, block3CoinBase, block, []*types.Transaction{tx}, t)
+
+	//voteFun(validatorAddr, backend, t)
 
 	fmt.Println("validator balance", state.GetBalance(common.HexToAddress("35658f7b2a9E7701e65E7a654659eb1C481d1dC5")))
-	insertBlockTxs(blockchain, 10, block10CoinBase, block, []*types.Transaction{tx}, t)
 	state, err := blockchain.State()
 	if err != nil {
 		t.Fatal(err)
 	}
+	backend.Commit()
 	fmt.Println("validator balance", state.GetBalance(common.HexToAddress("35658f7b2a9E7701e65E7a654659eb1C481d1dC5")))
 	fmt.Println("account1 balance", state.GetBalance(acc1Addr))
 	fmt.Println("account2 balance", state.GetBalance(acc2Addr))
 	fmt.Println("account3 balance", state.GetBalance(acc3Addr))
 	fmt.Println("account4 balance", state.GetBalance(acc4Addr))
 
-	for i := 10; i < 11; i++ {
+	for i := 4; i < 5; i++ {
 		blockCoinBase := fmt.Sprintf("0x1110000000000000000000000000000000000%3d", i)
-		b := insertBlock(blockchain, i, blockCoinBase, block, t)
+		b := insertBlockAfter(blockchain, i, blockCoinBase, block, t)
 		block = b
 	}
+	return
 	if blockchain.GetBlockByNumber(10).Header().Coinbase.Hex() != fmt.Sprintf("xdc2220000000000000000000000000000000000010") {
 		t.Fatalf("Canonical chain 10 should keep the old 450 block, new insert should remain as uncle %s", blockchain.GetBlockByNumber(10).Header().Coinbase.Hex())
-	}
-}
-
-func TestUpdateM1(t *testing.T) {
-	_, blockchain, _ := newXDPoSCanonical(0)
-	backend := getCommonBackend(t)
-	blockchain.Client = backend
-
-	block := blockchain.Genesis()
-	t.Logf("Inserting 450 blocks...")
-	for i := 1; i <= 450; i++ {
-		blockCoinBase := fmt.Sprintf("0x1110000000000000000000000000000000000%3d", i)
-		b := insertBlock(blockchain, i, blockCoinBase, block, t)
-		block = b
-
-	}
-	t.Logf("Inserting a longer chain forking at 450...")
-	block449 := blockchain.GetBlockByNumber(449)
-
-	block450CoinBase := "0x2220000000000000000000000000000000000450"
-	block450 := insertBlock(blockchain, 450, block450CoinBase, block449, t)
-
-	if blockchain.GetBlockByNumber(450).Header().Coinbase.Hex() == fmt.Sprintf("0x1110000000000000000000000000000000000450") {
-		t.Fatalf("Canonical chain 450 should keep the old 450 block, new insert should remain as uncle")
-	}
-
-	block451CoinBase := "0x2220000000000000000000000000000000000451"
-
-	insertBlock(blockchain, 451, block451CoinBase, block450, t)
-
-	if blockchain.GetBlockByNumber(450).Header().Coinbase.Hex() != "xdc2220000000000000000000000000000000000450" {
-		t.Fatalf("block chain should update to new block based on longest chain theory")
-	}
-	if blockchain.GetBlockByNumber(451).Header().Coinbase.Hex() != "xdc2220000000000000000000000000000000000451" {
-		t.Fatalf("block chain should update to new block based on longest chain theory %s", blockchain.GetBlockByNumber(451).Header().Coinbase.Hex())
 	}
 }
 
@@ -297,7 +352,7 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 		Coinbase:    common.HexToAddress(Coinbase),
 		Difficulty:  big.NewInt(int64(Difficulty)),
 		Number:      big.NewInt(int64(Number)),
-		GasLimit:    12000000,
+		GasLimit:    1200000000,
 		Time:        big.NewInt(int64(Time)),
 		Extra:       extraByte,
 		GasUsed:     gasUsed,
@@ -308,28 +363,32 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 	if len(txs) == 0 {
 		block = types.NewBlockWithHeader(&header)
 	} else {
-		gp := new(GasPool).AddGas(header.GasLimit)
+
 		state, err := bc.State()
-		code := state.GetCode(common.HexToAddress("0x35658f7b2a9E7701e65E7a654659eb1C481d1dC5"))
+		code := state.GetCode(common.HexToAddress("xdc35658f7b2a9E7701e65E7a654659eb1C481d1dC5"))
 		fmt.Println("state code:", code)
-		usedGas := uint64(0)
+		//gp := new(GasPool).AddGas(header.GasLimit)
+		//usedGas := uint64(0)
 		root := state.IntermediateRoot(true)
 		fmt.Println("Before Apply Root ===========================", root.Hex())
-		receipt, _, err := ApplyTransaction(bc.Config(), bc, nil, gp, state, &header, txs[0], &usedGas, vm.Config{})
-		//fmt.Println(receipt)
-		//receipt := &types.Receipt{Status: 1, CumulativeGasUsed: gasUsed, TxHash: common.HexToHash(TxHash)}
+		header.TxHash = common.HexToHash("c9cc29258dd0fdbb4cc77f1d213bf1b50063f28906dcc2eb4ef66eda4622fe4a")
+		//receipt, _, err := ApplyTransaction(bc.Config(), bc, nil, gp, state, &header, txs[0], &usedGas, vm.Config{})
+		//fmt.Println("receipt", receipt)
 		if err != nil {
 			fmt.Printf("%v when creating block", err)
 		}
+		receipt := &types.Receipt{Status: 1, CumulativeGasUsed: 22680}
+		fmt.Println("receipt", receipt)
 		//header.GasUsed = usedGas
 		state, err = bc.State()
-		root = state.IntermediateRoot(true)
-		fmt.Println("After Apply Root ================================", root.Hex())
+		//root = state.IntermediateRoot(true)
+		//fmt.Println("After Apply Root ================================", root.Hex())
 		//header.Root = root
-		header.Root = common.HexToHash("a8227328df2db70e0e9022979a27a695422f617d190d51083a02bf206e3682af")
+		//header.Root = root
+		//header.Root = common.HexToHash("413a27146ef7591ab6137451d36809cb565ef548599227bd073a2a8bfebcdf9e")
+		header.UncleHash = types.CalcUncleHash(nil)
 		block = types.NewBlock(&header, txs, nil, []*types.Receipt{receipt})
 		//root = state.IntermediateRoot(true)
-		//fmt.Println("Root", root.Hex())
 	}
 	return block
 }
@@ -340,10 +399,10 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 func newXDPoSCanonical(n int) (ethdb.Database, *BlockChain, error) {
 	// Initialize a fresh chain with only a genesis block
 	accountBalance := new(big.Int)
-	accountBalance.SetString("10000000000000000000000000", 10)
+	accountBalance.SetString("3000000000000000000000000000", 10)
 	gspec := &Genesis{
 		Config:   params.TestChainConfig,
-		GasLimit: 12000000,
+		GasLimit: 1200000000,
 		Alloc: GenesisAlloc{
 			acc1Addr: {Balance: accountBalance},
 			acc2Addr: {Balance: accountBalance},

@@ -115,7 +115,6 @@ func newObject(db *StateDB, address common.Address, data Account, onDirty func(a
 	if data.CodeHash == nil {
 		data.CodeHash = emptyCodeHash
 	}
-	fmt.Println("Create New Object", "address", address.Hex(), "addrHash", crypto.Keccak256Hash(address[:]).Hex(), "data.Root", data.Root.Hex())
 
 	return &stateObject{
 		db:            db,

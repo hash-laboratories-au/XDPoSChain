@@ -1353,7 +1353,6 @@ func (bc *BlockChain) getResultBlock(block *types.Block, verifiedM2 bool) (*Resu
 	// error if it fails.
 	var parent = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	state, err := state.New(parent.Root(), bc.stateCache)
-	fmt.Println("root 2", state.IntermediateRoot(true).Hex())
 	if err != nil {
 		return nil, err
 	}
@@ -1367,7 +1366,6 @@ func (bc *BlockChain) getResultBlock(block *types.Block, verifiedM2 bool) (*Resu
 		return nil, err
 	}
 	// Validate the state using the default validator
-	fmt.Println("root 1", state.IntermediateRoot(true).Hex())
 	err = bc.Validator().ValidateState(block, parent, state, receipts, usedGas)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
@@ -1437,14 +1435,14 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 			CheckpointCh <- 1
 		}
 		// prepare set of masternodes for the next epoch
-		//if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-		err := bc.UpdateM1()
-		if err != nil {
-			fmt.Println("updateM1", err)
-			log.Error("Error when update masternodes set. Stopping node", "err", err)
-			os.Exit(1)
+		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+			err := bc.UpdateM1()
+			if err != nil {
+				fmt.Println("updateM1", err)
+				log.Error("Error when update masternodes set. Stopping node", "err", err)
+				os.Exit(1)
+			}
 		}
-		//}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if status == CanonStatTy && bc.CurrentBlock().Hash() == block.Hash() {
@@ -1841,7 +1839,6 @@ func (bc *BlockChain) GetClient() (bind.ContractBackend, error) {
 }
 
 func (bc *BlockChain) UpdateM1() error {
-	fmt.Println("bc.CurrentHeader()", bc.CurrentHeader())
 	if bc.Config().XDPoS == nil {
 		return ErrNotXDPoS
 	}
@@ -1849,11 +1846,12 @@ func (bc *BlockChain) UpdateM1() error {
 	log.Info("It's time to update new set of masternodes for the next epoch...")
 	// get masternodes information from smart contract
 	client, err := bc.GetClient()
+
 	if err != nil {
 		return err
 	}
 	// TODO
-	addr := common.HexToAddress("xdc35658f7b2a9E7701e65E7a654659eb1C481d1dC5")
+	addr := common.HexToAddress(common.MasternodeVotingSMC)
 	validator, err := contractValidator.NewXDCValidator(addr, client)
 	if err != nil {
 		return err

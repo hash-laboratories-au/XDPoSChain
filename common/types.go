@@ -28,10 +28,9 @@ import (
 )
 
 const (
-	HashLength    = 32
-	AddressLength = 20
-	//MasternodeVotingSMC = "xdc0000000000000000000000000000000000000088"
-	MasternodeVotingSMC = "xdc35658f7b2a9E7701e65E7a654659eb1C481d1dC5"
+	HashLength          = 32
+	AddressLength       = 20
+	MasternodeVotingSMC = "xdc0000000000000000000000000000000000000088"
 	BlockSigners        = "xdc0000000000000000000000000000000000000089"
 	RandomizeSMC        = "xdc0000000000000000000000000000000000000090"
 	FoudationAddr       = "xdc746249C61f5832C5eEd53172776b460491bDcd5C"

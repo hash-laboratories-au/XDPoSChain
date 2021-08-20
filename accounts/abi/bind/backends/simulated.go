@@ -66,7 +66,16 @@ type SimulatedBackend struct {
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	database, _ := ethdb.NewMemDatabase()
-	genesis := core.Genesis{Config: params.AllXDPoSProtocolChanges, Alloc: alloc}
+	XDPoSConfig := params.XDPoSConfig{
+		Period:              2,
+		Epoch:               900,
+		Reward:              250,
+		RewardCheckpoint:    900,
+		Gap:                 897,
+		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+	}
+	config := &params.ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &XDPoSConfig}
+	genesis := core.Genesis{Config: config, Alloc: alloc}
 	genesis.MustCommit(database)
 	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, XDPoS.NewFaker(database), vm.Config{})
 

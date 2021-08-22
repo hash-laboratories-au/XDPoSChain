@@ -4,19 +4,19 @@ sudo: false
 jobs:
   include:
     # This builder only tests code linters on latest version of Go
-    # - stage: lint
-    #   os: linux
-    #   dist: bionic
-    #   go: 1.16.x
-    #   env:
-    #     - lint
-    #   git:
-    #     submodules: false # avoid cloning ethereum/tests
-    #   script:
-    #     - go run build/ci.go lint
+    - stage: lint
+      os: linux
+      dist: bionic
+      go: 1.16.x
+      env:
+        - lint
+      git:
+        submodules: false # avoid cloning ethereum/tests
+      script:
+        - go run build/ci.go lint
 
     # These builders run the tests
-    # - stage: build
+    # - stage: test
     #   os: linux
     #   arch: amd64
     #   dist: bionic
@@ -26,7 +26,7 @@ jobs:
     #   script:
     #     - go run build/ci.go test -coverage $TEST_PACKAGES
 
-    # - stage: build
+    # - stage: test
     #   os: linux
     #   dist: bionic
     #   go: 1.15.x
@@ -35,7 +35,13 @@ jobs:
     #   script:
     #     - go run build/ci.go test -coverage $TEST_PACKAGES
     
-    
-    - stage: deploy
+    - stage: Build, push and upgrade on devnet
+      if: type != pull_request AND branch = dev-upgrade AND repo= XinFinOrg/XDPoSChain
+      services:
+        - docker
+      install: skip
       script:
-        - ./build/devnet.sh
+        # - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+        - docker build -t xinfinorg/xinfin-dev-net:$TRAVIS_COMMIT -f build/Dockerfile .
+        - docker push xinfinorg/xinfin-dev-net:$TRAVIS_COMMIT
+        - ./build/devnet.sh $TRAVIS_COMMIT

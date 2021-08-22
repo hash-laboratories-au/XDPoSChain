@@ -1018,6 +1018,15 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	// Set new head.
 	if status == CanonStatTy {
 		bc.insert(block)
+
+		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+			err := bc.UpdateM1()
+			if err != nil {
+				fmt.Println("updateM1", err)
+				log.Error("Error when update masternodes set. Stopping node", "err", err)
+				os.Exit(1)
+			}
+		}
 	}
 	// save cache BlockSigners
 	if bc.chainConfig.XDPoS != nil && bc.chainConfig.IsTIPSigning(block.Number()) {
@@ -1435,14 +1444,16 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 			CheckpointCh <- 1
 		}
 		// prepare set of masternodes for the next epoch
-		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-			err := bc.UpdateM1()
-			if err != nil {
-				fmt.Println("updateM1", err)
-				log.Error("Error when update masternodes set. Stopping node", "err", err)
-				os.Exit(1)
+		/*
+			if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+				err := bc.UpdateM1()
+				if err != nil {
+					fmt.Println("updateM1", err)
+					log.Error("Error when update masternodes set. Stopping node", "err", err)
+					os.Exit(1)
+				}
 			}
-		}
+		*/
 	}
 	// Append a single chain head event if we've progressed the chain
 	if status == CanonStatTy && bc.CurrentBlock().Hash() == block.Hash() {
@@ -1584,11 +1595,22 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	for i := len(newChain) - 1; i >= 0; i-- {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
+
 		// write lookup entries for hash based transaction/receipt searches
 		if err := WriteTxLookupEntries(bc.db, newChain[i]); err != nil {
 			return err
 		}
 		addedTxs = append(addedTxs, newChain[i].Transactions()...)
+
+		//Update M1
+		if (newChain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+			err := bc.UpdateM1()
+			if err != nil {
+				fmt.Println("updateM1", err)
+				log.Error("Error when update masternodes set. Stopping node", "err", err)
+				os.Exit(1)
+			}
+		}
 	}
 	// calculate the difference between deleted and added transactions
 	diff := types.TxDifference(deletedTxs, addedTxs)
@@ -1864,7 +1886,6 @@ func (bc *BlockChain) UpdateM1() error {
 	var ms []XDPoS.Masternode
 	for _, candidate := range candidates {
 		v, err := validator.GetCandidateCap(opts, candidate)
-		fmt.Println("Candidates Address:", candidate.Hex(), v)
 		if err != nil {
 			return err
 		}
@@ -1886,7 +1907,6 @@ func (bc *BlockChain) UpdateM1() error {
 		}
 		// update masternodes
 		log.Info("Updating new set of masternodes")
-		return nil
 		// get block header
 		header := bc.CurrentHeader()
 		var maxMasternodes int

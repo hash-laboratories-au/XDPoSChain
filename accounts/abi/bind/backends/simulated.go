@@ -71,11 +71,11 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		Epoch:               900,
 		Reward:              250,
 		RewardCheckpoint:    900,
-		Gap:                 897,
+		Gap:                 890,
 		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
 	}
 	config := &params.ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &XDPoSConfig}
-	genesis := core.Genesis{Config: config, Alloc: alloc}
+	genesis := core.Genesis{Config: config, Alloc: alloc, ExtraData: append(make([]byte, 32), make([]byte, 65)...)}
 	genesis.MustCommit(database)
 	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, XDPoS.NewFaker(database), vm.Config{})
 

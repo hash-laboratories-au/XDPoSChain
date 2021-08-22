@@ -904,6 +904,7 @@ func (c *XDPoS) Prepare(chain consensus.ChainReader, header *types.Header) error
 }
 
 func (c *XDPoS) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []Masternode) error {
+	fmt.Println("update master nodes")
 	number := header.Number.Uint64()
 	log.Trace("take snapshot", "number", number, "hash", header.Hash())
 	// get snapshot

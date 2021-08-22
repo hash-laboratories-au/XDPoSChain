@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,18 +45,35 @@ import (
 )
 
 type masterNodes map[string]big.Int
+type signersList map[string]bool
 
 var (
 	acc1Key, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 	acc2Key, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
 	acc3Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	acc4Key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee04aefe388d1e14474d32c45c72ce7b7a")
-	acc1Addr   = crypto.PubkeyToAddress(acc1Key.PublicKey)
-	acc2Addr   = crypto.PubkeyToAddress(acc2Key.PublicKey)
-	acc3Addr   = crypto.PubkeyToAddress(acc3Key.PublicKey)
-	acc4Addr   = crypto.PubkeyToAddress(acc4Key.PublicKey)
+	acc1Addr   = crypto.PubkeyToAddress(acc1Key.PublicKey) //xdc703c4b2bD70c169f5717101CaeE543299Fc946C7
+	acc2Addr   = crypto.PubkeyToAddress(acc2Key.PublicKey) //xdc0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e
+	acc3Addr   = crypto.PubkeyToAddress(acc3Key.PublicKey) //xdc71562b71999873DB5b286dF957af199Ec94617F7
+	acc4Addr   = crypto.PubkeyToAddress(acc4Key.PublicKey) //xdc5F74529C0338546f82389402a01c31fB52c6f434
 	chainID    = int64(1337)
 )
+
+func debugMessage(backend *backends.SimulatedBackend, signers signersList, t *testing.T) {
+	ms := GetCandidateFromCurrentSmartContract(backend, t)
+	fmt.Println("=== current smart contract")
+	for nodeAddr, cap := range ms {
+		if !strings.Contains(nodeAddr, "000000000000000000000000000000000000") {
+			fmt.Println(nodeAddr, cap)
+		}
+	}
+	fmt.Println("=== this block signer list")
+	for signer := range signers {
+		if !strings.Contains(signer, "000000000000000000000000000000000000") {
+			fmt.Println(signer)
+		}
+	}
+}
 
 func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 
@@ -65,18 +83,40 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 	})
 
 	transactOpts := bind.NewKeyedTransactor(acc1Key)
+	cap := new(big.Int)
+	validatorCap1 := new(big.Int)
+	validatorCap2 := new(big.Int)
 	validatorCap3 := new(big.Int)
 	validatorCap4 := new(big.Int)
 
+	cap.SetString("1000000000", 10)
+	validatorCap1.SetString("10000001", 10)
+	validatorCap2.SetString("10000002", 10)
 	validatorCap3.SetString("10000003", 10)
 	validatorCap4.SetString("10000004", 10)
+	var candidates []common.Address
+	var caps []*big.Int
+	for i := 1; i <= 17; i++ {
+		addr := fmt.Sprintf("%02d", i)
+		candidates = append(candidates, common.StringToAddress(addr))
+		caps = append(caps, cap)
+	}
+
+	candidates = append(candidates, acc1Addr)
+	candidates = append(candidates, acc2Addr)
+	candidates = append(candidates, acc3Addr)
+	candidates = append(candidates, acc4Addr)
+	caps = append(caps, validatorCap1)
+	caps = append(caps, validatorCap2)
+	caps = append(caps, validatorCap3)
+	caps = append(caps, validatorCap4)
 
 	// create validator smart contract
 	validatorAddr, _, _, err := contractValidator.DeployXDCValidator(
 		transactOpts,
 		contractBackend1,
-		[]common.Address{acc3Addr, acc4Addr},
-		[]*big.Int{validatorCap3, validatorCap4},
+		candidates,
+		caps,
 		acc3Addr,
 		big.NewInt(50000),
 		big.NewInt(1),
@@ -134,7 +174,7 @@ func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, par
 		parentBlock.Hash().Hex(),
 		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
 		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		common.HexToHash("a582ebd7d65ad51a83483400653576efda95cfafd0ed1adc0d9ec09cbab113cd"),
+		common.HexToHash("c0abb331585cef76dda3c941b1d94b14e523c28bfb394075ae02e8e2973ed940"),
 	)
 	err := blockchain.InsertBlock(block)
 	if err != nil {
@@ -143,7 +183,22 @@ func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, par
 	return block, nil
 }
 
-func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction) (*types.Block, error) {
+func insertBlockAfter(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block) (*types.Block, error) {
+	block := createXDPoSTestBlock(
+		blockchain,
+		parentBlock.Hash().Hex(),
+		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
+		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		common.HexToHash("bae86f075f28838810e386e97804c02f9ae4f1c0148cf2ab191d4b7c29ab5088"),
+	)
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction, root string) (*types.Block, error) {
 	//state, err := blockchain.State()
 	//root := state.IntermediateRoot(true)
 	block := createXDPoSTestBlock(
@@ -151,7 +206,7 @@ func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, 
 		parentBlock.Hash().Hex(),
 		blockCoinBase, 105, blockNum, blockNum*10, txs, txs[0].Gas(),
 		"9319777b782ba2c83a33c995481ff894ac96d9a92a1963091346a3e1e386705c",
-		common.HexToHash("5e9e69e943847d340c66542f9121d5a25f49d7a8d29cae408a0bf9723145eb78"),
+		common.HexToHash(root),
 	)
 	err := blockchain.InsertBlock(block)
 	if err != nil {
@@ -176,10 +231,13 @@ func insertBlockTxs3A(blockchain *BlockChain, blockNum int, blockCoinBase string
 	return block, nil
 }
 
-func voteTX(gasLimit uint64, nonce uint64, t *testing.T) *types.Transaction {
+func voteTX(gasLimit uint64, nonce uint64, addr string, t *testing.T) *types.Transaction {
 	// vote : 6dd7d8ea vote
 	// addr3 : 00000000000000000000000071562b71999873db5b286df957af199ec94617f7
-	data := common.Hex2Bytes("6dd7d8ea00000000000000000000000071562b71999873db5b286df957af199ec94617f7")
+	vote := "6dd7d8ea"
+	action := fmt.Sprintf("%s%s%s", vote, "000000000000000000000000", addr[3:])
+	fmt.Println(action)
+	data := common.Hex2Bytes(action)
 	gasPrice := big.NewInt(int64(0))
 	amountInt := new(big.Int)
 	amount, ok := amountInt.SetString("60000", 10)
@@ -196,8 +254,28 @@ func voteTX(gasLimit uint64, nonce uint64, t *testing.T) *types.Transaction {
 
 	return signedTX
 }
+func UpdateSigner(bc *BlockChain) error {
+	err := bc.UpdateM1()
+	return err
+}
 
-func GetCandidateData(backend bind.ContractBackend, t *testing.T) masterNodes {
+func GetSnapshotSigner(bc *BlockChain, header *types.Header) (signersList, error) {
+	engine := bc.Engine().(*XDPoS.XDPoS)
+	snap, err := engine.GetSnapshot(bc, header)
+	if err != nil {
+		return nil, err
+
+	}
+	ms := make(signersList)
+
+	for addr := range snap.Signers {
+		ms[addr.Hex()] = true
+	}
+	return ms, nil
+
+}
+
+func GetCandidateFromCurrentSmartContract(backend bind.ContractBackend, t *testing.T) masterNodes {
 
 	addr := common.HexToAddress(common.MasternodeVotingSMC)
 	validator, err := contractValidator.NewXDCValidator(addr, backend)
@@ -222,7 +300,9 @@ func GetCandidateData(backend bind.ContractBackend, t *testing.T) masterNodes {
 	return ms
 }
 
-func TestPropose(t *testing.T) {
+func Test4(t *testing.T) {
+
+	// Preparation
 	var err error
 	backend := getCommonBackend(t)
 	blockchain := backend.GetBlockChain()
@@ -230,44 +310,108 @@ func TestPropose(t *testing.T) {
 
 	currentBlock := blockchain.Genesis()
 
-	for i := 1; i <= 2; i++ {
+	for i := 1; i <= 9; i++ {
 		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
 		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		currentBlock = block
 	}
-	t.Logf("Inserting block with propose at 3...")
-	blockCoinBase3A := "0xaaa0000000000000000000000000000000000003"
-	tx := voteTX(78185, 0, t)
+	UpdateSigner(blockchain)
 
-	_, err = insertBlockTxs(blockchain, 3, blockCoinBase3A, currentBlock, []*types.Transaction{tx})
+	// Insert first Block 10 A
+	t.Logf("Inserting block with propose at 10 A...")
+	blockCoinbaseA := "0xaaa0000000000000000000000000000000000010"
+	tx := voteTX(78185, 0, acc1Addr.String(), t)
+
+	blockA, err := insertBlockTxs(blockchain, 10, blockCoinbaseA, currentBlock, []*types.Transaction{tx}, "6736596e722b0565537c711ee43ec998f48a18a6fc7d81546071f39c67cf5934")
 	if err != nil {
 		t.Fatal(err)
 	}
-	ms := GetCandidateData(backend, t)
-	fmt.Println(ms)
 
-	blockCoinBase3B := "0xbbb0000000000000000000000000000000000003"
-	tx = voteTX(37117, 1, t)
-	_, err = insertBlock(blockchain, 3, blockCoinBase3B, currentBlock)
+	signers, err := GetSnapshotSigner(blockchain, blockA.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
-	ms = GetCandidateData(backend, t)
-	fmt.Println(ms)
-	/*
-		for i := 4; i < 5; i++ {
-			blockCoinBase := fmt.Sprintf("0x1110000000000000000000000000000000000%03d", i)
-			b := insertBlockAfter(blockchain, i, blockCoinBase, block, t)
-			block = b
+	if signers[acc1Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("account 1 should sit in the signer list")
+	}
+}
+
+func Test5(t *testing.T) {
+
+	// Preparation
+	var err error
+	backend := getCommonBackend(t)
+	blockchain := backend.GetBlockChain()
+	blockchain.Client = backend
+
+	currentBlock := blockchain.Genesis()
+
+	for i := 1; i <= 9; i++ {
+		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
+		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock)
+		if err != nil {
+			t.Fatal(err)
 		}
-	*/
-	return
-	if blockchain.GetBlockByNumber(10).Header().Coinbase.Hex() != fmt.Sprintf("xdc2220000000000000000000000000000000000010") {
-		t.Fatalf("Canonical chain 10 should keep the old 450 block, new insert should remain as uncle %s", blockchain.GetBlockByNumber(10).Header().Coinbase.Hex())
+		currentBlock = block
+	}
+	UpdateSigner(blockchain)
+
+	// Insert first Block 10 A
+	t.Logf("Inserting block with propose at 10 A...")
+	blockCoinbaseA := "0xaaa0000000000000000000000000000000000010"
+	tx := voteTX(78185, 0, acc1Addr.String(), t)
+
+	blockA, err := insertBlockTxs(blockchain, 10, blockCoinbaseA, currentBlock, []*types.Transaction{tx}, "6736596e722b0565537c711ee43ec998f48a18a6fc7d81546071f39c67cf5934")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signers, err := GetSnapshotSigner(blockchain, blockA.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signers[acc1Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("account 1 should sit in the signer list")
+	}
+
+	// Insert forked Block 10 B
+	t.Logf("Inserting block with propose at 10 B...")
+
+	blockCoinBase10B := "0xbbb0000000000000000000000000000000000010"
+	tx = voteTX(78185, 0, acc2Addr.String(), t)
+	blockB, err := insertBlockTxs(blockchain, 10, blockCoinBase10B, currentBlock, []*types.Transaction{tx}, "bae86f075f28838810e386e97804c02f9ae4f1c0148cf2ab191d4b7c29ab5088")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signers, err = GetSnapshotSigner(blockchain, blockB.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signers[acc4Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("account 2 should sit in the signer list")
+	}
+
+	//Insert block 11 parent is 11 B
+	t.Logf("Inserting block with propose at 11 B...")
+
+	blockCoinBase11B := "0xbbb0000000000000000000000000000000000011"
+	block11B, err := insertBlockAfter(blockchain, 11, blockCoinBase11B, blockB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signers, err = GetSnapshotSigner(blockchain, block11B.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signers[acc2Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("account 2 should sit in the signer list")
 	}
 }
 
@@ -298,27 +442,29 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 	if len(txs) == 0 {
 		block = types.NewBlockWithHeader(&header)
 	} else {
-
 		//code := state.GetCode(common.HexToAddress("xdc35658f7b2a9E7701e65E7a654659eb1C481d1dC5"))
 		//fmt.Println("state code:", code)
-		state, err := bc.State()
-		if err != nil {
-			fmt.Println("error:", err)
-		}
-		gp := new(GasPool).AddGas(header.GasLimit)
-		usedGas := uint64(0)
-		header.TxHash = common.HexToHash("c9cc29258dd0fdbb4cc77f1d213bf1b50063f28906dcc2eb4ef66eda4622fe4a")
-		receipt, _, err := ApplyTransaction(bc.Config(), bc, nil, gp, state, &header, txs[0], &usedGas, vm.Config{})
-
-		if err != nil {
-			fmt.Printf("%v when creating block", err)
-		}
-		//fmt.Println("receipt", receipt)
 		/*
-			receipt := &types.Receipt{
-				Status:            1,
-				CumulativeGasUsed: 78185,
-				Bloom:             types.BytesToBloom(common.Hex2Bytes("00000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")),
+			state, err := bc.State()
+			if err != nil {
+				fmt.Println("error:", err)
+			}
+			gp := new(GasPool).AddGas(header.GasLimit)
+			usedGas := uint64(0)
+			header.TxHash = common.HexToHash("c9cc29258dd0fdbb4cc77f1d213bf1b50063f28906dcc2eb4ef66eda4622fe4a")
+			receipt, _, err := ApplyTransaction(bc.Config(), bc, nil, gp, state, &header, txs[0], &usedGas, vm.Config{})
+
+			if err != nil {
+				fmt.Printf("%v when creating block", err)
+			}
+		*/
+		//fmt.Println("receipt", receipt)
+
+		receipt := &types.Receipt{
+			Status:            1,
+			CumulativeGasUsed: 78185,
+			Bloom:             types.BytesToBloom(common.Hex2Bytes("00000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")),
+			/*
 				Logs: []*types.Log{
 					//	return fmt.Sprintf(`log: %x %x %x %x %d %x %d`, l.Address, l.Topics, l.Data, l.TxHash, l.TxIndex, l.BlockHash, l.Index)
 					{
@@ -333,8 +479,8 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 						Removed:     false,
 					},
 				},
-			}
-		*/
+			*/
+		}
 
 		header.Bloom = types.BytesToBloom(common.Hex2Bytes("00000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000040000000000000000000000000000000000000000000000000000000000080000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
 		//header.GasUsed = usedGas
@@ -426,7 +572,7 @@ func transferTx(t *testing.T) *types.Transaction {
 	return signedTX
 }
 
-func insertBlockAfter(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
+func insertBlockAfterBackup(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
 	block := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),

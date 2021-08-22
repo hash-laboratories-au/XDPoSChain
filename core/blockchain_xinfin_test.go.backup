@@ -29,13 +29,18 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/XDPoS"
+	"github.com/ethereum/go-ethereum/contracts/validator"
 	contractValidator "github.com/ethereum/go-ethereum/contracts/validator/contract"
 	"github.com/ethereum/go-ethereum/core"
 	. "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -154,15 +159,22 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 	return contractBackend2
 
 }
+func insertGenesisBlock(blockchain *BlockChain) (*types.Block, error) {
+	block := blockchain.Genesis()
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
 
-// insert Block without transcation attached
-func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, root string) (*types.Block, error) {
+func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block) (*types.Block, error) {
 	block := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),
 		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
 		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		common.HexToHash(root),
+		common.HexToHash("c0abb331585cef76dda3c941b1d94b14e523c28bfb394075ae02e8e2973ed940"),
 	)
 	err := blockchain.InsertBlock(block)
 	if err != nil {
@@ -171,8 +183,24 @@ func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, par
 	return block, nil
 }
 
-// insert Block with transcation attached
+func insertBlockAfter(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block) (*types.Block, error) {
+	block := createXDPoSTestBlock(
+		blockchain,
+		parentBlock.Hash().Hex(),
+		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
+		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		common.HexToHash("bae86f075f28838810e386e97804c02f9ae4f1c0148cf2ab191d4b7c29ab5088"),
+	)
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
 func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction, root string) (*types.Block, error) {
+	//state, err := blockchain.State()
+	//root := state.IntermediateRoot(true)
 	block := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),
@@ -186,26 +214,45 @@ func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, 
 	}
 	return block, nil
 }
+func insertBlockTxs3A(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction) (*types.Block, error) {
+	//state, err := blockchain.State()
+	//root := state.IntermediateRoot(true)
+	block := createXDPoSTestBlock(
+		blockchain,
+		parentBlock.Hash().Hex(),
+		blockCoinBase, 105, blockNum, blockNum*10, txs, txs[0].Gas(),
+		"9319777b782ba2c83a33c995481ff894ac96d9a92a1963091346a3e1e386705c",
+		common.HexToHash("8d5533e2678a162181e2f5d41b3f4be49802e25eb843106625c26d4142065c91"),
+	)
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
 
-func voteTX(gasLimit uint64, nonce uint64, addr string) (*types.Transaction, error) {
+func voteTX(gasLimit uint64, nonce uint64, addr string, t *testing.T) *types.Transaction {
+	// vote : 6dd7d8ea vote
+	// addr3 : 00000000000000000000000071562b71999873db5b286df957af199ec94617f7
 	vote := "6dd7d8ea"
 	action := fmt.Sprintf("%s%s%s", vote, "000000000000000000000000", addr[3:])
+	fmt.Println(action)
 	data := common.Hex2Bytes(action)
 	gasPrice := big.NewInt(int64(0))
 	amountInt := new(big.Int)
 	amount, ok := amountInt.SetString("60000", 10)
 	if !ok {
-		return nil, fmt.Errorf("big int init failed")
+		t.Fatal("big int init failed")
 	}
 	to := common.HexToAddress(common.MasternodeVotingSMC)
 	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
 
 	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
-	return signedTX, nil
+	return signedTX
 }
 func UpdateSigner(bc *BlockChain) error {
 	err := bc.UpdateM1()
@@ -229,6 +276,7 @@ func GetSnapshotSigner(bc *BlockChain, header *types.Header) (signersList, error
 }
 
 func GetCandidateFromCurrentSmartContract(backend bind.ContractBackend, t *testing.T) masterNodes {
+
 	addr := common.HexToAddress(common.MasternodeVotingSMC)
 	validator, err := contractValidator.NewXDCValidator(addr, backend)
 	if err != nil {
@@ -252,7 +300,8 @@ func GetCandidateFromCurrentSmartContract(backend bind.ContractBackend, t *testi
 	return ms
 }
 
-func PrepareXDCTestBlockChain(t *testing.T) (*BlockChain, *backends.SimulatedBackend, *types.Block) {
+func Test4(t *testing.T) {
+
 	// Preparation
 	var err error
 	backend := getCommonBackend(t)
@@ -261,35 +310,20 @@ func PrepareXDCTestBlockChain(t *testing.T) (*BlockChain, *backends.SimulatedBac
 
 	currentBlock := blockchain.Genesis()
 
-	// Insert initial 9 blocks
 	for i := 1; i <= 9; i++ {
 		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
-		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock, "c0abb331585cef76dda3c941b1d94b14e523c28bfb394075ae02e8e2973ed940")
+		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock)
 		if err != nil {
 			t.Fatal(err)
 		}
 		currentBlock = block
 	}
-	// Update Signer as there is no previous signer assigned
-	err = UpdateSigner(blockchain)
-	if err != nil {
-		t.Fatal(err)
-	}
+	UpdateSigner(blockchain)
 
-	return blockchain, backend, currentBlock
-}
-
-//Should call updateM1 at gap block, and update the snapshot if there are SM transactions involved
-func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
-
-	blockchain, backend, currentBlock := PrepareXDCTestBlockChain(t)
 	// Insert first Block 10 A
 	t.Logf("Inserting block with propose at 10 A...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000000010"
-	tx, err := voteTX(78185, 0, acc1Addr.String())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := voteTX(78185, 0, acc1Addr.String(), t)
 
 	blockA, err := insertBlockTxs(blockchain, 10, blockCoinbaseA, currentBlock, []*types.Transaction{tx}, "6736596e722b0565537c711ee43ec998f48a18a6fc7d81546071f39c67cf5934")
 	if err != nil {
@@ -306,18 +340,30 @@ func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 	}
 }
 
-//Should call updateM1 and update snapshot when a forked block(at gap block number) is inserted back into main chain (Edge case)
-func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
+func Test5(t *testing.T) {
 
-	blockchain, backend, currentBlock := PrepareXDCTestBlockChain(t)
+	// Preparation
+	var err error
+	backend := getCommonBackend(t)
+	blockchain := backend.GetBlockChain()
+	blockchain.Client = backend
+
+	currentBlock := blockchain.Genesis()
+
+	for i := 1; i <= 9; i++ {
+		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
+		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentBlock = block
+	}
+	UpdateSigner(blockchain)
 
 	// Insert first Block 10 A
 	t.Logf("Inserting block with propose at 10 A...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000000010"
-	tx, err := voteTX(78185, 0, acc1Addr.String())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := voteTX(78185, 0, acc1Addr.String(), t)
 
 	blockA, err := insertBlockTxs(blockchain, 10, blockCoinbaseA, currentBlock, []*types.Transaction{tx}, "6736596e722b0565537c711ee43ec998f48a18a6fc7d81546071f39c67cf5934")
 	if err != nil {
@@ -337,11 +383,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	t.Logf("Inserting block with propose at 10 B...")
 
 	blockCoinBase10B := "0xbbb0000000000000000000000000000000000010"
-	tx, err = voteTX(78185, 0, acc2Addr.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	tx = voteTX(78185, 0, acc2Addr.String(), t)
 	blockB, err := insertBlockTxs(blockchain, 10, blockCoinBase10B, currentBlock, []*types.Transaction{tx}, "bae86f075f28838810e386e97804c02f9ae4f1c0148cf2ab191d4b7c29ab5088")
 	if err != nil {
 		t.Fatal(err)
@@ -352,15 +394,14 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	}
 	if signers[acc4Addr.Hex()] != true {
 		debugMessage(backend, signers, t)
-		t.Fatalf("account 4 should sit in the signer list as previos block result")
+		t.Fatalf("account 2 should sit in the signer list")
 	}
 
 	//Insert block 11 parent is 11 B
 	t.Logf("Inserting block with propose at 11 B...")
 
 	blockCoinBase11B := "0xbbb0000000000000000000000000000000000011"
-	block11B, err := insertBlock(blockchain, 11, blockCoinBase11B, blockB, "bae86f075f28838810e386e97804c02f9ae4f1c0148cf2ab191d4b7c29ab5088")
-
+	block11B, err := insertBlockAfter(blockchain, 11, blockCoinBase11B, blockB)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,4 +493,134 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 	}
 
 	return block
+}
+
+//
+//
+//
+//
+//
+// Backup Function
+
+// newXDPoSCanonical creates a chain database, and injects a deterministic canonical
+// chain. Depending on the full flag, if creates either a full block chain or a
+// header only chain.
+func newXDPoSCanonical(n int) (ethdb.Database, *BlockChain, error) {
+	// Initialize a fresh chain with only a genesis block
+	accountBalance := new(big.Int)
+	accountBalance.SetString("3000000000000000000000000000", 10)
+	gspec := &Genesis{
+		Config:   params.TestChainConfig,
+		GasLimit: 1200000000,
+		Alloc: GenesisAlloc{
+			acc1Addr: {Balance: accountBalance},
+			acc2Addr: {Balance: accountBalance},
+			acc3Addr: {Balance: accountBalance},
+			acc4Addr: {Balance: accountBalance},
+		},
+	}
+	// change genesis fields
+	extraByte, _ := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	gspec.ExtraData = extraByte
+	gspec.Difficulty = big.NewInt(105)
+	db, _ := ethdb.NewMemDatabase()
+	genesis := gspec.MustCommit(db)
+
+	XDPoSConfig := params.XDPoSConfig{
+		Period:              2,
+		Epoch:               900,
+		Reward:              250,
+		RewardCheckpoint:    900,
+		Gap:                 450,
+		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+	}
+	engine := XDPoS.New(&XDPoSConfig, db)
+	config := &params.ChainConfig{big.NewInt(chainID), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &XDPoSConfig}
+	blockchain, _ := NewBlockChain(db, nil, config, engine, vm.Config{})
+	// Create and inject the requested chain
+	if n == 0 {
+		return db, blockchain, nil
+	}
+	// Full block-chain requested
+	blocks := makeBlockChain(genesis, n, engine, db, canonicalSeed)
+	_, err := blockchain.InsertChain(blocks)
+	return db, blockchain, err
+}
+
+var canonicalSeed = 1
+
+func makeBlockChain(parent *types.Block, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Block {
+	blocks, _ := GenerateChain(params.TestChainConfig, parent, engine, db, n, func(i int, b *BlockGen) {
+		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
+	})
+	return blocks
+}
+
+func transferTx(t *testing.T) *types.Transaction {
+	data := []byte{}
+	gasPrice := big.NewInt(int64(1))
+	gasLimit := uint64(21000)
+	amount := big.NewInt(int64(999))
+	nonce := uint64(0)
+	to := common.HexToAddress("35658f7b2a9E7701e65E7a654659eb1C481d1dC5")
+	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signedTX
+}
+
+func insertBlockAfterBackup(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, t *testing.T) *types.Block {
+	block := createXDPoSTestBlock(
+		blockchain,
+		parentBlock.Hash().Hex(),
+		blockCoinBase, 105, blockNum, blockNum*10, nil, 0,
+		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+		common.HexToHash("ba9e18937a3347c2acbbaeb93b1add58fba4c5ce97296251a7b92323c11e7e5a"),
+	)
+	err := blockchain.InsertBlock(block)
+	if err != nil {
+		t.Fatalf("%v at %d", err, blockNum)
+	}
+	return block
+}
+
+func voteFun(validatorAddr common.Address, contractBackend *backends.SimulatedBackend, t *testing.T) {
+	acc1Opts := bind.NewKeyedTransactor(acc1Key)
+	acc1Opts.Value = new(big.Int).SetInt64(int64(500))
+	validator, err := validator.NewValidator(acc1Opts, validatorAddr, contractBackend)
+	if err != nil {
+		t.Fatalf("can't get current validator: %v", err)
+	}
+	tx, err := validator.Vote(acc3Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(tx)
+	contractBackend.Commit()
+}
+
+func proposeTX(t *testing.T) *types.Transaction {
+	data := common.Hex2Bytes("012679510000000000000000000000000d3ab14bbad3d99f4203bd7a11acb94882050e7e")
+	//data := []byte{}
+	fmt.Println("data", string(data[:]))
+	gasPrice := big.NewInt(int64(0))
+	gasLimit := uint64(22680)
+
+	amountInt := new(big.Int)
+	amount, ok := amountInt.SetString("11000000000000000000000000", 10)
+	if !ok {
+		t.Fatal("big int init failed")
+	}
+	nonce := uint64(0)
+	to := common.HexToAddress("xdc35658f7b2a9e7701e65e7a654659eb1c481d1dc5")
+	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signedTX
 }

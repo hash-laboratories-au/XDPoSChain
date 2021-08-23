@@ -90,23 +90,15 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 		caps = append(caps, defalutCap)
 	}
 
-	validatorCap1 := new(big.Int)
-	validatorCap2 := new(big.Int)
-	validatorCap3 := new(big.Int)
-	validatorCapVoter := new(big.Int)
+	validatorCap1, validatorCap2, validatorCap3, validatorCapVoter := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+
 	validatorCap1.SetString("10000001", 10)
 	validatorCap2.SetString("10000002", 10)
 	validatorCap3.SetString("10000003", 10)
 	validatorCapVoter.SetString("1000000000", 10)
-	caps = append(caps, validatorCap1)
-	caps = append(caps, validatorCap2)
-	caps = append(caps, validatorCap3)
-	caps = append(caps, validatorCapVoter)
 
-	candidates = append(candidates, acc1Addr)
-	candidates = append(candidates, acc2Addr)
-	candidates = append(candidates, acc3Addr)
-	candidates = append(candidates, voterAddr)
+	caps = append(caps, validatorCapVoter, validatorCap1, validatorCap2, validatorCap3)
+	candidates = append(candidates, voterAddr, acc1Addr, acc2Addr, acc3Addr)
 	// create validator smart contract
 	validatorSCAddr, _, _, err := contractValidator.DeployXDCValidator(
 		transactOpts,

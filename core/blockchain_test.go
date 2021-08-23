@@ -46,6 +46,8 @@ var (
 	acc3Addr   = crypto.PubkeyToAddress(acc3Key.PublicKey)
 	acc4Addr   = crypto.PubkeyToAddress(acc4Key.PublicKey)
 	chainID    = int64(1337)
+	addoneAddr = common.HexToAddress("0x00000000000000000000000000000000000000fc")
+	addoneCode = common.Hex2Bytes("6001600155")
 )
 
 // Test fork of length N starting from block i
@@ -1415,6 +1417,7 @@ func TestNewBlockWithTx(t *testing.T) {
 	}
 	fmt.Println("Root2: ", state.IntermediateRoot(true).Hex())
 	fmt.Println("Nonce2: ", state.GetNonce(acc4Addr))
+	fmt.Println("Storage at 1: ", state.GetState(addoneAddr, common.BigToHash(big.NewInt(1))).Hex(), "\nIf this is 1, it means smart contract runs successfully. The smart contract changes the storage at 1 to 1. (It was 0.)")
 }
 func TestXDPoS450(t *testing.T) {
 	var err error
@@ -1541,8 +1544,8 @@ func createXDPoSTestBlockWithOneTx(bc *BlockChain, ParentHash, Root, Coinbase, e
 		Coinbase:    common.HexToAddress(Coinbase),
 		Difficulty:  big.NewInt(int64(Difficulty)),
 		Number:      big.NewInt(int64(Number)),
-		GasLimit:    21000,
-		GasUsed:     21000,
+		GasLimit:    332004,
+		GasUsed:     332004,
 		Time:        big.NewInt(int64(Time)),
 		Extra:       extraByte,
 	}
@@ -1556,6 +1559,9 @@ func createXDPoSTestBlockWithOneTx(bc *BlockChain, ParentHash, Root, Coinbase, e
 	if err != nil {
 		fmt.Printf("%v when creating block", err)
 	}
+	if receipt.Status != 1 {
+		fmt.Println("err when creating block", receipt)
+	}
 	header.GasUsed = usedGas
 	root := state.IntermediateRoot(true)
 	header.Root = root
@@ -1568,7 +1574,15 @@ func createXDPoSTestBlockWithOneTx(bc *BlockChain, ParentHash, Root, Coinbase, e
 // header only chain.
 func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
 	// Initialize a fresh chain with only a genesis block
-	gspec := new(Genesis)
+	gspec := &Genesis{
+		GasLimit: 1200000000,
+		Alloc: GenesisAlloc{
+			addoneAddr: {
+				Balance: big.NewInt(0),
+				Code:    addoneCode,
+			},
+		},
+	}
 	// change genesis fields
 	extraByte, _ := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000001b82c4bf317fcafe3d77e8b444c82715d216afe845b7bd987fa22c9bac89b71f0ded03f6e150ba31ad670b2b166684657ffff95f4810380ae7381e9bce41231d5dd8cdd7499e418b648c00af75d184a2f9aba09a6fa4a46fb1a6a3919b027d9cac5aa6890000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
 	gspec.ExtraData = extraByte
@@ -1604,12 +1618,14 @@ func newXDPoSCanonical(n int, full bool) (ethdb.Database, *BlockChain, error) {
 }
 
 func toyTx(t *testing.T) *types.Transaction {
-	data := []byte{}
+	// data := []byte{}
+	data := common.Hex2Bytes("d155908b")
 	gasPrice := big.NewInt(int64(0))
-	gasLimit := uint64(21000)
+	gasLimit := uint64(332004)
 	amount := big.NewInt(int64(0))
 	nonce := uint64(0)
-	to := acc3Addr
+	// to := acc3Addr
+	to := addoneAddr
 	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
 
 	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)

@@ -73,24 +73,26 @@ func debugMessage(backend *backends.SimulatedBackend, signers signersList, t *te
 func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 
 	// initial helper backend
-	contractBackend1 := backends.NewSimulatedBackend(core.GenesisAlloc{
+	contractBackendForSC := backends.NewSimulatedBackend(core.GenesisAlloc{
 		acc1Addr: {Balance: new(big.Int).SetUint64(10000000000)},
 	})
 
 	transactOpts := bind.NewKeyedTransactor(acc1Key)
-	cap := new(big.Int)
+
 	validatorCap1 := new(big.Int)
 	validatorCap2 := new(big.Int)
 	validatorCap3 := new(big.Int)
 	validatorCap4 := new(big.Int)
 
-	cap.SetString("1000000000", 10)
 	validatorCap1.SetString("10000001", 10)
 	validatorCap2.SetString("10000002", 10)
 	validatorCap3.SetString("10000003", 10)
 	validatorCap4.SetString("10000004", 10)
 	var candidates []common.Address
 	var caps []*big.Int
+	cap := new(big.Int)
+	cap.SetString("1000000000", 10)
+
 	for i := 1; i <= 17; i++ {
 		addr := fmt.Sprintf("%02d", i)
 		candidates = append(candidates, common.StringToAddress(addr))
@@ -107,12 +109,12 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 	caps = append(caps, validatorCap4)
 
 	// create validator smart contract
-	validatorAddr, _, _, err := contractValidator.DeployXDCValidator(
+	validatorSCAddr, _, _, err := contractValidator.DeployXDCValidator(
 		transactOpts,
-		contractBackend1,
+		contractBackendForSC,
 		candidates,
 		caps,
-		acc3Addr,
+		acc3Addr, // first owner, not used
 		big.NewInt(50000),
 		big.NewInt(1),
 		big.NewInt(99),
@@ -123,14 +125,14 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
 
-	contractBackend1.Commit()
+	contractBackendForSC.Commit() // Write into database(state)
 
 	// Prepare Code and Storage
 	d := time.Now().Add(1000 * time.Millisecond)
 	ctx, cancel := context.WithDeadline(context.Background(), d)
 	defer cancel()
 
-	code, _ := contractBackend1.CodeAt(ctx, validatorAddr, nil)
+	code, _ := contractBackendForSC.CodeAt(ctx, validatorSCAddr, nil)
 	storage := make(map[common.Hash]common.Hash)
 	f := func(key, val common.Hash) bool {
 		decode := []byte{}
@@ -140,7 +142,7 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 		log.Info("DecodeBytes", "value", val.String(), "decode", storage[key].String())
 		return true
 	}
-	contractBackend1.ForEachStorageAt(ctx, validatorAddr, nil, f)
+	contractBackendForSC.ForEachStorageAt(ctx, validatorSCAddr, nil, f)
 
 	// create test backend with smart contract in it
 	contractBackend2 := backends.NewSimulatedBackend(core.GenesisAlloc{
@@ -148,7 +150,7 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 		acc2Addr: {Balance: new(big.Int).SetUint64(10000000000)},
 		acc3Addr: {Balance: new(big.Int).SetUint64(10000000000)},
 		acc4Addr: {Balance: new(big.Int).SetUint64(10000000000)},
-		common.HexToAddress(common.MasternodeVotingSMC): {Balance: new(big.Int).SetUint64(1), Code: code, Storage: storage},
+		common.HexToAddress(common.MasternodeVotingSMC): {Balance: new(big.Int).SetUint64(1), Code: code, Storage: storage}, // Binding the MasternodeVotingSMC with newly created 'code' for SC execution
 	})
 
 	return contractBackend2
@@ -188,7 +190,7 @@ func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, 
 }
 
 func voteTX(gasLimit uint64, nonce uint64, addr string) (*types.Transaction, error) {
-	vote := "6dd7d8ea"
+	vote := "6dd7d8ea" // VoteMethod = "0x6dd7d8ea"
 	action := fmt.Sprintf("%s%s%s", vote, "000000000000000000000000", addr[3:])
 	data := common.Hex2Bytes(action)
 	gasPrice := big.NewInt(int64(0))
@@ -350,6 +352,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Should not run the `updateM1` for forked chain, hence account4 still exit
 	if signers[acc4Addr.Hex()] != true {
 		debugMessage(backend, signers, t)
 		t.Fatalf("account 4 should sit in the signer list as previos block result")
@@ -375,9 +378,9 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 }
 
 func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficulty, Number, Time int, txs []*types.Transaction, gasUsed uint64, ReceiptHash string, Root common.Hash) *types.Block {
-	extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101"
-	UncleHash := "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"
-	TxHash := "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+	extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101" // Grabbed from existing mainnet block, it does not have any meaning except for the length validation
+	UncleHash := "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"                                                                                                                                      // Empty uncle, special value
+	TxHash := "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"                                                                                                                                         // Empty Hash, special value
 	//ReceiptHash = "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 	//Root := "0xc99c095e53ff1afe3b86750affd13c7550a2d24d51fb8e41b3c3ef2ea8274bcc"
 	extraByte, _ := hex.DecodeString(extraSubstring)
@@ -420,7 +423,7 @@ func createXDPoSTestBlock(bc *BlockChain, ParentHash, Coinbase string, Difficult
 		//fmt.Println("receipt", receipt)
 
 		receipt := &types.Receipt{
-			Status:            1,
+			Status:            1, // 1 means wrote into main chain.
 			CumulativeGasUsed: 78185,
 			Bloom:             types.BytesToBloom(common.Hex2Bytes("00000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")),
 			/*

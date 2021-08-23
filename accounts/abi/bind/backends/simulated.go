@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus/XDPoS"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -66,16 +67,23 @@ type SimulatedBackend struct {
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	database, _ := ethdb.NewMemDatabase()
-	XDPoSConfig := params.XDPoSConfig{
-		Period:              2,
-		Epoch:               900,
-		Reward:              250,
-		RewardCheckpoint:    900,
-		Gap:                 890,
-		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+	genesis := core.Genesis{Config: params.AllEthashProtocolChanges, Alloc: alloc}
+	genesis.MustCommit(database)
+	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{})
+
+	backend := &SimulatedBackend{
+		database:   database,
+		blockchain: blockchain,
+		config:     genesis.Config,
+		events:     filters.NewEventSystem(new(event.TypeMux), &filterBackend{database, blockchain}, false),
 	}
-	config := &params.ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, &XDPoSConfig}
-	genesis := core.Genesis{Config: config, Alloc: alloc, ExtraData: append(make([]byte, 32), make([]byte, 65)...)}
+	backend.rollback()
+	return backend
+}
+
+func NewXDCSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
+	database, _ := ethdb.NewMemDatabase()
+	genesis := core.Genesis{Config: params.TestXDPoSChainConfig, Alloc: alloc, ExtraData: append(make([]byte, 32), make([]byte, 65)...)}
 	genesis.MustCommit(database)
 	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, XDPoS.NewFaker(database), vm.Config{})
 

@@ -1023,7 +1023,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
 			err := bc.UpdateM1()
 			if err != nil {
-				fmt.Println("updateM1", err)
 				log.Error("Error when update masternodes set. Stopping node", "err", err)
 				os.Exit(1)
 			}
@@ -1035,7 +1034,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		engine.CacheSigner(block.Header().Hash(), block.Transactions())
 	}
 	bc.futureBlocks.Remove(block.Hash())
-
 	return status, nil
 }
 
@@ -1576,7 +1574,6 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	for i := len(newChain) - 1; i >= 0; i-- {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
-
 		// write lookup entries for hash based transaction/receipt searches
 		if err := WriteTxLookupEntries(bc.db, newChain[i]); err != nil {
 			return err
@@ -1849,7 +1846,6 @@ func (bc *BlockChain) UpdateM1() error {
 	if err != nil {
 		return err
 	}
-
 	addr := common.HexToAddress(common.MasternodeVotingSMC)
 	validator, err := contractValidator.NewXDCValidator(addr, client)
 	if err != nil {

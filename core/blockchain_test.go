@@ -1634,3 +1634,66 @@ func toyTx(t *testing.T) *types.Transaction {
 	}
 	return signedTX
 }
+
+// Below follows this doc: https://docs.soliditylang.org/en/v0.4.21/miscellaneous.html#layout-of-state-variables-in-storage
+// and the smart contract is at commit 7f856ffe672162dfa9c4006c89afb45a24fb7f9f
+// Notice that if smart contract changes, below also changes
+var (
+	slotValidatorMapping = map[string]uint64{
+		"validatorsState": 1,
+		"candidates":      8,
+	}
+)
+
+func GetCandidates(statedb *state.StateDB) []common.Address {
+	slot := slotValidatorMapping["candidates"]
+	slotHash := common.BigToHash(new(big.Int).SetUint64(slot))
+	arrLength := statedb.GetState(common.HexToAddress(common.MasternodeVotingSMC), slotHash)
+	keys := []common.Hash{}
+	for i := uint64(0); i < arrLength.Big().Uint64(); i++ {
+		key := getLocDynamicArrAtElement(slotHash, i, 1)
+		keys = append(keys, key)
+	}
+	rets := []common.Address{}
+	for _, key := range keys {
+		ret := statedb.GetState(common.HexToAddress(common.MasternodeVotingSMC), key)
+		rets = append(rets, common.HexToAddress(ret.Hex()))
+	}
+	return rets
+}
+
+func GetCandidateCap(statedb *state.StateDB, candidate common.Address) *big.Int {
+	slot := slotValidatorMapping["validatorsState"]
+	// validatorsState[_candidate].cap;
+	locValidatorsState := getLocMappingAtKey(candidate.Hash(), slot)
+	locCandidateCap := locValidatorsState.Add(locValidatorsState, new(big.Int).SetUint64(uint64(2)))
+	ret := statedb.GetState(common.HexToAddress(common.MasternodeVotingSMC), common.BigToHash(locCandidateCap))
+	cap := new(big.Int)
+	cap.SetString(ret.Hex(), 16)
+	return cap
+}
+
+func getLocMappingAtKey(key common.Hash, slot uint64) *big.Int {
+	slotHash := common.BigToHash(new(big.Int).SetUint64(slot))
+	retByte := crypto.Keccak256(key.Bytes(), slotHash.Bytes())
+	ret := new(big.Int)
+	ret.SetBytes(retByte)
+	return ret
+}
+
+func getLocDynamicArrAtElement(slotHash common.Hash, index uint64, elementSize uint64) common.Hash {
+	slotKecBig := crypto.Keccak256Hash(slotHash.Bytes()).Big()
+	//arrBig = slotKecBig + index * elementSize
+	arrBig := slotKecBig.Add(slotKecBig, new(big.Int).SetUint64(index*elementSize))
+	return common.BigToHash(arrBig)
+}
+
+func TestEVMMapping(t *testing.T) {
+	candidate := "0x00000000000000000000000025c65b4b379ac37cf78357c4915f73677022eaff"
+	slot := slotValidatorMapping["validatorsState"]
+	// validatorsState[_candidate].cap;
+	locValidatorsState := getLocMappingAtKey(common.HexToHash(candidate), slot)
+	locCandidateCap := locValidatorsState.Add(locValidatorsState, new(big.Int).SetUint64(uint64(1)))
+	t.Log("locCandidateCap", common.BigToHash(locCandidateCap).Hex())
+}
+

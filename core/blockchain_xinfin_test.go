@@ -225,7 +225,7 @@ func PrepareXDCTestBlockChain(t *testing.T) (*BlockChain, *backends.SimulatedBac
 	// Insert initial 9 blocks
 	for i := 1; i <= 9; i++ {
 		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
-		merkleRoot := "35dd13892f64487a9f50d31fbfd5b9a17b03034bd22ed9d8b1eeb8a78ba5298e"
+		merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
 		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock, merkleRoot)
 		if err != nil {
 			t.Fatal(err)
@@ -275,6 +275,16 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 
 	blockchain, backend, currentBlock := PrepareXDCTestBlockChain(t)
 
+	// Check initial signer
+	signers, err := GetSnapshotSigner(blockchain, blockchain.CurrentBlock().Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signers[acc3Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("voterAddr should sit in the signer list")
+	}
+
 	// Insert first Block 10 A
 	t.Logf("Inserting block with propose at 10 A...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000000010"
@@ -283,13 +293,13 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	merkleRoot := "574dbdb6efbd2e8a44bf50eb2b70b8f7e0b3edf7e300769b2dd9e2abb766045e"
+	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
 	blockA, err := insertBlockTxs(blockchain, 10, blockCoinbaseA, currentBlock, []*types.Transaction{tx}, merkleRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	signers, err := GetSnapshotSigner(blockchain, blockA.Header())
+	signers, err = GetSnapshotSigner(blockchain, blockA.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,16 +317,16 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	merkleRoot = "0c19770aa24e4fb7493cd0b6a4054f20b0603dfdd0f2e0d2a6fbec8c57222a15"
-	blockB, err := insertBlockTxs(blockchain, 10, blockCoinBase10B, currentBlock, []*types.Transaction{tx}, merkleRoot)
+	merkleRoot = "068dfa09d7b4093441c0cc4d9807a71bc586f6101c072d939b214c21cd136eb3"
+	block10B, err := insertBlockTxs(blockchain, 10, blockCoinBase10B, currentBlock, []*types.Transaction{tx}, merkleRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signers, err = GetSnapshotSigner(blockchain, blockB.Header())
+	signers, err = GetSnapshotSigner(blockchain, block10B.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Should not run the `updateM1` for forked chain, hence account4 still exit
+	// Should not run the `updateM1` for forked chain, hence account3 still exit
 	if signers[acc3Addr.Hex()] != true {
 		debugMessage(backend, signers, t)
 		t.Fatalf("account 3 should sit in the signer list as previos block result")
@@ -326,12 +336,22 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	t.Logf("Inserting block with propose at 11 B...")
 
 	blockCoinBase11B := "0xbbb0000000000000000000000000000000000011"
-	merkleRoot = "0c19770aa24e4fb7493cd0b6a4054f20b0603dfdd0f2e0d2a6fbec8c57222a15"
-	block11B, err := insertBlock(blockchain, 11, blockCoinBase11B, blockB, merkleRoot)
+	merkleRoot = "068dfa09d7b4093441c0cc4d9807a71bc586f6101c072d939b214c21cd136eb3"
+	block11B, err := insertBlock(blockchain, 11, blockCoinBase11B, block10B, merkleRoot)
 
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	signers, err = GetSnapshotSigner(blockchain, block10B.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signers[acc2Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("account 2 should sit in the signer list")
+	}
+
 	signers, err = GetSnapshotSigner(blockchain, block11B.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -339,6 +359,15 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	if signers[acc2Addr.Hex()] != true {
 		debugMessage(backend, signers, t)
 		t.Fatalf("account 2 should sit in the signer list")
+	}
+
+	signers, err = GetSnapshotSigner(blockchain, blockchain.CurrentBlock().Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signers[acc2Addr.Hex()] != true {
+		debugMessage(backend, signers, t)
+		t.Fatalf("acc2Addr should sit in the signer list")
 	}
 }
 

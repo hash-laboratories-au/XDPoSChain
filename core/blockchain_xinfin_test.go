@@ -148,6 +148,47 @@ func getCommonBackend(t *testing.T) *backends.SimulatedBackend {
 
 }
 
+/*
+func transferTx(t *testing.T) *types.Transaction {
+	data := []byte{}
+	gasPrice := big.NewInt(int64(1))
+	gasLimit := uint64(21000)
+	amount := big.NewInt(int64(999))
+	nonce := uint64(0)
+	to := common.HexToAddress("35658f7b2a9E7701e65E7a654659eb1C481d1dC5")
+	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signedTX
+}
+
+func proposeTX(t *testing.T) *types.Transaction {
+	data := common.Hex2Bytes("012679510000000000000000000000000d3ab14bbad3d99f4203bd7a11acb94882050e7e")
+	//data := []byte{}
+	fmt.Println("data", string(data[:]))
+	gasPrice := big.NewInt(int64(0))
+	gasLimit := uint64(22680)
+
+	amountInt := new(big.Int)
+	amount, ok := amountInt.SetString("11000000000000000000000000", 10)
+	if !ok {
+		t.Fatal("big int init failed")
+	}
+	nonce := uint64(0)
+	to := common.HexToAddress("xdc35658f7b2a9e7701e65e7a654659eb1c481d1dc5")
+	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signedTX
+}
+*/
+
 func voteTX(gasLimit uint64, nonce uint64, addr string) (*types.Transaction, error) {
 	vote := "6dd7d8ea" // VoteMethod = "0x6dd7d8ea"
 	action := fmt.Sprintf("%s%s%s", vote, "000000000000000000000000", addr[3:])

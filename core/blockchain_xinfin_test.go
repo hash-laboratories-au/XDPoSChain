@@ -295,7 +295,7 @@ func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 	}
 
 	//Get from block validator error message
-	merkleRoot := "574dbdb6efbd2e8a44bf50eb2b70b8f7e0b3edf7e300769b2dd9e2abb766045e"
+	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
 	blockA, err := insertBlockTxs(blockchain, 10, blockCoinbaseA, currentBlock, []*types.Transaction{tx}, merkleRoot)
 	if err != nil {
 		t.Fatal(err)

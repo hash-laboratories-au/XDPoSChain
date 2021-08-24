@@ -1019,6 +1019,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	if status == CanonStatTy {
 		bc.insert(block)
 
+		// prepare set of masternodes for the next epoch
 		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
 			err := bc.UpdateM1()
 			if err != nil {
@@ -1229,25 +1230,16 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.processed++
 		stats.usedGas += usedGas
 		stats.report(chain, i, bc.stateCache.TrieDB().Size())
-		if bc.chainConfig.XDPoS != nil {
-			if status == CanonStatTy {
-				// epoch block
-				if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
-					CheckpointCh <- 1
-				}
-				// prepare set of masternodes for the next epoch
-				if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-					err := bc.UpdateM1()
-					if err != nil {
-						log.Crit("Error when update masternodes set. Stopping node", "err", err)
-					}
-				}
-			} else {
-				if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-					// copy from canon block signer
-					if err != nil {
-						log.Crit("Error when update masternodes set. Stopping node", "err", err)
-					}
+		if status == CanonStatTy && bc.chainConfig.XDPoS != nil {
+			// epoch block
+			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
+				CheckpointCh <- 1
+			}
+			// prepare set of masternodes for the next epoch
+			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
+				err := bc.UpdateM1()
+				if err != nil {
+					log.Crit("Error when update masternodes set. Stopping node", "err", err)
 				}
 			}
 		}
@@ -1438,22 +1430,11 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 	stats.processed++
 	stats.usedGas += result.usedGas
 	stats.report(types.Blocks{block}, 0, bc.stateCache.TrieDB().Size())
-	if bc.chainConfig.XDPoS != nil {
+	if status == CanonStatTy && bc.chainConfig.XDPoS != nil {
 		// epoch block
-		if status == CanonStatTy && (block.NumberU64()%bc.chainConfig.XDPoS.Epoch) == 0 {
+		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
 			CheckpointCh <- 1
 		}
-		// prepare set of masternodes for the next epoch
-		/*
-			if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-				err := bc.UpdateM1()
-				if err != nil {
-					fmt.Println("updateM1", err)
-					log.Error("Error when update masternodes set. Stopping node", "err", err)
-					os.Exit(1)
-				}
-			}
-		*/
 	}
 	// Append a single chain head event if we've progressed the chain
 	if status == CanonStatTy && bc.CurrentBlock().Hash() == block.Hash() {
@@ -1602,11 +1583,10 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		}
 		addedTxs = append(addedTxs, newChain[i].Transactions()...)
 
-		//Update M1
+		// prepare set of masternodes for the next epoch
 		if (newChain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
 			err := bc.UpdateM1()
 			if err != nil {
-				fmt.Println("updateM1", err)
 				log.Error("Error when update masternodes set. Stopping node", "err", err)
 				os.Exit(1)
 			}
@@ -1813,9 +1793,7 @@ func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 }
 
 // Config retrieves the blockchain's chain configuration.
-func (bc *BlockChain) Config() *params.ChainConfig {
-	return bc.chainConfig
-}
+func (bc *BlockChain) Config() *params.ChainConfig { return bc.chainConfig }
 
 // Engine retrieves the blockchain's consensus engine.
 func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }
@@ -1868,11 +1846,10 @@ func (bc *BlockChain) UpdateM1() error {
 	log.Info("It's time to update new set of masternodes for the next epoch...")
 	// get masternodes information from smart contract
 	client, err := bc.GetClient()
-
 	if err != nil {
 		return err
 	}
-	// TODO
+
 	addr := common.HexToAddress(common.MasternodeVotingSMC)
 	validator, err := contractValidator.NewXDCValidator(addr, client)
 	if err != nil {

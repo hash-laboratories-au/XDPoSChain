@@ -904,7 +904,6 @@ func (c *XDPoS) Prepare(chain consensus.ChainReader, header *types.Header) error
 }
 
 func (c *XDPoS) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []Masternode) error {
-	fmt.Println("update master nodes")
 	number := header.Number.Uint64()
 	log.Trace("take snapshot", "number", number, "hash", header.Hash())
 	// get snapshot
@@ -1054,12 +1053,12 @@ func (c *XDPoS) CalcDifficulty(chain consensus.ChainReader, time uint64, parent 
 }
 
 func (c *XDPoS) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
-	// len, preIndex, curIndex, _, err := c.YourTurn(chain, parent, signer)
-	// if err != nil {
-	// 	return big.NewInt(int64(len + curIndex - preIndex))
-	// }
-	// return big.NewInt(int64(len - Hop(len, preIndex, curIndex)))
 	return big.NewInt(105)
+	len, preIndex, curIndex, _, err := c.YourTurn(chain, parent, signer)
+	if err != nil {
+		return big.NewInt(int64(len + curIndex - preIndex))
+	}
+	return big.NewInt(int64(len - Hop(len, preIndex, curIndex)))
 }
 
 // APIs implements consensus.Engine, returning the user facing RPC API to allow

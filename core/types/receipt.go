@@ -151,9 +151,6 @@ func (r *Receipt) Size() common.StorageSize {
 
 // String implements the Stringer interface.
 func (r *Receipt) String() string {
-	//s, _ := json.MarshalIndent(r, "", "\t")
-	//fmt.Println(string(s))
-	//return string(s)
 	if len(r.PostState) == 0 {
 		return fmt.Sprintf("receipt{status=%d cgas=%v bloom=%x logs=%v}", r.Status, r.CumulativeGasUsed, r.Bloom, r.Logs)
 	}

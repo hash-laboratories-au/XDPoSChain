@@ -233,7 +233,6 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	// TODO: clean it after fixing the issue https://github.com/XDCchain/XDCchain/issues/401
 	var contractAction string
 	nonce := uint64(1)
-
 	if contractCreation {
 		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
 		contractAction = "contract creation"
@@ -255,6 +254,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	}
 	st.refundGas()
 	st.state.AddBalance(st.evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
+
 	return ret, st.gasUsed(), vmerr != nil, err
 }
 

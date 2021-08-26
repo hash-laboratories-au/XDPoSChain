@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	. "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -414,14 +415,18 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 
 // insert Block without transcation attached
 func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, root string) (*types.Block, error) {
-	block := createXDPoSTestBlock(
+	block, err := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),
 		blockCoinBase, blockNum, nil,
 		"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
 		common.HexToHash(root),
 	)
-	err := blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+
+	err = blockchain.InsertBlock(block)
 	if err != nil {
 		return nil, err
 	}
@@ -430,21 +435,25 @@ func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, par
 
 // insert Block with transcation attached
 func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction, root string) (*types.Block, error) {
-	block := createXDPoSTestBlock(
+	block, err := createXDPoSTestBlock(
 		blockchain,
 		parentBlock.Hash().Hex(),
 		blockCoinBase, blockNum, txs,
 		"9319777b782ba2c83a33c995481ff894ac96d9a92a1963091346a3e1e386705c",
 		common.HexToHash(root),
 	)
-	err := blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+
+	err = blockchain.InsertBlock(block)
 	if err != nil {
 		return nil, err
 	}
 	return block, nil
 }
 
-func createXDPoSTestBlock(bc *BlockChain, parentHash, coinbase string, number int, txs []*types.Transaction, receiptHash string, root common.Hash) *types.Block {
+func createXDPoSTestBlock(bc *BlockChain, parentHash, coinbase string, number int, txs []*types.Transaction, receiptHash string, root common.Hash) (*types.Block, error) {
 	extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101" // Grabbed from existing mainnet block, it does not have any meaning except for the length validation
 	//ReceiptHash = "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 	//Root := "0xc99c095e53ff1afe3b86750affd13c7550a2d24d51fb8e41b3c3ef2ea8274bcc"
@@ -467,52 +476,22 @@ func createXDPoSTestBlock(bc *BlockChain, parentHash, coinbase string, number in
 	if len(txs) == 0 {
 		block = types.NewBlockWithHeader(&header)
 	} else {
-		//code := state.GetCode(common.HexToAddress("xdc35658f7b2a9E7701e65E7a654659eb1C481d1dC5"))
-		//fmt.Println("state code:", code)
 
-		/*
-			state, err := bc.State()
-			if err != nil {
-				fmt.Println("error:", err)
-			}
-			gp := new(GasPool).AddGas(header.GasLimit)
-			usedGas := uint64(0)
-			header.TxHash = common.HexToHash("c9cc29258dd0fdbb4cc77f1d213bf1b50063f28906dcc2eb4ef66eda4622fe4a")
-			receipt, _, err := ApplyTransaction(bc.Config(), bc, nil, gp, state, &header, txs[0], &usedGas, vm.Config{})
-
-			if err != nil {
-				fmt.Printf("%v when creating block", err)
-			}
-		*/
-
-		receipt := &types.Receipt{
-			Status:            1, // 1 means wrote into main chain.
-			CumulativeGasUsed: 78185,
-			Bloom:             types.BytesToBloom(common.Hex2Bytes("00000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")),
-			/*
-				Logs: []*types.Log{
-					//	return fmt.Sprintf(`log: %x %x %x %x %d %x %d`, l.Address, l.Topics, l.Data, l.TxHash, l.TxIndex, l.BlockHash, l.Index)
-					{
-						Address:     common.HexToAddress("35658f7b2a9e7701e65e7a654659eb1c481d1dc5"),
-						Topics:      []common.Hash{common.StringToHash("66a9138482c99e9baf08860110ef332cc0c23b4a199a53593d8db0fc8f96fbfc")},
-						Data:        common.Hex2Bytes("0000000000000000000000005f74529c0338546f82389402a01c31fb52c6f43400000000000000000000000071562b71999873db5b286df957af199ec94617f7000000000000000000000000000000000000000000000000000000000000c350"),
-						TxHash:      common.StringToHash("9f83055bb924b663da55b64f2eeab967e3f9d65ea7a162f950845e9ed56e64b7"),
-						TxIndex:     0,
-						BlockHash:   common.StringToHash("42eaa539927574e6a53839548f80510114fb5af7262c3eeb653ec5c943b99f5b"),
-						Index:       0,
-						BlockNumber: 3,
-						Removed:     false,
-					},
-				},
-			*/
+		// Prepare Receipt
+		statedb, err := bc.StateAt(bc.GetBlockByNumber(uint64(number - 1)).Root()) //Get parent root
+		if err != nil {
+			return nil, fmt.Errorf("%v when get state", err)
 		}
-
-		Bloom := types.BytesToBloom(common.Hex2Bytes("00000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000040000000000000000000000000000000000000000000000000000000000080000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
-		header.Bloom = Bloom
-		header.UncleHash = types.CalcUncleHash(nil)
+		gp := new(GasPool).AddGas(header.GasLimit)
+		usedGas := uint64(0)
+		statedb.Prepare(txs[0].Hash(), header.Hash(), 0)
+		receipt, _, err := ApplyTransaction(bc.Config(), bc, &header.Coinbase, gp, statedb, &header, txs[0], &usedGas, vm.Config{})
+		if err != nil {
+			return nil, fmt.Errorf("%v when creating block", err)
+		}
 		header.GasUsed = txs[0].Gas()
 		block = types.NewBlock(&header, txs, nil, []*types.Receipt{receipt})
 	}
 
-	return block
+	return block, nil
 }

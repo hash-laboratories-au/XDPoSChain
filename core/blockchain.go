@@ -1233,13 +1233,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
 				CheckpointCh <- 1
 			}
-			// prepare set of masternodes for the next epoch
-			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == (bc.chainConfig.XDPoS.Epoch - bc.chainConfig.XDPoS.Gap) {
-				err := bc.UpdateM1()
-				if err != nil {
-					log.Crit("Error when update masternodes set. Stopping node", "err", err)
-				}
-			}
 		}
 	}
 	// Append a single chain head event if we've progressed the chain

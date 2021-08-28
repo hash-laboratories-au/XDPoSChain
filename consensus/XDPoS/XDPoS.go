@@ -265,14 +265,7 @@ var engine *XDPoS
 
 func NewFaker(db ethdb.Database) *XDPoS {
 	// Set any missing consensus parameters to their defaults
-	conf := params.XDPoSConfig{
-		Period:              2,
-		Epoch:               900,
-		Reward:              250,
-		RewardCheckpoint:    900,
-		Gap:                 450,
-		FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
-	}
+	conf := params.TestXDPoSChainConfig.XDPoS
 	if conf.Epoch == 0 {
 		conf.Epoch = epochLength
 	}
@@ -283,7 +276,7 @@ func NewFaker(db ethdb.Database) *XDPoS {
 	validatorSignatures, _ := lru.NewARC(inmemorySnapshots)
 	verifiedHeaders, _ := lru.NewARC(inmemorySnapshots)
 	engine = &XDPoS{
-		config:              &conf,
+		config:              conf,
 		db:                  db,
 		BlockSigners:        BlockSigners,
 		recents:             recents,

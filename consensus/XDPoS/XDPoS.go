@@ -211,13 +211,6 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	return signer, nil
 }
 
-type Mode uint
-
-const (
-	ModeNormal Mode = iota
-	ModeFake
-)
-
 // XDPoS is the proof-of-stake-voting consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type XDPoS struct {

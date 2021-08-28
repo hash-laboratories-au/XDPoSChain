@@ -348,6 +348,7 @@ func (c *XDPoS) verifyHeaderWithCache(chain consensus.ChainReader, header *types
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
 func (c *XDPoS) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header, fullVerify bool) error {
+	// If we're running a engine faking, accept any block as valid
 	if c.config.SkipValidation {
 		return nil
 	}
@@ -1055,6 +1056,7 @@ func (c *XDPoS) CalcDifficulty(chain consensus.ChainReader, time uint64, parent 
 }
 
 func (c *XDPoS) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
+	// If we're running a engine faking, skip calculation
 	if c.config.SkipValidation {
 		return big.NewInt(1)
 	}

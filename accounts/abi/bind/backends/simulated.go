@@ -83,7 +83,12 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 
 func NewXDCSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	database, _ := ethdb.NewMemDatabase()
-	genesis := core.Genesis{Config: params.TestXDPoSMockChainConfig, Alloc: alloc, ExtraData: append(make([]byte, 32), make([]byte, 65)...)}
+	genesis := core.Genesis{
+		GasLimit:  10000000, // need this big, support initial smart contract
+		Config:    params.TestXDPoSMockChainConfig,
+		Alloc:     alloc,
+		ExtraData: append(make([]byte, 32), make([]byte, 65)...),
+	}
 	genesis.MustCommit(database)
 	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, XDPoS.NewFaker(database), vm.Config{})
 

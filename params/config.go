@@ -267,6 +267,11 @@ func (c *ChainConfig) String() string {
 	)
 }
 
+// Always return 1.0 for now. TODO: Do a diff with the config from ChainConfig to determine which version should use for this block number
+func BlockConsensusVersion(num *big.Int) string {
+	return "1.0"
+}
+
 // IsHomestead returns whether num is either equal to the homestead block or greater.
 func (c *ChainConfig) IsHomestead(num *big.Int) bool {
 	return isForked(c.HomesteadBlock, num)

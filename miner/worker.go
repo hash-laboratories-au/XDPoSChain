@@ -636,15 +636,15 @@ func (w *worker) resultLoop() {
 			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
 
 			if w.config.XDPoS != nil {
-				c := w.engine.(*XDPoS.XDPoS)
-				snap, err := c.GetSnapshot(w.chain, block.Header())
+				adaptor := w.engine.(*XDPoS.EngineAdaptor)
+				snap, err := adaptor.GetSnapshot(w.chain, block.Header())
 				if err != nil {
 					log.Error("Fail to get snapshot for sign tx signer.")
 					return
 				}
 				if _, authorized := snap.Signers[w.coinbase]; !authorized {
 					valid := false
-					masternodes := c.GetMasternodes(w.chain, block.Header())
+					masternodes := adaptor.GetMasternodes(w.chain, block.Header())
 					for _, m := range masternodes {
 						if m == w.coinbase {
 							valid = true
@@ -972,8 +972,8 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		// only go with XDPoS
 		if w.config.XDPoS != nil {
 			// get masternodes set from latest checkpoint
-			c := w.engine.(*XDPoS.XDPoS)
-			len, preIndex, curIndex, ok, err := c.YourTurn(w.chain, parent.Header(), w.coinbase)
+			adaptor := w.engine.(*XDPoS.EngineAdaptor)
+			len, preIndex, curIndex, ok, err := adaptor.YourTurn(w.chain, parent.Header(), w.coinbase)
 			if err != nil {
 				log.Warn("Failed when trying to commit new work", "err", err)
 				return

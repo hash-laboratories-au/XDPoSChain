@@ -757,7 +757,7 @@ func (s *PublicBlockChainAPI) GetMasternodes(ctx context.Context, b *types.Block
 		if prevBlockNumber >= latestBlockNumber || !s.b.ChainConfig().IsTIP2019(b.Number()) {
 			prevBlockNumber = curBlockNumber
 		}
-		if engine, ok := s.b.GetEngine().(*XDPoS.XDPoS); ok {
+		if engine, ok := s.b.GetEngine().(*XDPoS.EngineAdaptor); ok {
 			// Get block epoc latest.
 			lastCheckpointNumber := prevBlockNumber - (prevBlockNumber % s.b.ChainConfig().XDPoS.Epoch)
 			prevCheckpointBlock, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(lastCheckpointNumber))
@@ -1167,7 +1167,7 @@ func (s *PublicBlockChainAPI) rpcOutputBlockSigners(b *types.Block, ctx context.
 		if signedBlockNumber >= latestBlockNumber.Uint64() || !s.b.ChainConfig().IsTIP2019(b.Number()) {
 			signedBlockNumber = blockNumber
 		}
-		if engine, ok := s.b.GetEngine().(*XDPoS.XDPoS); ok {
+		if engine, ok := s.b.GetEngine().(*XDPoS.EngineAdaptor); ok {
 			// Get block epoc latest.
 			lastCheckpointNumber := signedBlockNumber - (signedBlockNumber % s.b.ChainConfig().XDPoS.Epoch)
 			prevCheckpointBlock, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(lastCheckpointNumber))
@@ -1857,7 +1857,7 @@ func GetSignersFromBlocks(b Backend, blockNumber uint64, blockHash common.Hash, 
 	for _, node := range masternodes {
 		mapMN[node] = true
 	}
-	if engine, ok := b.GetEngine().(*XDPoS.XDPoS); ok {
+	if engine, ok := b.GetEngine().(*XDPoS.EngineAdaptor); ok {
 		limitNumber := blockNumber - blockNumber%b.ChainConfig().XDPoS.Epoch + 2*b.ChainConfig().XDPoS.Epoch - 1
 		currentNumber := b.CurrentBlock().NumberU64()
 		if limitNumber > currentNumber {
@@ -1868,7 +1868,7 @@ func GetSignersFromBlocks(b Backend, blockNumber uint64, blockHash common.Hash, 
 			if err != nil {
 				return addrs, err
 			}
-			signData, ok := engine.BlockSigners.Get(header.Hash())
+			signData, ok := engine.GetBlockSigners(header)
 			var signTxs []*types.Transaction = nil
 			if !ok {
 				blockData, err := b.BlockByNumber(nil, rpc.BlockNumber(i))

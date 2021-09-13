@@ -25,8 +25,12 @@ import (
 // API is a user facing RPC API to allow controlling the signer and voting
 // mechanisms of the proof-of-authority scheme.
 type API struct {
-	chain consensus.ChainReader
-	XDPoS *XDPoS
+	chain         consensus.ChainReader
+	engineAdaptor *EngineAdaptor
+}
+
+func NewAPI(chain consensus.ChainReader, engineAdaptor *EngineAdaptor) *API {
+	return &API{chain: chain, engineAdaptor: engineAdaptor}
 }
 
 // GetSnapshot retrieves the state snapshot at a given block.
@@ -42,7 +46,7 @@ func (api *API) GetSnapshot(number *rpc.BlockNumber) (*Snapshot, error) {
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	return api.XDPoS.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	return api.engineAdaptor.GetSnapshot(api.chain, header)
 }
 
 // GetSnapshotAtHash retrieves the state snapshot at a given block.
@@ -51,7 +55,7 @@ func (api *API) GetSnapshotAtHash(hash common.Hash) (*Snapshot, error) {
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	return api.XDPoS.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	return api.engineAdaptor.GetSnapshot(api.chain, header)
 }
 
 // GetSigners retrieves the list of authorized signers at the specified block.
@@ -67,7 +71,7 @@ func (api *API) GetSigners(number *rpc.BlockNumber) ([]common.Address, error) {
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.XDPoS.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.engineAdaptor.GetSnapshot(api.chain, header)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +84,7 @@ func (api *API) GetSignersAtHash(hash common.Hash) ([]common.Address, error) {
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.XDPoS.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.engineAdaptor.GetSnapshot(api.chain, header)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +93,5 @@ func (api *API) GetSignersAtHash(hash common.Hash) ([]common.Address, error) {
 
 // Proposals returns the current proposals the node tries to uphold and vote on.
 func (api *API) Proposals() map[common.Address]bool {
-	api.XDPoS.lock.RLock()
-	defer api.XDPoS.lock.RUnlock()
-
-	proposals := make(map[common.Address]bool)
-	for address, auth := range api.XDPoS.proposals {
-		proposals[address] = auth
-	}
-	return proposals
+	return api.engineAdaptor.Engine_v1.GetProposals()
 }

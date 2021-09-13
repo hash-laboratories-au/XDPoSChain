@@ -68,7 +68,7 @@ func (s signersAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent signers, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, signers []common.Address) *Snapshot {
+func NewSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, signers []common.Address) *Snapshot {
 	snap := &Snapshot{
 		config:   config,
 		sigcache: sigcache,
@@ -84,8 +84,12 @@ func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint
 	return snap
 }
 
+func (snap *Snapshot) GetSnapshotCache() *lru.ARCCache {
+	return snap.sigcache
+}
+
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
+func LoadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
 	blob, err := db.Get(append([]byte("XDPoS-"), hash[:]...))
 	if err != nil {
 		return nil, err
@@ -101,7 +105,7 @@ func loadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.D
 }
 
 // store inserts the snapshot into the database.
-func (s *Snapshot) store(db ethdb.Database) error {
+func (s *Snapshot) Store(db ethdb.Database) error {
 	blob, err := json.Marshal(s)
 	if err != nil {
 		return err
@@ -137,7 +141,7 @@ func (s *Snapshot) copy() *Snapshot {
 
 // validVote returns whether it makes sense to cast the specified vote in the
 // given snapshot context (e.g. don't try to add an already authorized signer).
-func (s *Snapshot) validVote(address common.Address, authorize bool) bool {
+func (s *Snapshot) ValidVote(address common.Address, authorize bool) bool {
 	_, signer := s.Signers[address]
 	return (signer && !authorize) || (!signer && authorize)
 }
@@ -145,7 +149,7 @@ func (s *Snapshot) validVote(address common.Address, authorize bool) bool {
 // cast adds a new vote into the tally.
 func (s *Snapshot) cast(address common.Address, authorize bool) bool {
 	// Ensure the vote is meaningful
-	if !s.validVote(address, authorize) {
+	if !s.ValidVote(address, authorize) {
 		return false
 	}
 	// Cast the vote into an existing or new tally
@@ -181,7 +185,7 @@ func (s *Snapshot) uncast(address common.Address, authorize bool) bool {
 
 // apply creates a new authorization snapshot by applying the given headers to
 // the original one.
-func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
+func (s *Snapshot) Apply(headers []*types.Header) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
 		return s, nil

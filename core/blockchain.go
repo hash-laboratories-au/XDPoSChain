@@ -533,7 +533,7 @@ func (bc *BlockChain) insert(block *types.Block) {
 
 	// save cache BlockSigners
 	if bc.chainConfig.XDPoS != nil && !bc.chainConfig.IsTIPSigning(block.Number()) {
-		engine := bc.Engine().(*XDPoS.XDPoS)
+		engine := bc.Engine().(*XDPoS.EngineAdaptor)
 		engine.CacheData(block.Header(), block.Transactions(), bc.GetReceiptsByHash(block.Hash()))
 	}
 
@@ -1070,7 +1070,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 	// save cache BlockSigners
 	if bc.chainConfig.XDPoS != nil && bc.chainConfig.IsTIPSigning(block.Number()) {
-		engine := bc.Engine().(*XDPoS.XDPoS)
+		engine := bc.Engine().(*XDPoS.EngineAdaptor)
 		engine.CacheSigner(block.Header().Hash(), block.Transactions())
 	}
 	bc.futureBlocks.Remove(block.Hash())
@@ -2007,7 +2007,7 @@ func (bc *BlockChain) UpdateM1() error {
 	if bc.Config().XDPoS == nil {
 		return ErrNotXDPoS
 	}
-	engine := bc.Engine().(*XDPoS.XDPoS)
+	engine := bc.Engine().(*XDPoS.EngineAdaptor)
 	log.Info("It's time to update new set of masternodes for the next epoch...")
 	// get masternodes information from smart contract
 	client, err := bc.GetClient()

@@ -345,7 +345,7 @@ func startNode(ctx *cli.Context, stack *node.Node, cfg XDCConfig) {
 	if err := stack.Service(&ethereum); err != nil {
 		utils.Fatalf("Ethereum service not running: %v", err)
 	}
-	if _, ok := ethereum.Engine().(*XDPoS.XDPoS); ok {
+	if _, ok := ethereum.Engine().(*XDPoS.EngineAdaptor); ok {
 		go func() {
 			started := false
 			ok := false

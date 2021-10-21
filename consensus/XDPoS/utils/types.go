@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/clique"
 	"github.com/XinFinOrg/XDPoSChain/core/state"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
+	"github.com/XinFinOrg/XDPoSChain/rlp"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -55,4 +57,72 @@ type PublicApiSnapshot struct {
 	Recents map[uint64]common.Address       `json:"recents"` // Set of recent signers for spam protections
 	Votes   []*clique.Vote                  `json:"votes"`   // List of votes cast in chronological order
 	Tally   map[common.Address]clique.Tally `json:"tally"`   // Current vote tally to avoid recalculating
+}
+
+// Vote message in XDPoS 2.0
+type VoteType struct {
+	ProposedBlockInfo BlockInfo
+	Signature         []byte
+}
+
+// Timeout message in XDPoS 2.0
+type TimeoutType struct {
+	Round     uint64
+	Signature []byte
+}
+
+// BFT Sync Info message in XDPoS 2.0
+type SyncInfoType struct {
+	HighestQuorumCert  QuorumCertType
+	HighestTimeoutCert TimeoutCertType
+}
+
+// Block Info struct in XDPoS 2.0, used for vote message, etc.
+type BlockInfo struct {
+	Hash   common.Hash
+	Round  uint64
+	Number *big.Int
+}
+
+// Quorum Certificate struct in XDPoS 2.0
+type QuorumCertType struct {
+	ProposedBlockInfo BlockInfo
+	Signatures        []byte
+}
+
+// Timeout Certificate struct in XDPoS 2.0
+type TimeoutCertType struct {
+	Round      uint64
+	Signatures []byte
+}
+
+// The parsed extra fields in block header in XDPoS 2.0 (excluding the version byte)
+// (The version (consensus version) byte is the first byte in header's extra) and it's only valid with value >= 2.0)
+type ExtraFields_v2 struct {
+	Round      uint64
+	QuorumCert QuorumCertType
+}
+
+func (e *ExtraFields_v2) Encode() ([]byte, error) {
+	bytes, err := rlp.EncodeToBytes(e)
+	if err != nil {
+		return nil, err
+	}
+	versionByte := []byte{2}
+	return append(versionByte, bytes...), nil
+}
+
+func DecodeExtraFields(bytes []byte) (*ExtraFields_v2, error) {
+	//question shall this be sepcific to version 2? or all versions>=2?
+	if len(bytes) == 0 {
+		return nil, fmt.Errorf("extra field is 0 length")
+	}
+	version := bytes[0]
+	if version == 2 {
+		var e ExtraFields_v2
+		rlp.DecodeBytes(bytes[1:], &e)
+		return &e, nil
+	} else {
+		return nil, fmt.Errorf("unknown version: %d", version)
+	}
 }

@@ -79,15 +79,15 @@ type SyncInfoType struct {
 
 // Block Info struct in XDPoS 2.0, used for vote message, etc.
 type BlockInfo struct {
-	Hash   common.Hash
-	Round  uint64
-	Number *big.Int
+	Hash   common.Hash `json:"hash"`
+	Round  uint64      `json:"round"`
+	Number *big.Int    `json:"number"`
 }
 
 // Quorum Certificate struct in XDPoS 2.0
 type QuorumCertType struct {
-	ProposedBlockInfo BlockInfo
-	Signatures        []byte
+	ProposedBlockInfo BlockInfo `json:"proposedBlock"`
+	Signatures        []byte    `json:"signatures"`
 }
 
 // Timeout Certificate struct in XDPoS 2.0
@@ -97,13 +97,13 @@ type TimeoutCertType struct {
 }
 
 // The parsed extra fields in block header in XDPoS 2.0 (excluding the version byte)
-// (The version (consensus version) byte is the first byte in header's extra) and it's only valid with value >= 2.0)
+// (The version (consensus version) byte is the first byte in header's extra) and it's only valid with value >= 2)
 type ExtraFields_v2 struct {
 	Round      uint64
 	QuorumCert QuorumCertType
 }
 
-func (e *ExtraFields_v2) Encode() ([]byte, error) {
+func (e *ExtraFields_v2) EncodeToBytes() ([]byte, error) {
 	bytes, err := rlp.EncodeToBytes(e)
 	if err != nil {
 		return nil, err
@@ -112,17 +112,10 @@ func (e *ExtraFields_v2) Encode() ([]byte, error) {
 	return append(versionByte, bytes...), nil
 }
 
-func DecodeExtraFields(bytes []byte) (*ExtraFields_v2, error) {
-	//question shall this be sepcific to version 2? or all versions>=2?
-	if len(bytes) == 0 {
-		return nil, fmt.Errorf("extra field is 0 length")
+func DecodeBytesExtraFields(b []byte, val interface{}) error {
+	//question shall this be specific to version 2? or all versions>=2?
+	if len(b) == 0 {
+		return fmt.Errorf("extra field is 0 length")
 	}
-	version := bytes[0]
-	if version == 2 {
-		var e ExtraFields_v2
-		rlp.DecodeBytes(bytes[1:], &e)
-		return &e, nil
-	} else {
-		return nil, fmt.Errorf("unknown version: %d", version)
-	}
+	return rlp.DecodeBytes(b[1:], val)
 }

@@ -18,15 +18,16 @@ func testExtraFields() *ExtraFields_v2 {
 }
 func TestExtraFieldsEncodeDecode(t *testing.T) {
 	extraFields := testExtraFields()
-	encoded, err := extraFields.Encode()
+	encoded, err := extraFields.EncodeToBytes()
 	if err != nil {
 		t.Errorf("Error when encoding extra fields")
 	}
-	decoded, err := DecodeExtraFields(encoded)
+	var decoded ExtraFields_v2
+	err = DecodeBytesExtraFields(encoded, &decoded)
 	if err != nil {
 		t.Errorf("Error when decoding extra fields")
 	}
-	if !reflect.DeepEqual(extraFields, decoded) {
+	if !reflect.DeepEqual(extraFields, &decoded) {
 		t.Fatalf("Decoded not equal to original extra field, original: %v; decoded: %v", extraFields, decoded)
 	}
 }

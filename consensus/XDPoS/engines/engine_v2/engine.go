@@ -9,14 +9,16 @@ import (
 )
 
 type XDPoS_v2 struct {
-	config *params.XDPoSConfig // Consensus engine configuration parameters
-	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
+	config      *params.XDPoSConfig // Consensus engine configuration parameters
+	db          ethdb.Database      // Database to store and retrieve snapshot checkpoints
+	BroadcastCh chan interface{}    // Broadcast channel for v2 specific messages
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	return &XDPoS_v2{
-		config: config,
-		db:     db,
+		config:      config,
+		db:          db,
+		BroadcastCh: make(chan interface{}),
 	}
 }
 

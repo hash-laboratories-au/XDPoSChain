@@ -3,6 +3,7 @@ package bft
 import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
+	"github.com/XinFinOrg/XDPoSChain/log"
 )
 
 type collectVoteFn func(utils.VoteType) error
@@ -18,10 +19,10 @@ type broadcastTimeoutFn func(utils.TimeoutType)
 type broadcastSyncInfoFn func(utils.SyncInfoType)
 
 type BFT struct {
-	messageBus chan interface{}
-	quit       chan struct{}
-	engine     ConsensusFns
-	broadcast  BroadcastFns
+	broadcastCh chan interface{}
+	quit        chan struct{}
+	engine      ConsensusFns
+	broadcast   BroadcastFns
 }
 
 type ConsensusFns struct {
@@ -43,22 +44,41 @@ func New(engine *XDPoS.XDPoS, broadcasts BroadcastFns) *BFT {
 		updateRound:    engine.UpdateRound,
 	}
 	return &BFT{
-		messageBus: make(chan interface{}),
-		engine:     consensus,
-		broadcast:  broadcasts,
+		broadcastCh: engine.EngineV2.BroadcastCh,
+		engine:      consensus,
+		broadcast:   broadcasts,
 	}
 }
 
 func (b *BFT) Vote(vote interface{}) {
-	b.engine.collectVote(vote)
+	log.Trace("Receive Vote", "vote", vote)
+	err := b.engine.collectVote(vote)
+	if err != nil {
+		log.Error("Collect BFT Vote", "error", err)
+		return
+	}
+	b.broadcast.Vote(vote)
 }
 
 func (b *BFT) Timeout(timeout interface{}) {
-	b.engine.collectTimeout(timeout)
+	log.Trace("Receive Timeout", "timeout", timeout)
+
+	err := b.engine.collectTimeout(timeout)
+	if err != nil {
+		log.Error("Collect BFT Timeout", "error", err)
+		return
+	}
+	b.broadcast.Timeout(timeout)
 }
 
 func (b *BFT) SyncInfo(syncInfo interface{}) {
-	b.engine.updateRound(syncInfo)
+	log.Trace("Receive SyncInfo", "syncInfo", syncInfo)
+	err := b.engine.updateRound(syncInfo)
+	if err != nil {
+		log.Error("Collect BFT SyncInfo", "error", err)
+		return
+	}
+	b.broadcast.SyncInfo(syncInfo)
 }
 func (b *BFT) Start() {
 	go b.loop()
@@ -74,7 +94,7 @@ func (b *BFT) loop() {
 		select {
 		case <-b.quit:
 			return
-		case obj := <-b.messageBus:
+		case obj := <-b.broadcastCh:
 			switch v := obj.(type) {
 			case utils.VoteType:
 				b.broadcast.Vote(v)
@@ -86,6 +106,5 @@ func (b *BFT) loop() {
 
 			}
 		}
-		//TODO: stop routine
 	}
 }

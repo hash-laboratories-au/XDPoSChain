@@ -41,6 +41,9 @@ const (
 	maxKnownOrderTxs   = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
 	maxKnownLendingTxs = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
 	maxKnownBlocks     = 1024  // Maximum block hashes to keep in the known list (prevent DOS)
+	maxKnownVote       = 1024  // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownTimeout    = 1024  // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownSyncInfo   = 1024  // Maximum transactions hashes to keep in the known list (prevent DOS)
 	handshakeTimeout   = 5 * time.Second
 )
 
@@ -160,6 +163,36 @@ func (p *peer) MarkLendingTransaction(hash common.Hash) {
 		p.knownLendingTxs.Pop()
 	}
 	p.knownLendingTxs.Add(hash)
+}
+
+// MarkVote marks a vote as known for the peer, ensuring that it
+// will never be propagated to this particular peer.
+func (p *peer) MarkVote(hash interface{}) {
+	// If we reached the memory allowance, drop a previously known transaction hash
+	for p.knownVote.Cardinality() >= maxKnownVote {
+		p.knownVote.Pop()
+	}
+	p.knownVote.Add(hash)
+}
+
+// MarkTimeout marks a timeout as known for the peer, ensuring that it
+// will never be propagated to this particular peer.
+func (p *peer) MarkTimeout(hash interface{}) {
+	// If we reached the memory allowance, drop a previously known transaction hash
+	for p.knownTimeout.Cardinality() >= maxKnownTimeout {
+		p.knownTimeout.Pop()
+	}
+	p.knownTimeout.Add(hash)
+}
+
+// MarkSyncInfo marks a syncInfo as known for the peer, ensuring that it
+// will never be propagated to this particular peer.
+func (p *peer) MarkSyncInfo(hash interface{}) {
+	// If we reached the memory allowance, drop a previously known transaction hash
+	for p.knownSyncInfo.Cardinality() >= maxKnownSyncInfo {
+		p.knownSyncInfo.Pop()
+	}
+	p.knownSyncInfo.Add(hash)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes

@@ -68,7 +68,6 @@ const (
 	VoteMsg     = 0xe0
 	TimeoutMsg  = 0xe1
 	SyncInfoMsg = 0xe2
-	TCMsg       = 0xe3
 )
 
 type errCode int

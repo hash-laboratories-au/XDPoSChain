@@ -17,8 +17,6 @@ type broadcastTimeoutFn func(utils.TimeoutType)
 
 type broadcastSyncInfoFn func(utils.SyncInfoType)
 
-type broadcastTCFn func(utils.TCType)
-
 type BFT struct {
 	messageBus chan interface{}
 	quit       chan struct{}
@@ -36,7 +34,6 @@ type BroadcastFns struct {
 	Vote     broadcastVoteFn
 	Timeout  broadcastTimeoutFn
 	SyncInfo broadcastSyncInfoFn
-	TC       broadcastTCFn
 }
 
 func New(engine *XDPoS.XDPoS, broadcasts BroadcastFns) *BFT {
@@ -67,6 +64,10 @@ func (b *BFT) Start() {
 	go b.loop()
 }
 
+func (b *BFT) Stop() {
+	close(b.quit)
+}
+
 func (b *BFT) loop() {
 
 	for {
@@ -81,8 +82,6 @@ func (b *BFT) loop() {
 				b.broadcast.Timeout(v)
 			case utils.SyncInfoType:
 				b.broadcast.SyncInfo(v)
-			case utils.TCType:
-				b.broadcast.TC(v)
 			default:
 
 			}

@@ -17,7 +17,7 @@ import (
 type VoteType interface{}
 type TimeoutType interface{}
 type SyncInfoType interface{}
-type TCType interface{}
+type TimeoutCertType interface{}
 
 type Masternode struct {
 	Address common.Address

@@ -227,7 +227,6 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		Vote:     manager.BroadcastVote,
 		Timeout:  manager.BroadcastTimeout,
 		SyncInfo: manager.BroadcastSyncInfo,
-		TC:       manager.BroadcastTC,
 	}
 	if blockchain.Config().XDPoS != nil {
 		XDPoSEngine := engine.(*XDPoS.XDPoS)
@@ -925,17 +924,6 @@ func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo utils.SyncInfoType) {
 	}
 	//log.Trace("Propagated block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	return
-}
-func (pm *ProtocolManager) BroadcastTC(TC utils.TCType) {
-	//hash := TC.Hash()
-	hash := common.Hash{}
-	peers := pm.peers.PeersWithoutTC(hash)
-	for _, peer := range peers {
-		peer.SendTC(TC)
-	}
-	//log.Trace("Propagated block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
-	return
-
 }
 
 // OrderBroadcastTx will propagate a transaction to all peers which are not known to

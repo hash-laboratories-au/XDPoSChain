@@ -74,7 +74,6 @@ type peer struct {
 
 	knownVote     mapset.Set // Set of BFT Vote known to be known by this peer
 	knownTimeout  mapset.Set // Set of BFT timeout known to be known by this peer
-	knownTC       mapset.Set // Set of BFT TC known to be known by this peer
 	knownSyncInfo mapset.Set // Set of BFT Sync Info known to be known by this peer`
 }
 
@@ -304,15 +303,6 @@ func (p *peer) AsyncSendSyncInfo() {
 
 }
 */
-
-func (p *peer) SendTC(syncInfo interface{}) error {
-	p.knownTC.Add(syncInfo)
-	if p.pairRw != nil {
-		return p2p.Send(p.pairRw, TCMsg, syncInfo)
-	} else {
-		return p2p.Send(p.rw, TCMsg, syncInfo)
-	}
-}
 
 // RequestOneHeader is a wrapper around the header query functions to fetch a
 // single header. It is used solely by the fetcher.
@@ -568,21 +558,6 @@ func (ps *peerSet) PeersWithoutTimeout(hash common.Hash) []*peer {
 	list := make([]*peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		if !p.knownTimeout.Contains(hash) {
-			list = append(list, p)
-		}
-	}
-	return list
-}
-
-// PeersWithoutTC retrieves a list of peers that do not have a given block in
-// their set of known hashes.
-func (ps *peerSet) PeersWithoutTC(hash common.Hash) []*peer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
-
-	list := make([]*peer, 0, len(ps.peers))
-	for _, p := range ps.peers {
-		if !p.knownTC.Contains(hash) {
 			list = append(list, p)
 		}
 	}

@@ -58,45 +58,45 @@ type PublicApiSnapshot struct {
 }
 
 // Vote message in XDPoS 2.0
-type VoteType struct {
+type Vote struct {
 	ProposedBlockInfo BlockInfo
 	Signature         []byte
 }
 
 // Timeout message in XDPoS 2.0
-type TimeoutType struct {
+type Timeout struct {
 	Round     uint64
 	Signature []byte
 }
 
 // BFT Sync Info message in XDPoS 2.0
-type SyncInfoType struct {
-	HighestQuorumCert  QuorumCertType
-	HighestTimeoutCert TimeoutCertType
+type SyncInfo struct {
+	HighestQuorumCert  QuorumCert
+	HighestTimeoutCert TimeoutCert
 }
 
 // Block Info struct in XDPoS 2.0, used for vote message, etc.
 type BlockInfo struct {
-	Hash   common.Hash `json:"hash"`
-	Round  uint64      `json:"round"`
-	Number *big.Int    `json:"number"`
+	Hash   common.Hash
+	Round  uint64
+	Number *big.Int
 }
 
 // Quorum Certificate struct in XDPoS 2.0
-type QuorumCertType struct {
-	ProposedBlockInfo BlockInfo `json:"proposedBlock"`
-	Signatures        [][]byte  `json:"signatures"`
+type QuorumCert struct {
+	ProposedBlockInfo BlockInfo
+	Signatures        [][]byte
 }
 
 // Timeout Certificate struct in XDPoS 2.0
-type TimeoutCertType struct {
+type TimeoutCert struct {
 	Round      uint64
 	Signatures [][]byte
 }
 
 // The parsed extra fields in block header in XDPoS 2.0 (excluding the version byte)
-// (The version (consensus version) byte is the first byte in header's extra) and it's only valid with value >= 2)
+// The version byte (consensus version) is the first byte in header's extra and it's only valid with value >= 2
 type ExtraFields_v2 struct {
 	Round      uint64
-	QuorumCert QuorumCertType
+	QuorumCert QuorumCert
 }

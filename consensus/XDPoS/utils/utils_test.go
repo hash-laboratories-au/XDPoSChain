@@ -84,17 +84,17 @@ func TestCompareSignersLists(t *testing.T) {
 	}
 }
 
-func testExtraFields() *ExtraFields_v2 {
+func toyExtraFields() *ExtraFields_v2 {
 	round := uint64(307)
 	block_info := BlockInfo{Hash: common.BigToHash(big.NewInt(2047)), Round: round - 1, Number: big.NewInt(1)}
 	signature := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 	signatures := [][]byte{signature}
-	quorum_cert := QuorumCertType{ProposedBlockInfo: block_info, Signatures: signatures}
+	quorum_cert := QuorumCert{ProposedBlockInfo: block_info, Signatures: signatures}
 	e := &ExtraFields_v2{Round: round, QuorumCert: quorum_cert}
 	return e
 }
 func TestExtraFieldsEncodeDecode(t *testing.T) {
-	extraFields := testExtraFields()
+	extraFields := toyExtraFields()
 	encoded, err := extraFields.EncodeToBytes()
 	if err != nil {
 		t.Errorf("Error when encoding extra fields")

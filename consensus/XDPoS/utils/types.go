@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"math/big"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/clique"
 	"github.com/XinFinOrg/XDPoSChain/core/state"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
-	"github.com/XinFinOrg/XDPoSChain/rlp"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -87,13 +85,13 @@ type BlockInfo struct {
 // Quorum Certificate struct in XDPoS 2.0
 type QuorumCertType struct {
 	ProposedBlockInfo BlockInfo `json:"proposedBlock"`
-	Signatures        []byte    `json:"signatures"`
+	Signatures        [][]byte  `json:"signatures"`
 }
 
 // Timeout Certificate struct in XDPoS 2.0
 type TimeoutCertType struct {
 	Round      uint64
-	Signatures []byte
+	Signatures [][]byte
 }
 
 // The parsed extra fields in block header in XDPoS 2.0 (excluding the version byte)
@@ -101,21 +99,4 @@ type TimeoutCertType struct {
 type ExtraFields_v2 struct {
 	Round      uint64
 	QuorumCert QuorumCertType
-}
-
-func (e *ExtraFields_v2) EncodeToBytes() ([]byte, error) {
-	bytes, err := rlp.EncodeToBytes(e)
-	if err != nil {
-		return nil, err
-	}
-	versionByte := []byte{2}
-	return append(versionByte, bytes...), nil
-}
-
-func DecodeBytesExtraFields(b []byte, val interface{}) error {
-	//question shall this be specific to version 2? or all versions>=2?
-	if len(b) == 0 {
-		return fmt.Errorf("extra field is 0 length")
-	}
-	return rlp.DecodeBytes(b[1:], val)
 }

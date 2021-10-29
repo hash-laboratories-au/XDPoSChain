@@ -141,6 +141,4 @@ func TestHashAndSigHash(t *testing.T) {
 	if TimeoutSigHash(&round) == TimeoutSigHash(&round2) {
 		t.Fatalf("SigHash of two round shouldn't equal")
 	}
-	t.Logf("SigHash %s", TimeoutSigHash(&round).Hex())
-	t.Logf("SigHash %s", TimeoutSigHash(&round2).Hex())
 }

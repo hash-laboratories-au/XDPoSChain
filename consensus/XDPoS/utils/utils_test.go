@@ -85,7 +85,7 @@ func TestCompareSignersLists(t *testing.T) {
 }
 
 func toyExtraFields() *ExtraFields_v2 {
-	round := uint64(307)
+	round := Round(307)
 	blockInfo := BlockInfo{Hash: common.BigToHash(big.NewInt(2047)), Round: round - 1, Number: big.NewInt(1)}
 	signature := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 	signatures := [][]byte{signature}
@@ -110,7 +110,7 @@ func TestExtraFieldsEncodeDecode(t *testing.T) {
 }
 
 func TestHashAndSigHash(t *testing.T) {
-	round := uint64(307)
+	round := Round(307)
 	blockInfo1 := BlockInfo{Hash: common.BigToHash(big.NewInt(2047)), Round: round - 1, Number: big.NewInt(1)}
 	blockInfo2 := BlockInfo{Hash: common.BigToHash(big.NewInt(4095)), Round: round - 1, Number: big.NewInt(1)}
 	signature1 := []byte{1, 2, 3, 4, 5, 6, 7, 8}
@@ -137,9 +137,10 @@ func TestHashAndSigHash(t *testing.T) {
 	if VoteSigHash(&blockInfo1) == VoteSigHash(&blockInfo2) {
 		t.Fatalf("SigHash of two block info shouldn't equal")
 	}
-	round2 := uint64(999)
+	round2 := Round(999)
 	if TimeoutSigHash(&round) == TimeoutSigHash(&round2) {
 		t.Fatalf("SigHash of two round shouldn't equal")
 	}
-
+	t.Logf("SigHash %s", TimeoutSigHash(&round).Hex())
+	t.Logf("SigHash %s", TimeoutSigHash(&round2).Hex())
 }

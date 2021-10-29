@@ -199,6 +199,6 @@ func VoteSigHash(m *BlockInfo) common.Hash {
 	return rlpHash(m)
 }
 
-func TimeoutSigHash(m *uint64) common.Hash {
+func TimeoutSigHash(m *Round) common.Hash {
 	return rlpHash(m)
 }

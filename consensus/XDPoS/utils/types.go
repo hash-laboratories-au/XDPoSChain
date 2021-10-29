@@ -57,6 +57,9 @@ type PublicApiSnapshot struct {
 	Tally   map[common.Address]clique.Tally `json:"tally"`   // Current vote tally to avoid recalculating
 }
 
+// Round number type in XDPoS 2.0
+type Round uint64
+
 // Vote message in XDPoS 2.0
 type Vote struct {
 	ProposedBlockInfo BlockInfo
@@ -65,7 +68,7 @@ type Vote struct {
 
 // Timeout message in XDPoS 2.0
 type Timeout struct {
-	Round     uint64
+	Round     Round
 	Signature []byte
 }
 
@@ -78,7 +81,7 @@ type SyncInfo struct {
 // Block Info struct in XDPoS 2.0, used for vote message, etc.
 type BlockInfo struct {
 	Hash   common.Hash
-	Round  uint64
+	Round  Round
 	Number *big.Int
 }
 
@@ -90,13 +93,13 @@ type QuorumCert struct {
 
 // Timeout Certificate struct in XDPoS 2.0
 type TimeoutCert struct {
-	Round      uint64
+	Round      Round
 	Signatures [][]byte
 }
 
 // The parsed extra fields in block header in XDPoS 2.0 (excluding the version byte)
 // The version byte (consensus version) is the first byte in header's extra and it's only valid with value >= 2
 type ExtraFields_v2 struct {
-	Round      uint64
+	Round      Round
 	QuorumCert QuorumCert
 }

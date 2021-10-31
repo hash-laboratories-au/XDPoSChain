@@ -7,15 +7,10 @@ import (
 )
 
 type collectVoteFn func(utils.VoteType) error
-
 type collectTimeoutFn func(utils.TimeoutType) error
-
 type updateRoundFn func(utils.SyncInfoType) error
-
 type broadcastVoteFn func(utils.VoteType)
-
 type broadcastTimeoutFn func(utils.TimeoutType)
-
 type broadcastSyncInfoFn func(utils.SyncInfoType)
 
 type BFT struct {
@@ -29,6 +24,7 @@ type ConsensusFns struct {
 	collectVote    collectVoteFn
 	collectTimeout collectTimeoutFn
 	updateRound    updateRoundFn
+	verifyVote     verifyVotefn
 }
 
 type BroadcastFns struct {
@@ -42,6 +38,11 @@ func New(engine *XDPoS.XDPoS, broadcasts BroadcastFns) *BFT {
 		collectVote:    engine.CollectVote,
 		collectTimeout: engine.CollectTimeout,
 		updateRound:    engine.UpdateRound,
+		verifyVote:     engine.CollectVote,
+		VeifySyncIno:   engine.VeifySyncInoMessage,
+		VerifyVote:     engine.VerifyVoteMessage,
+		VerifyTimeout:  engine.VerifyTimeoutMessage,
+		veifyBlockInfo: engine.veifyBlockInfo,
 	}
 	return &BFT{
 		broadcastCh: engine.EngineV2.BroadcastCh,

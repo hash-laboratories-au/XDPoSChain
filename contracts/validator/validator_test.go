@@ -16,10 +16,12 @@
 package validator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math/big"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 
@@ -28,9 +30,11 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	contractValidator "github.com/XinFinOrg/XDPoSChain/contracts/validator/contract"
 	"github.com/XinFinOrg/XDPoSChain/core"
+	"github.com/XinFinOrg/XDPoSChain/core/state"
 	"github.com/XinFinOrg/XDPoSChain/crypto"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
+	"github.com/XinFinOrg/XDPoSChain/rlp"
 )
 
 var (
@@ -249,4 +253,79 @@ func GetCandidatesOwnerBySigner(validator *contractValidator.XDCValidator, signe
 	}
 
 	return owner
+}
+
+func TestStatedbUtils(t *testing.T) {
+	validatorCap := new(big.Int)
+	validatorCap.SetString("50000000000000000000000", 10)
+	genesisAlloc := core.GenesisAlloc{
+		addr:     {Balance: big.NewInt(1000000000)},
+		acc1Addr: {Balance: validatorCap},
+		acc2Addr: {Balance: validatorCap},
+		acc4Addr: {Balance: validatorCap},
+	}
+	contractBackend := backends.NewXDCSimulatedBackend(genesisAlloc, 10000000, params.TestXDPoSMockChainConfig)
+	transactOpts := bind.NewKeyedTransactor(key)
+
+	validatorAddress, _, err := DeployValidator(transactOpts, contractBackend, []common.Address{addr, acc1Addr}, []*big.Int{validatorCap, validatorCap}, addr)
+	if err != nil {
+		t.Fatalf("can't deploy root registry: %v", err)
+	}
+	contractBackend.Commit()
+	//TODO: vote getVoter
+	d := time.Now().Add(1000 * time.Millisecond)
+	ctx, cancel := context.WithDeadline(context.Background(), d)
+	defer cancel()
+	code, _ := contractBackend.CodeAt(ctx, validatorAddress, nil)
+	storage := make(map[common.Hash]common.Hash)
+	f := func(key, val common.Hash) bool {
+		decode := []byte{}
+		trim := bytes.TrimLeft(val.Bytes(), "\x00")
+		rlp.DecodeBytes(trim, &decode)
+		storage[key] = common.BytesToHash(decode)
+		// t.Log("DecodeBytes", "value", val.String(), "decode", storage[key].String())
+		return true
+	}
+	contractBackend.ForEachStorageAt(ctx, validatorAddress, nil, f)
+	genesisAlloc[common.HexToAddress(common.MasternodeVotingSMC)] = core.GenesisAccount{
+		Balance: validatorCap,
+		Code:    code,
+		Storage: storage,
+	}
+	contractBackendForValidator := backends.NewXDCSimulatedBackend(genesisAlloc, 10000000, params.TestXDPoSMockChainConfig)
+	validator, err := NewValidator(transactOpts, common.HexToAddress(common.MasternodeVotingSMC), contractBackendForValidator)
+	if err != nil {
+		t.Fatalf("can't get validator object: %v", err)
+	}
+	statedb, err := contractBackendForValidator.GetBlockChain().State()
+	if err != nil {
+		t.Fatalf("can't get statedb: %v", err)
+	}
+	candidates, err := validator.GetCandidates()
+	if err != nil {
+		t.Fatalf("can't get candidates: %v", err)
+	}
+	candidates_statedb := state.GetCandidates(statedb)
+	if !reflect.DeepEqual(candidates, candidates_statedb) {
+		t.Fatalf("candidates not equal, statedb utils is wrong,\nbind calling result\n%v\nstatedb result\n%v", candidates, candidates_statedb)
+	}
+	if len(candidates) == 0 {
+		t.Fatalf("candidates empty, smart contract init is wrong")
+	}
+	// t.Logf("bind calling result\n%v\nstatedb result\n%v", candidates, candidates_statedb)
+	for _, it := range candidates {
+		cap, _ := validator.GetCandidateCap(it)
+		cap_statedb := state.GetCandidateCap(statedb, it)
+		if cap.Cmp(cap_statedb) != 0 {
+			t.Fatalf("cap not equal, statedb utils is wrong")
+		}
+		if cap.Cmp(validatorCap) != 0 {
+			t.Fatalf("cap not equal, smart contract init is wrong")
+		}
+		owner, _ := validator.GetCandidateOwner(it)
+		owner_statedb := state.GetCandidateOwner(statedb, it)
+		if !reflect.DeepEqual(owner, owner_statedb) {
+			t.Fatalf("owner not equal, statedb utils is wrong")
+		}
+	}
 }

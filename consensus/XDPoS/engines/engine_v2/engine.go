@@ -1,26 +1,41 @@
 package engine_v2
 
 import (
+	"time"
+
 	"github.com/XinFinOrg/XDPoSChain/common"
+	"github.com/XinFinOrg/XDPoSChain/common/countdown"
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
 )
 
 type XDPoS_v2 struct {
-	config      *params.XDPoSConfig // Consensus engine configuration parameters
-	db          ethdb.Database      // Database to store and retrieve snapshot checkpoints
-	BroadcastCh chan interface{}
-	BFTQueue    chan interface{}
+	config        *params.XDPoSConfig // Consensus engine configuration parameters
+	db            ethdb.Database      // Database to store and retrieve snapshot checkpoints
+	BroadcastCh   chan interface{}
+	BFTQueue      chan interface{}
+	timeoutWorker *countdown.CountdownTimer // Timer to generate broadcast timeout msg if threashold reached
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
-	return &XDPoS_v2{
-		config: config,
-		db:     db,
+	// Setup Timer
+	// TODO: (hashlab) Introduce consensus v2 engine specific config under the main config struct
+	duration := 50000 * time.Millisecond // Hardcoded value until we move it to a config (XIN-72)
+	timer := countdown.NewCountDown(duration)
+
+	engine := &XDPoS_v2{
+		config:        config,
+		db:            db,
+		timeoutWorker: timer,
 	}
+	// Add callback to the timer
+	timer.OnTimeoutFn = engine.onCountdownTimeout
+
+	return engine
 }
 
 func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
@@ -60,11 +75,11 @@ func (consensus *XDPoS_v2) Dispatcher() error {
 	SyncInfo workflow
 */
 // Verify syncInfo and trigger trigger process QC or TC if successful
-func (consensus *XDPoS_v2) VerifySyncInfoMessage(utils.SyncInfo) error {
+func (consensus *XDPoS_v2) VerifySyncInfoMessage(header *types.Header) error {
 	/*
 		1. Verify items including:
-				- veifyQC
-				- veifyTC
+				- verifyQC
+				- verifyTC
 		2. Broadcast(Not part of consensus)
 	*/
 	return nil
@@ -81,7 +96,7 @@ func (consensus *XDPoS_v2) SyncInfoHandler(header *types.Header) error {
 /*
 	Vote workflow
 */
-func (consensus *XDPoS_v2) VerifyVoteMessage(utils.Vote) error {
+func (consensus *XDPoS_v2) VerifyVoteMessage() error {
 	/*
 		  1. Check signature:
 					- Use ecRecover to get the public key
@@ -149,11 +164,11 @@ func (consensus *XDPoS_v2) generateBlockInfo() error {
 }
 
 // To be used by different message verification. Verify local DB block info against the received block information(i.e hash, blockNum, round)
-func (consensus *XDPoS_v2) VerifyBlockInfo(header *types.Header) error {
+func (consensus *XDPoS_v2) verifyBlockInfo(header *types.Header) error {
 	return nil
 }
 
-func (consensus *XDPoS_v2) VerifyQC(header *types.Header) error {
+func (consensus *XDPoS_v2) verifyQC(header *types.Header) error {
 	/*
 		1. Verify signer signatures: (List of signatures)
 					- Use ecRecover to get the public key
@@ -164,7 +179,7 @@ func (consensus *XDPoS_v2) VerifyQC(header *types.Header) error {
 	return nil
 }
 
-func (consensus *XDPoS_v2) VerifyTC(header *types.Header) error {
+func (consensus *XDPoS_v2) verifyTC(header *types.Header) error {
 	/*
 		1. Verify signer signature: (List of signatures)
 					- Use ecRecover to get the public key
@@ -209,7 +224,11 @@ func (consensus *XDPoS_v2) checkRoundNumber(header *types.Header) error {
 // Hot stuff rule to decide whether this node is eligible to vote for the received block
 func (consensus *XDPoS_v2) verifyVotingRule(header *types.Header) error {
 	/*
-		(TODO)
+		Make sure this node has not voted for this round. We can have a variable highestVotedRound, and check currentRound > highestVotedRound.
+		HotStuff Voting rule:
+		header's round == local current round, AND (one of the following two:)
+		header's block extends LockQC's ProposedBlockInfo (we need a isExtending(block_a, block_b) function), OR
+		header's QC's ProposedBlockInfo.Round > LockQC's ProposedBlockInfo.Round
 	*/
 	return nil
 }
@@ -234,5 +253,17 @@ func (consensus *XDPoS_v2) sendTimeout() error {
 
 // Generate and send syncInfo into Broadcast channel. The SyncInfo includes local highest QC & TC
 func (consensus *XDPoS_v2) sendSyncInfo() error {
+	return nil
+}
+
+/*
+	Function that will be called by timer when countdown reaches its threshold.
+	In the engine v2, we would need to broadcast timeout messages to other peers
+*/
+func (consensus *XDPoS_v2) onCountdownTimeout(time time.Time) error {
+	err := consensus.sendTimeout()
+	if err != nil {
+		log.Error("Error while sending out timeout message at time: ", time)
+	}
 	return nil
 }

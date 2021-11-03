@@ -60,6 +60,7 @@ func New(engine consensus.Engine, broadcasts BroadcastFns) *Bfter {
 
 	return &Bfter{
 		broadcastCh:    e.EngineV2.BroadcastCh,
+		quit:           make(chan struct{}),
 		consensus:      consensus,
 		broadcast:      broadcasts,
 		knownVotes:     knownVotes,

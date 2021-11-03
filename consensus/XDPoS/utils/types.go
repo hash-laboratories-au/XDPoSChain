@@ -69,7 +69,7 @@ type BlockInfo struct {
 
 // Vote message in XDPoS 2.0
 type Vote struct {
-	ProposedBlockInfo *BlockInfo
+	ProposedBlockInfo blockInfo
 	Signature         []byte
 }
 
@@ -87,7 +87,7 @@ type SyncInfo struct {
 
 // Quorum Certificate struct in XDPoS 2.0
 type QuorumCert struct {
-	ProposedBlockInfo *BlockInfo
+	ProposedBlockInfo BlockInfo
 	Signatures        [][]byte
 }
 

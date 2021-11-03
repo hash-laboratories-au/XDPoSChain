@@ -69,7 +69,7 @@ type BlockInfo struct {
 
 // Vote message in XDPoS 2.0
 type Vote struct {
-	ProposedBlockInfo blockInfo
+	ProposedBlockInfo BlockInfo
 	Signature         []byte
 }
 

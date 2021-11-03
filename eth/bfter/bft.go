@@ -12,12 +12,12 @@ const (
 	messageLimit = 1024
 )
 
-type collectVoteFn func(utils.Vote) error
-type collectTimeoutFn func(utils.Timeout) error
-type updateRoundFn func(utils.Timeout) error
-type VerifySyncInfoMessageFn func(utils.SyncInfo) error
+//Define Verify Group functions
+type VerifySyncInfoFn func(utils.SyncInfo) error
 type VerifyVoteFn func(utils.Vote) error
-type VerifyTimeoutMessageFn func(utils.Timeout) error
+type VerifyTimeoutFn func(utils.Timeout) error
+
+//Define Boradcast Group functions
 type broadcastVoteFn func(utils.Vote)
 type broadcastTimeoutFn func(utils.Timeout)
 type broadcastSyncInfoFn func(utils.SyncInfo)
@@ -27,6 +27,7 @@ type Bfter struct {
 	quit        chan struct{}
 	consensus   ConsensusFns
 	broadcast   BroadcastFns
+
 	// Message Cache
 	knownVotes     *lru.ARCCache
 	knownSyncInfos *lru.ARCCache
@@ -34,9 +35,9 @@ type Bfter struct {
 }
 
 type ConsensusFns struct {
-	verifySyncInfo VerifySyncInfoMessageFn
+	verifySyncInfo VerifySyncInfoFn
 	verifyVote     VerifyVoteFn
-	verifyTimeout  VerifyTimeoutMessageFn
+	verifyTimeout  VerifyTimeoutFn
 }
 
 type BroadcastFns struct {
@@ -98,6 +99,7 @@ func (b *Bfter) Timeout(timeout utils.Timeout) {
 		log.Error("Verify BFT Timeout", "error", err)
 		return
 	}
+
 	b.knownTimeouts.Add(timeout.Hash(), true)
 	b.broadcastCh <- timeout
 }
@@ -119,6 +121,8 @@ func (b *Bfter) SyncInfo(syncInfo utils.SyncInfo) {
 	b.knownSyncInfos.Add(syncInfo.Hash(), true)
 	b.broadcastCh <- syncInfo
 }
+
+// Start Bft receiver
 func (b *Bfter) Start() {
 	go b.loop()
 }
@@ -136,12 +140,13 @@ func (b *Bfter) loop() {
 		case obj := <-b.broadcastCh:
 			switch v := obj.(type) {
 			case utils.Vote:
-				b.broadcast.Vote(v)
+				go b.broadcast.Vote(v)
 			case utils.Timeout:
-				b.broadcast.Timeout(v)
+				go b.broadcast.Timeout(v)
 			case utils.SyncInfo:
-				b.broadcast.SyncInfo(v)
+				go b.broadcast.SyncInfo(v)
 			default:
+				log.Error("Unknown message type received, value: %v", v)
 			}
 		}
 	}

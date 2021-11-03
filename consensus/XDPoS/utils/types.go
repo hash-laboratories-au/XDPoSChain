@@ -14,11 +14,6 @@ import (
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
-type VoteType interface{}
-type TimeoutType interface{}
-type SyncInfoType interface{}
-type TimeoutCertType interface{}
-
 type Masternode struct {
 	Address common.Address
 	Stake   *big.Int

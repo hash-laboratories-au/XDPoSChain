@@ -53,8 +53,8 @@ type XDPoS struct {
 	GetLendingService func() utils.LendingService
 
 	// The exact consensus engine with different versions
-	EngineV1 engine_v1.XDPoS_v1
-	EngineV2 engine_v2.XDPoS_v2
+	EngineV1 *engine_v1.XDPoS_v1
+	EngineV2 *engine_v2.XDPoS_v2
 }
 
 // New creates a XDPoS delegated-proof-of-stake consensus engine with the initial
@@ -74,8 +74,8 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		db:     db,
 
 		signingTxsCache: signingTxsCache,
-		EngineV1:        *engine_v1.New(&conf, db),
-		EngineV2:        *engine_v2.New(&conf, db),
+		EngineV1:        engine_v1.New(&conf, db),
+		EngineV2:        engine_v2.New(&conf, db),
 	}
 }
 
@@ -97,8 +97,8 @@ func NewFaker(db ethdb.Database, chainConfig *params.ChainConfig) *XDPoS {
 		db:     db,
 
 		signingTxsCache: signingTxsCache,
-		EngineV1:        *engine_v1.NewFaker(db, conf),
-		EngineV2:        *engine_v2.NewFaker(db, conf),
+		EngineV1:        engine_v1.NewFaker(db, conf),
+		EngineV2:        engine_v2.NewFaker(db, conf),
 	}
 	return fakeEngine
 }
@@ -352,14 +352,14 @@ func (x *XDPoS) GetCachedSigningTxs(hash common.Hash) (interface{}, bool) {
 }
 
 //V2
-func (x *XDPoS) CollectVote(utils.VoteType) error {
+func (x *XDPoS) CollectVote(utils.Vote) error {
 	return nil
 }
 
-func (x *XDPoS) CollectTimeout(utils.TimeoutType) error {
+func (x *XDPoS) CollectTimeout(utils.Timeout) error {
 	return nil
 }
 
-func (x *XDPoS) UpdateRound(utils.SyncInfoType) error {
+func (x *XDPoS) UpdateRound(utils.SyncInfo) error {
 	return nil
 }

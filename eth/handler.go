@@ -230,7 +230,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	}
 	if blockchain.Config().XDPoS != nil {
 		XDPoSEngine := engine.(*XDPoS.XDPoS)
-		manager.bfter = bft.New(XDPoSEngine, broadcasts)
+		manager.bfter = bft.New(XDPoSEngine.EngineV2, broadcasts)
 	}
 
 	return manager, nil

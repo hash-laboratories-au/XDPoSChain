@@ -352,14 +352,18 @@ func (x *XDPoS) GetCachedSigningTxs(hash common.Hash) (interface{}, bool) {
 }
 
 //V2
-func (x *XDPoS) CollectVote(utils.Vote) error {
+func (x *XDPoS) VerifyVote(utils.Vote) error {
 	return nil
 }
 
-func (x *XDPoS) CollectTimeout(utils.Timeout) error {
+func (x *XDPoS) VerifyTimeout(utils.Timeout) error {
 	return nil
 }
 
-func (x *XDPoS) UpdateRound(utils.SyncInfo) error {
+func (x *XDPoS) VerifySyncInfo(utils.SyncInfo) error {
+	return nil
+}
+
+func (x *XDPoS) VerifyBlockInfo(utils.BlockInfo) error {
 	return nil
 }

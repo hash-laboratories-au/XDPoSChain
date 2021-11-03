@@ -29,12 +29,11 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus"
-	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/consensus/misc"
 	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
-	"github.com/XinFinOrg/XDPoSChain/eth/bft"
+	"github.com/XinFinOrg/XDPoSChain/eth/bfter"
 	"github.com/XinFinOrg/XDPoSChain/eth/downloader"
 	"github.com/XinFinOrg/XDPoSChain/eth/fetcher"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
@@ -83,7 +82,7 @@ type ProtocolManager struct {
 	downloader *downloader.Downloader
 	fetcher    *fetcher.Fetcher
 	peers      *peerSet
-	bfter      *bft.BFT
+	bfter      *bfter.Bfter
 
 	SubProtocols []p2p.Protocol
 
@@ -223,14 +222,14 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, prepare, manager.removePeer)
 	//Define bft function
-	broadcasts := bft.BroadcastFns{
+	broadcasts := bfter.BroadcastFns{
 		Vote:     manager.BroadcastVote,
 		Timeout:  manager.BroadcastTimeout,
 		SyncInfo: manager.BroadcastSyncInfo,
 	}
 	if blockchain.Config().XDPoS != nil {
-		XDPoSEngine := engine.(*XDPoS.XDPoS)
-		manager.bfter = bft.New(XDPoSEngine.EngineV2, broadcasts)
+
+		manager.bfter = bfter.New(engine, broadcasts)
 	}
 
 	return manager, nil
@@ -823,7 +822,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			pm.lendingpool.AddRemotes(txs)
 		}
 	case msg.Code == VoteMsg:
-		var vote utils.VoteType
+		var vote utils.Vote
 		if err := msg.Decode(&vote); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
@@ -831,7 +830,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		p.MarkVote(vote)
 		pm.bfter.Vote(vote)
 	case msg.Code == TimeoutMsg:
-		var timeout utils.TimeoutType
+		var timeout utils.Timeout
 		if err := msg.Decode(&timeout); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
@@ -840,7 +839,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		p.MarkTimeout(timeout)
 		pm.bfter.Timeout(timeout)
 	case msg.Code == SyncInfoMsg:
-		var syncInfo utils.SyncInfoType
+		var syncInfo utils.SyncInfo
 		if err := msg.Decode(&syncInfo); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
@@ -900,7 +899,7 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 
 // BroadcastVote will propagate a Vote to all peers which are not known to
 // already have the given vote.
-func (pm *ProtocolManager) BroadcastVote(vote utils.VoteType) {
+func (pm *ProtocolManager) BroadcastVote(vote utils.Vote) {
 	//hash := Vote.Hash()
 	hash := common.Hash{}
 	peers := pm.peers.PeersWithoutVote(hash)
@@ -912,7 +911,7 @@ func (pm *ProtocolManager) BroadcastVote(vote utils.VoteType) {
 
 // BroadcastTimeout will propagate a Timeout to all peers which are not known to
 // already have the given timeout.
-func (pm *ProtocolManager) BroadcastTimeout(timeout utils.TimeoutType) {
+func (pm *ProtocolManager) BroadcastTimeout(timeout utils.Timeout) {
 	//hash := timeout.Hash()
 	hash := common.Hash{}
 	peers := pm.peers.PeersWithoutTimeout(hash)
@@ -924,7 +923,7 @@ func (pm *ProtocolManager) BroadcastTimeout(timeout utils.TimeoutType) {
 
 // BroadcastSyncInfo will propagate a SyncInfo to all peers which are not known to
 // already have the given SyncInfo.
-func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo utils.SyncInfoType) {
+func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo utils.SyncInfo) {
 	//hash := syncInfo.Hash()
 	hash := common.Hash{}
 	peers := pm.peers.PeersWithoutSyncInfo(hash)

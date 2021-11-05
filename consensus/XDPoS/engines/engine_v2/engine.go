@@ -31,19 +31,27 @@ type XDPoS_v2 struct {
 	timeoutWorker *countdown.CountdownTimer // Timer to generate broadcast timeout msg if threashold reached
 
 	currentRound utils.Round
+	highestVotedRound  utils.Round
+	highestQuorumCert  *utils.QuorumCert
+	lockQuorumCert     *utils.QuorumCert
+	highestTimeoutCert *utils.TimeoutCert
+	highestCommitBlock *utils.BlockInfo
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	// Setup Timer
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
-
+	// currentRound := utils.Round(1)
+	// highestVotedRound := utils.Round(1)
 	engine := &XDPoS_v2{
 		config:        config,
 		db:            db,
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		BFTQueue:      make(chan interface{}),
+		// currentRound:      &currentRound,
+		// highestVotedRound: &highestVotedRound,
 	}
 	// Add callback to the timer
 	timer.OnTimeoutFn = engine.onCountdownTimeout
@@ -63,6 +71,8 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
 
+	// currentRound := utils.Round(1)
+	// highestVotedRound := utils.Round(1)
 	// Allocate the snapshot caches and create the engine
 	fakeEngine = &XDPoS_v2{
 		config:        conf,
@@ -70,6 +80,8 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		BFTQueue:      make(chan interface{}),
+		// currentRound:      &currentRound,
+		// highestVotedRound: &highestVotedRound,
 	}
 	// Add callback to the timer
 	timer.OnTimeoutFn = fakeEngine.onCountdownTimeout
@@ -245,29 +257,49 @@ func (x *XDPoS_v2) verifyTC(header *types.Header) error {
 }
 
 // Update local QC variables including highestQC & lockQC, as well as update commit blockInfo before call
-func (x *XDPoS_v2) processQC(header *types.Header) error {
+func (x *XDPoS_v2) processQC(quorumCert *utils.QuorumCert) error {
 	/*
 		1. Update HighestQC and LockQC
 		2. Update commit block info (TODO)
 		3. Check QC round >= node's currentRound. If yes, call setNewRound
 	*/
+	if quorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
+		x.highestQuorumCert = quorumCert
+		//TODO: do I need a clone?
+	}
+	//TODO: x.blockchain.getBlock(quorumCert.ProposedBlockInfo.Hash) then get the QC inside that block header
+	//TODO: update lockQC
+	//TODO: find parent and grandparent and grandgrandparent block, check round number, if so, commit grandgrandparent
+	if quorumCert.ProposedBlockInfo.Round >= x.currentRound {
+		x.setNewRound(quorumCert.ProposedBlockInfo.Round + 1)
+	}
 	return nil
 }
 
-func (x *XDPoS_v2) processTC(header *types.Header) error {
+func (x *XDPoS_v2) processTC(timeoutCert *utils.TimeoutCert) error {
 	/*
 		1. Update highestTC
 		2. Check TC round >= node's currentRound. If yes, call setNewRound
 	*/
+	if timeoutCert.Round > x.highestTimeoutCert.Round {
+		x.highestTimeoutCert = timeoutCert
+	}
+	if timeoutCert.Round >= x.currentRound {
+		x.setNewRound(timeoutCert.Round + 1)
+	}
 	return nil
 }
 
-func (x *XDPoS_v2) setNewRound() error {
+func (x *XDPoS_v2) setNewRound(round utils.Round) error {
 	/*
 		1. Set currentRound = QC round + 1 (or TC round +1)
 		2. Reset timer
 		3. Reset vote and timeout Pools
 	*/
+	x.currentRound = round
+	//TODO: tell miner now it's a new round and start mine if it's leader
+	//TODO: reset timer
+	//TODO: vote and timeout pools
 	return nil
 }
 

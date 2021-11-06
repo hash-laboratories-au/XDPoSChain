@@ -93,8 +93,10 @@ func NewFaker(db ethdb.Database, chainConfig *params.ChainConfig) *XDPoS {
 	signingTxsCache, _ := lru.New(utils.BlockSignersCacheLimit)
 
 	fakeEngine = &XDPoS{
-		config: conf,
-		db:     db,
+		config:            conf,
+		db:                db,
+		GetXDCXService:    func() utils.TradingService { return nil },
+		GetLendingService: func() utils.LendingService { return nil },
 
 		signingTxsCache: signingTxsCache,
 		EngineV1:        engine_v1.NewFaker(db, conf),

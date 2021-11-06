@@ -46,22 +46,13 @@ type BroadcastFns struct {
 	SyncInfo broadcastSyncInfoFn
 }
 
-func New(engine consensus.Engine, broadcasts BroadcastFns) *Bfter {
-	e := engine.(*XDPoS.XDPoS)
-	consensus := ConsensusFns{
-		verifySyncInfo: e.VerifySyncInfo,
-		verifyVote:     e.VerifyVote,
-		verifyTimeout:  e.VerifyTimeout,
-	}
-
+func New(broadcasts BroadcastFns) *Bfter {
 	knownVotes, _ := lru.NewARC(messageLimit)
 	knownSyncInfos, _ := lru.NewARC(messageLimit)
 	knownTimeouts, _ := lru.NewARC(messageLimit)
-
 	return &Bfter{
-		broadcastCh:    e.EngineV2.BroadcastCh,
 		quit:           make(chan struct{}),
-		consensus:      consensus,
+		broadcastCh:    make(chan interface{}),
 		broadcast:      broadcasts,
 		knownVotes:     knownVotes,
 		knownSyncInfos: knownSyncInfos,
@@ -69,6 +60,17 @@ func New(engine consensus.Engine, broadcasts BroadcastFns) *Bfter {
 	}
 }
 
+func (b *Bfter) SetConsensusFuns(engine consensus.Engine) {
+	e := engine.(*XDPoS.XDPoS)
+	b.broadcastCh = e.EngineV2.BroadcastCh
+	b.consensus = ConsensusFns{
+		verifySyncInfo: e.VerifySyncInfo,
+		verifyVote:     e.VerifyVote,
+		verifyTimeout:  e.VerifyTimeout,
+	}
+}
+
+// TODO: rename
 func (b *Bfter) Vote(vote utils.Vote) {
 	log.Trace("Receive Vote", "vote", vote)
 

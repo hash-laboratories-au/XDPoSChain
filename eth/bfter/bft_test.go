@@ -31,7 +31,8 @@ func newTester() *bfterTester {
 	broadcasts := BroadcastFns{}
 
 	tester := &bfterTester{}
-	tester.bfter = New(testConsensus, broadcasts)
+	tester.bfter = New(broadcasts)
+	tester.bfter.SetConsensusFuns(testConsensus)
 	tester.bfter.broadcastCh = make(chan interface{})
 	tester.bfter.Start()
 

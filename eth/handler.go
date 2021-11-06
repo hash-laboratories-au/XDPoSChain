@@ -227,9 +227,9 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		Timeout:  manager.BroadcastTimeout,
 		SyncInfo: manager.BroadcastSyncInfo,
 	}
+	manager.bfter = bfter.New(broadcasts)
 	if blockchain.Config().XDPoS != nil {
-
-		manager.bfter = bfter.New(engine, broadcasts)
+		manager.bfter.SetConsensusFuns(engine)
 	}
 
 	return manager, nil
@@ -266,7 +266,6 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	// broadcast transactions
 	pm.txCh = make(chan core.TxPreEvent, txChanSize)
 	pm.txSub = pm.txpool.SubscribeTxPreEvent(pm.txCh)
-
 	pm.orderTxCh = make(chan core.OrderTxPreEvent, txChanSize)
 	if pm.orderpool != nil {
 		pm.orderTxSub = pm.orderpool.SubscribeTxPreEvent(pm.orderTxCh)

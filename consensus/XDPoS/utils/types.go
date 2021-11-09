@@ -132,3 +132,13 @@ func VoteSigHash(m *BlockInfo) common.Hash {
 func TimeoutSigHash(m *Round) common.Hash {
 	return rlpHash(m)
 }
+
+func (m *Vote) PoolKey() string {
+	// return the voted block hash
+	return m.ProposedBlockInfo.Hash.Hex()
+}
+
+func (m *Timeout) PoolKey() string {
+	// return a default pool key string
+	return "0"
+}

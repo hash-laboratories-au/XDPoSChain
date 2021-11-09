@@ -30,7 +30,7 @@ type XDPoS_v2 struct {
 	BFTQueue      chan interface{}
 	timeoutWorker *countdown.CountdownTimer // Timer to generate broadcast timeout msg if threashold reached
 
-	timeoutPool        *utils.TimeoutPool
+	timeoutPool        *utils.Pool
 	currentRound       utils.Round
 	highestVotedRound  utils.Round
 	highestQuorumCert  *utils.QuorumCert
@@ -43,13 +43,14 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	// Setup Timer
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
+	timeoutPool := utils.NewPool(10) //TODO: consensus v2 engine specific config
 	engine := &XDPoS_v2{
 		config:        config,
 		db:            db,
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		BFTQueue:      make(chan interface{}),
-		timeoutPool:   utils.NewTimeoutPool(10), //TODO: consensus v2 engine specific config
+		timeoutPool:   timeoutPool,
 	}
 	// Add callback to the timer
 	timer.OnTimeoutFn = engine.onCountdownTimeout
@@ -68,6 +69,7 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
 	// Setup Timer
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
+	timeoutPool := utils.NewPool(1)
 
 	// Allocate the snapshot caches and create the engine
 	fakeEngine = &XDPoS_v2{
@@ -76,7 +78,7 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		BFTQueue:      make(chan interface{}),
-		timeoutPool:   utils.NewTimeoutPool(1),
+		timeoutPool:   timeoutPool,
 	}
 	// Add callback to the timer
 	timer.OnTimeoutFn = fakeEngine.onCountdownTimeout
@@ -203,7 +205,7 @@ func (x *XDPoS_v2) VerifyTimeoutMessage(timeoutMsg utils.Timeout) (bool, error) 
 */
 func (x *XDPoS_v2) TimeoutHandler(timeout *utils.Timeout) {
 	// Collect timeout, generate TC
-	timeoutCert := x.timeoutPool.AddTimeout(timeout)
+	timeoutCert := x.timeoutPool.Add(timeout)
 	// If TC is generated
 	if timeoutCert != nil {
 		//TODO: processTC(),generateSyncInfo()
@@ -301,7 +303,7 @@ func (x *XDPoS_v2) setNewRound(round utils.Round) error {
 	//TODO: tell miner now it's a new round and start mine if it's leader
 	//TODO: reset timer
 	//TODO: vote pools
-	x.timeoutPool.SetNewRound(round)
+	x.timeoutPool.Clear()
 	return nil
 }
 

@@ -44,7 +44,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	// Setup Timer
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
-	timeoutPool := utils.NewPool(10) //TODO: consensus v2 engine specific config
+	timeoutPool := utils.NewPool(config.V2.CertThreshold)
 	engine := &XDPoS_v2{
 		config:        config,
 		db:            db,
@@ -70,7 +70,7 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
 	// Setup Timer
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
-	timeoutPool := utils.NewPool(1)
+	timeoutPool := utils.NewPool(2)
 
 	// Allocate the snapshot caches and create the engine
 	fakeEngine = &XDPoS_v2{

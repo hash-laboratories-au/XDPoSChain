@@ -31,14 +31,14 @@ func (pool *Pool) Add(obj PoolObj) error {
 	if len(objListKeyed) >= pool.threshold && pool.OnThresholdFn != nil {
 		objs := make([]PoolObj, pool.threshold)
 		i := 0
-		for h, t := range objListKeyed {
+		for _, t := range objListKeyed {
 			objs[i] = t
-			delete(objListKeyed, h)
 			i += 1
 			if i == pool.threshold {
 				break
 			}
 		}
+		pool.Clear()
 		return pool.OnThresholdFn(objs)
 	} else {
 		return nil
@@ -46,7 +46,7 @@ func (pool *Pool) Add(obj PoolObj) error {
 }
 
 func (pool *Pool) Clear() {
-	pool.objList = make(map[string]map[common.Hash]PoolObj) //TODO: is this corrent way to clear it?
+	pool.objList = make(map[string]map[common.Hash]PoolObj)
 }
 
 func (pool *Pool) SetThreshold(t int) {

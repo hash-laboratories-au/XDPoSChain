@@ -34,6 +34,7 @@ type XDPoS_v2 struct {
 	currentRound       utils.Round
 	highestVotedRound  utils.Round
 	highestQuorumCert  *utils.QuorumCert
+	// LockQC in XDPoS Consensus 2.0, used in voting rule
 	lockQuorumCert     *utils.QuorumCert
 	highestTimeoutCert *utils.TimeoutCert
 	highestCommitBlock *utils.BlockInfo

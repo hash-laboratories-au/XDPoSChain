@@ -178,7 +178,7 @@ func (x *XDPoS_v2) VoteHandler() {
 */
 func (x *XDPoS_v2) VerifyTimeoutMessage(timeoutMsg utils.Timeout) (bool, error) {
 	// Recover the public key and the Ethereum address
-	pubkey, err := crypto.Ecrecover(utils.TimeoutSigHash(timeoutMsg.Round).Bytes(), timeoutMsg.Signature)
+	pubkey, err := crypto.Ecrecover(utils.TimeoutSigHash(&timeoutMsg.Round).Bytes(), timeoutMsg.Signature)
 	if err != nil {
 		return false, fmt.Errorf("Error while verifying time out message: %v", err)
 	}
@@ -342,7 +342,7 @@ func (x *XDPoS_v2) sendTimeout() error {
 	signer, signFn := x.signer, x.signFn
 	x.lock.RUnlock()
 
-	signedHash, err := signFn(accounts.Account{Address: signer}, utils.TimeoutSigHash(x.currentRound).Bytes())
+	signedHash, err := signFn(accounts.Account{Address: signer}, utils.TimeoutSigHash(&x.currentRound).Bytes())
 	if err != nil {
 		return fmt.Errorf("Error while signing for timeout message")
 	}

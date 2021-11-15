@@ -1,7 +1,13 @@
 package engine_v2
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -11,16 +17,21 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/consensus/clique"
+	"github.com/XinFinOrg/XDPoSChain/core/state"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/crypto"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 type XDPoS_v2 struct {
 	config *params.XDPoSConfig // Consensus engine configuration parameters
 	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
+
+	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
+	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
 
 	signer common.Address  // Ethereum address of the signing key
 	signFn clique.SignerFn // Signer function to authorize hashes with
@@ -30,14 +41,16 @@ type XDPoS_v2 struct {
 	BFTQueue      chan interface{}
 	timeoutWorker *countdown.CountdownTimer // Timer to generate broadcast timeout msg if threashold reached
 
-	timeoutPool        *utils.Pool
-	currentRound       utils.Round
-	highestVotedRound  utils.Round
-	highestQuorumCert  *utils.QuorumCert
+	timeoutPool       *utils.Pool
+	currentRound      utils.Round
+	highestVotedRound utils.Round
+	highestQuorumCert *utils.QuorumCert
 	// LockQC in XDPoS Consensus 2.0, used in voting rule
 	lockQuorumCert     *utils.QuorumCert
 	highestTimeoutCert *utils.TimeoutCert
 	highestCommitBlock *utils.BlockInfo
+
+	HookReward func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
@@ -45,9 +58,15 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
 	timer := countdown.NewCountDown(duration)
 	timeoutPool := utils.NewPool(config.V2.CertThreshold)
+
+	recents, _ := lru.NewARC(utils.InmemorySnapshots)
+	signatures, _ := lru.NewARC(utils.InmemorySnapshots)
+
 	engine := &XDPoS_v2{
 		config:        config,
 		db:            db,
+		recents:       recents,
+		signatures:    signatures,
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		BFTQueue:      make(chan interface{}),
@@ -72,10 +91,15 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v2 {
 	timer := countdown.NewCountDown(duration)
 	timeoutPool := utils.NewPool(2)
 
+	recents, _ := lru.NewARC(utils.InmemorySnapshots)
+	signatures, _ := lru.NewARC(utils.InmemorySnapshots)
+
 	// Allocate the snapshot caches and create the engine
 	fakeEngine = &XDPoS_v2{
 		config:        conf,
 		db:            db,
+		recents:       recents,
+		signatures:    signatures,
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		BFTQueue:      make(chan interface{}),
@@ -93,6 +117,147 @@ func (x *XDPoS_v2) SetNewRoundFaker(newRound utils.Round) {
 	x.currentRound = newRound
 }
 
+// Prepare implements consensus.Engine, preparing all the consensus fields of the
+// header for running the transactions on top.
+func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	// If the block isn't a checkpoint, cast a random vote (good enough for now)
+	header.Coinbase = common.Address{}
+	header.Nonce = types.BlockNonce{}
+
+	number := header.Number.Uint64()
+	// TODO to be confirmed
+	/*
+
+		// Assemble the voting snapshot to check which votes make sense
+		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
+		if err != nil {
+			return err
+		}
+
+		if number%x.config.Epoch != 0 {
+			x.lock.RLock()
+
+			// Gather all the proposals that make sense voting on
+			addresses := make([]common.Address, 0, len(x.proposals))
+			for address, authorize := range x.proposals {
+				if snap.validVote(address, authorize) {
+					addresses = append(addresses, address)
+				}
+			}
+			// If there's pending proposals, cast a vote on them
+			if len(addresses) > 0 {
+				header.Coinbase = addresses[rand.Intn(len(addresses))]
+				if x.proposals[header.Coinbase] {
+					copy(header.Nonce[:], utils.NonceAuthVote)
+				} else {
+					copy(header.Nonce[:], utils.NonceDropVote)
+				}
+			}
+			x.lock.RUnlock()
+		}
+	*/
+	parent := chain.GetHeader(header.ParentHash, number-1)
+	if parent == nil {
+		return consensus.ErrUnknownAncestor
+	}
+	// Set the correct difficulty
+	header.Difficulty = x.calcDifficulty(chain, parent, x.signer)
+	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
+	// Ensure the extra data has all it's components
+	if len(header.Extra) < utils.ExtraVanity {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, utils.ExtraVanity-len(header.Extra))...)
+	}
+	header.Extra = header.Extra[:utils.ExtraVanity]
+	/*
+		masternodes := snap.GetMasterNodes()
+		if number >= x.config.Epoch && number%x.config.Epoch == 0 {
+			if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
+				var penMasternodes []common.Address
+				var err error
+				if chain.Config().IsTIPSigning(header.Number) {
+					penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
+				} else {
+					penMasternodes, err = x.HookPenalty(chain, number)
+				}
+				if err != nil {
+					return err
+				}
+				if len(penMasternodes) > 0 {
+					// penalize bad masternode(s)
+					masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
+					for _, address := range penMasternodes {
+						log.Debug("Penalty status", "address", address, "number", number)
+					}
+					header.Penalties = common.ExtractAddressToBytes(penMasternodes)
+				}
+			}
+			// Prevent penalized masternode(s) within 4 recent epochs
+			for i := 1; i <= common.LimitPenaltyEpoch; i++ {
+				if number > uint64(i)*x.config.Epoch {
+					masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
+				}
+			}
+			for _, masternode := range masternodes {
+				header.Extra = append(header.Extra, masternode[:]...)
+			}
+			if x.HookValidator != nil {
+				validators, err := x.HookValidator(header, masternodes)
+				if err != nil {
+					return err
+				}
+				header.Validators = validators
+			}
+		}
+	*/
+	header.Extra = append(header.Extra, make([]byte, utils.ExtraSeal)...)
+	//TODO header.Extra = version + QC
+
+	// Mix digest is reserved for now, set to empty
+	header.MixDigest = common.Hash{}
+
+	// Ensure the timestamp has the correct delay
+
+	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(x.config.Period))
+	if header.Time.Int64() < time.Now().Unix() {
+		header.Time = big.NewInt(time.Now().Unix())
+	}
+
+	return nil
+}
+
+// Finalize implements consensus.Engine, ensuring no uncles are set, nor block
+// rewards given, and returns the final block.
+func (x *XDPoS_v2) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, parentState *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+	// set block reward
+	number := header.Number.Uint64()
+	rCheckpoint := chain.Config().XDPoS.RewardCheckpoint
+
+	// _ = c.CacheData(header, txs, receipts)
+
+	if x.HookReward != nil && number%rCheckpoint == 0 {
+		err, rewards := x.HookReward(chain, state, parentState, header)
+		if err != nil {
+			return nil, err
+		}
+		if len(common.StoreRewardFolder) > 0 {
+			data, err := json.Marshal(rewards)
+			if err == nil {
+				err = ioutil.WriteFile(filepath.Join(common.StoreRewardFolder, header.Number.String()+"."+header.Hash().Hex()), data, 0644)
+			}
+			if err != nil {
+				log.Error("Error when save reward info ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
+			}
+		}
+	}
+
+	// the state remains as is and uncles are dropped
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.UncleHash = types.CalcUncleHash(nil)
+
+	// Assemble and return the final block for sealing
+	return types.NewBlock(header, txs, nil, receipts), nil
+}
+
 // Authorize injects a private key into the consensus engine to mint new blocks with.
 func (x *XDPoS_v2) Authorize(signer common.Address, signFn clique.SignerFn) {
 	x.lock.Lock()
@@ -103,7 +268,275 @@ func (x *XDPoS_v2) Authorize(signer common.Address, signFn clique.SignerFn) {
 }
 
 func (x *XDPoS_v2) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, nil
+	return utils.Ecrecover(header, x.signatures)
+}
+
+// Seal implements consensus.Engine, attempting to create a sealed block using
+// the local signing credentials.
+func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
+	header := block.Header()
+
+	// Sealing the genesis block is not supported
+	number := header.Number.Uint64()
+	if number == 0 {
+		return nil, utils.ErrUnknownBlock
+	}
+	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
+	// checkpoint blocks have no tx
+	if x.config.Period == 0 && len(block.Transactions()) == 0 && number%x.config.Epoch != 0 {
+		return nil, utils.ErrWaitTransactions
+	}
+	// Don't hold the signer fields for the entire sealing procedure
+	x.lock.RLock()
+	signer, signFn := x.signer, x.signFn
+	x.lock.RUnlock()
+
+	// Bail out if we're unauthorized to sign a block
+	snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		return nil, err
+	}
+	masternodes := x.GetMasternodes(chain, header)
+	if _, authorized := snap.MasterNodes[signer]; !authorized {
+		valid := false
+		for _, m := range masternodes {
+			if m == signer {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, utils.ErrUnauthorized
+		}
+	}
+	// If we're amongst the recent signers, wait for the next block
+	// only check recent signers if there are more than one signer.
+	if len(masternodes) > 1 {
+		for seen, recent := range snap.Recents {
+			if recent == signer {
+				// Signer is among recents, only wait if the current block doesn't shift it out
+				// There is only case that we don't allow signer to create two continuous blocks.
+				if limit := uint64(2); number < limit || seen > number-limit {
+					// Only take into account the non-epoch blocks
+					if number%x.config.Epoch != 0 {
+						log.Info("Signed recently, must wait for others ", "len(masternodes)", len(masternodes), "number", number, "limit", limit, "seen", seen, "recent", recent.String(), "snap.Recents", snap.Recents)
+						<-stop
+						return nil, nil
+					}
+				}
+			}
+		}
+	}
+	select {
+	case <-stop:
+		return nil, nil
+	default:
+	}
+	// Sign all the things!
+	sighash, err := signFn(accounts.Account{Address: signer}, utils.SigHash(header).Bytes())
+	if err != nil {
+		return nil, err
+	}
+	copy(header.Extra[len(header.Extra)-utils.ExtraSeal:], sighash)
+	m2, err := x.GetValidator(signer, chain, header)
+	if err != nil {
+		return nil, fmt.Errorf("can't get block validator: %v", err)
+	}
+	if m2 == signer {
+		header.Validator = sighash
+	}
+	return block.WithSeal(header), nil
+}
+
+// CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
+// that a new block should have based on the previous blocks in the chain and the
+// current signer.
+func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, parent *types.Header) *big.Int {
+	return x.calcDifficulty(chain, parent, x.signer)
+}
+
+func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
+	// If we're running a engine faking, skip calculation
+	if x.config.SkipValidation {
+		return big.NewInt(1)
+	}
+	len, preIndex, curIndex, _, err := x.YourTurn(chain, parent, signer)
+	if err != nil {
+		return big.NewInt(int64(len + curIndex - preIndex))
+	}
+	return big.NewInt(int64(len - utils.Hop(len, preIndex, curIndex)))
+}
+
+func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
+	masternodes := x.GetMasternodes(chain, parent)
+
+	snap, err := x.GetSnapshot(chain, parent)
+	if err != nil {
+		log.Warn("Failed when trying to commit new work", "err", err)
+		return 0, -1, -1, false, err
+	}
+	if len(masternodes) == 0 {
+		return 0, -1, -1, false, errors.New("Masternodes not found")
+	}
+	pre := common.Address{}
+	// masternode[0] has chance to create block 1
+	preIndex := -1
+	if parent.Number.Uint64() != 0 {
+		pre, err = whoIsCreator(snap, parent)
+		if err != nil {
+			return 0, 0, 0, false, err
+		}
+		preIndex = utils.Position(masternodes, pre)
+	}
+	curIndex := utils.Position(masternodes, signer)
+	if signer == x.signer {
+		log.Debug("Masternodes cycle info", "number of masternodes", len(masternodes), "previous", pre, "position", preIndex, "current", signer, "position", curIndex)
+	}
+	for i, s := range masternodes {
+		log.Debug("Masternode:", "index", i, "address", s.String())
+	}
+	if (preIndex+1)%len(masternodes) == curIndex {
+		return len(masternodes), preIndex, curIndex, true, nil
+	}
+	return len(masternodes), preIndex, curIndex, false, nil
+}
+
+func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error) {
+	if header.Number.Uint64() == 0 {
+		return common.Address{}, errors.New("Don't take block 0")
+	}
+	m, err := utils.Ecrecover(header, snap.sigcache)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return m, nil
+}
+
+func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Header) []common.Address {
+	n := header.Number.Uint64()
+	e := x.config.Epoch
+	switch {
+	case n%e == 0:
+		return utils.GetMasternodesFromCheckpointHeader(header)
+	case n%e != 0:
+		h := chain.GetHeaderByNumber(n - (n % e))
+		return utils.GetMasternodesFromCheckpointHeader(h)
+	default:
+		return []common.Address{}
+	}
+}
+
+func (x *XDPoS_v2) GetValidator(creator common.Address, chain consensus.ChainReader, header *types.Header) (common.Address, error) {
+	epoch := x.config.Epoch
+	no := header.Number.Uint64()
+	cpNo := no
+	if no%epoch != 0 {
+		cpNo = no - (no % epoch)
+	}
+	if cpNo == 0 {
+		return common.Address{}, nil
+	}
+	cpHeader := chain.GetHeaderByNumber(cpNo)
+	if cpHeader == nil {
+		if no%epoch == 0 {
+			cpHeader = header
+		} else {
+			return common.Address{}, fmt.Errorf("couldn't find checkpoint header")
+		}
+	}
+	m, err := utils.GetM1M2FromCheckpointHeader(cpHeader, header, chain.Config())
+	if err != nil {
+		return common.Address{}, err
+	}
+	return m[creator], nil
+}
+
+func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV2, error) {
+	number := header.Number.Uint64()
+	log.Trace("get snapshot", "number", number, "hash", header.Hash())
+	snap, err := x.snapshot(chain, number, header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap, nil
+}
+
+// snapshot retrieves the authorization snapshot at a given point in time.
+func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*SnapshotV2, error) {
+	// Search for a SnapshotV2 in memory or on disk for checkpoints
+	var (
+		headers []*types.Header
+		snap    *SnapshotV2
+	)
+	for snap == nil {
+		// If an in-memory SnapshotV2 was found, use that
+		if s, ok := x.recents.Get(hash); ok {
+			snap = s.(*SnapshotV2)
+			break
+		}
+		// If an on-disk checkpoint snapshot can be found, use that
+		// checkpoint snapshot = checkpoint - gap
+		if (number+x.config.Gap)%x.config.Epoch == 0 {
+			if s, err := loadSnapshot(x.config, x.signatures, x.db, hash); err == nil {
+				log.Trace("Loaded snapshot form disk", "number", number, "hash", hash)
+				snap = s
+				break
+			}
+		}
+		// If we're at block zero, make a snapshot
+		if number == 0 {
+			genesis := chain.GetHeaderByNumber(0)
+			if err := x.VerifyHeader(chain, genesis, true); err != nil {
+				return nil, err
+			}
+			signers := make([]common.Address, (len(genesis.Extra)-utils.ExtraVanity-utils.ExtraSeal)/common.AddressLength)
+			for i := 0; i < len(signers); i++ {
+				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
+			}
+			snap = newSnapshot(x.config, x.signatures, 0, genesis.Hash(), x.currentRound, *x.highestQuorumCert, signers)
+			if err := snap.store(x.db); err != nil {
+				return nil, err
+			}
+			log.Trace("Stored genesis voting snapshot to disk")
+			break
+		}
+		// No snapshot for this header, gather the header and move backward
+		var header *types.Header
+		if len(parents) > 0 {
+			// If we have explicit parents, pick from there (enforced)
+			header = parents[len(parents)-1]
+			if header.Hash() != hash || header.Number.Uint64() != number {
+				return nil, consensus.ErrUnknownAncestor
+			}
+			parents = parents[:len(parents)-1]
+		} else {
+			// No explicit parents (or no more left), reach out to the database
+			header = chain.GetHeader(hash, number)
+			if header == nil {
+				return nil, consensus.ErrUnknownAncestor
+			}
+		}
+		headers = append(headers, header)
+		number, hash = number-1, header.ParentHash
+	}
+	// Previous snapshot found, apply any pending headers on top of it
+	for i := 0; i < len(headers)/2; i++ {
+		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
+	}
+	snap, err := snap.apply(headers)
+	if err != nil {
+		return nil, err
+	}
+	x.recents.Add(snap.Hash, snap)
+
+	// If we've generated a new checkpoint snapshot, save to disk
+	if (snap.Number+x.config.Gap)%x.config.Epoch == 0 {
+		if err = snap.store(x.db); err != nil {
+			return nil, err
+		}
+		log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+	}
+	return snap, err
 }
 
 func (x *XDPoS_v2) VerifyHeader(chain consensus.ChainReader, header *types.Header, fullVerify bool) error {

@@ -63,8 +63,8 @@ func TestPoolWithVote(t *testing.T) {
 	pool := NewPool(2) // 2 is the cert threshold
 	ret = 0
 	pool.SetOnThresholdFn(onThresholdFn)
-	blockInfo1 := BlockInfo{Hash: common.BigToHash(big.NewInt(2047)), Round: 1, Number: big.NewInt(1)}
-	blockInfo2 := BlockInfo{Hash: common.BigToHash(big.NewInt(4095)), Round: 1, Number: big.NewInt(1)}
+	blockInfo1 := &BlockInfo{Hash: common.BigToHash(big.NewInt(2047)), Round: 1, Number: big.NewInt(1)}
+	blockInfo2 := &BlockInfo{Hash: common.BigToHash(big.NewInt(4095)), Round: 1, Number: big.NewInt(1)}
 	vote1 := Vote{ProposedBlockInfo: blockInfo1, Signature: []byte{1}}
 	vote2 := Vote{ProposedBlockInfo: blockInfo2, Signature: []byte{2}}
 	vote3 := Vote{ProposedBlockInfo: blockInfo1, Signature: []byte{3}}

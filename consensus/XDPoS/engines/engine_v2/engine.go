@@ -1,7 +1,6 @@
 package engine_v2
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,54 +162,66 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	// Set the correct difficulty
 	header.Difficulty = x.calcDifficulty(chain, parent, x.signer)
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
-	// Ensure the extra data has all it's components
-	if len(header.Extra) < utils.ExtraVanity {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, utils.ExtraVanity-len(header.Extra))...)
-	}
-	header.Extra = header.Extra[:utils.ExtraVanity]
 	/*
-		masternodes := snap.GetMasterNodes()
-		if number >= x.config.Epoch && number%x.config.Epoch == 0 {
-			if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
-				var penMasternodes []common.Address
-				var err error
-				if chain.Config().IsTIPSigning(header.Number) {
-					penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
-				} else {
-					penMasternodes, err = x.HookPenalty(chain, number)
-				}
-				if err != nil {
-					return err
-				}
-				if len(penMasternodes) > 0 {
-					// penalize bad masternode(s)
-					masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
-					for _, address := range penMasternodes {
-						log.Debug("Penalty status", "address", address, "number", number)
+			masternodes := snap.GetMasterNodes()
+			if number >= x.config.Epoch && number%x.config.Epoch == 0 {
+				if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
+					var penMasternodes []common.Address
+					var err error
+					if chain.Config().IsTIPSigning(header.Number) {
+						penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
+					} else {
+						penMasternodes, err = x.HookPenalty(chain, number)
 					}
-					header.Penalties = common.ExtractAddressToBytes(penMasternodes)
+					if err != nil {
+						return err
+					}
+					if len(penMasternodes) > 0 {
+						// penalize bad masternode(s)
+						masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
+						for _, address := range penMasternodes {
+							log.Debug("Penalty status", "address", address, "number", number)
+						}
+						header.Penalties = common.ExtractAddressToBytes(penMasternodes)
+					}
+				}
+				// Prevent penalized masternode(s) within 4 recent epochs
+				for i := 1; i <= common.LimitPenaltyEpoch; i++ {
+					if number > uint64(i)*x.config.Epoch {
+						masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
+					}
+				}
+				for _, masternode := range masternodes {
+					header.Extra = append(header.Extra, masternode[:]...)
+				}
+				if x.HookValidator != nil {
+					validators, err := x.HookValidator(header, masternodes)
+					if err != nil {
+						return err
+					}
+					header.Validators = validators
 				}
 			}
-			// Prevent penalized masternode(s) within 4 recent epochs
-			for i := 1; i <= common.LimitPenaltyEpoch; i++ {
-				if number > uint64(i)*x.config.Epoch {
-					masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
-				}
+		if x.HookValidator != nil {
+			validators, err := x.HookValidator(header, masternodes)
+			if err != nil {
+				return err
 			}
-			for _, masternode := range masternodes {
-				header.Extra = append(header.Extra, masternode[:]...)
-			}
-			if x.HookValidator != nil {
-				validators, err := x.HookValidator(header, masternodes)
-				if err != nil {
-					return err
-				}
-				header.Validators = validators
-			}
+			header.Validators = validators
 		}
 	*/
-	header.Extra = append(header.Extra, make([]byte, utils.ExtraSeal)...)
-	//TODO header.Extra = version + QC
+
+	extra := utils.ExtraFields_v2{
+		Round:      x.currentRound,
+		QuorumCert: x.highestQuorumCert,
+	}
+
+	extraByte, err := extra.EncodeToBytes()
+	if err != nil {
+		return err
+	}
+
+	header.Extra = extraByte
 
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
@@ -311,22 +322,24 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 	// If we're amongst the recent signers, wait for the next block
 	// only check recent signers if there are more than one signer.
-	if len(masternodes) > 1 {
-		for seen, recent := range snap.Recents {
-			if recent == signer {
-				// Signer is among recents, only wait if the current block doesn't shift it out
-				// There is only case that we don't allow signer to create two continuous blocks.
-				if limit := uint64(2); number < limit || seen > number-limit {
-					// Only take into account the non-epoch blocks
-					if number%x.config.Epoch != 0 {
-						log.Info("Signed recently, must wait for others ", "len(masternodes)", len(masternodes), "number", number, "limit", limit, "seen", seen, "recent", recent.String(), "snap.Recents", snap.Recents)
-						<-stop
-						return nil, nil
+	/*
+		if len(masternodes) > 1 {
+			for seen, recent := range snap.Recents {
+				if recent == signer {
+					// Signer is among recents, only wait if the current block doesn't shift it out
+					// There is only case that we don't allow signer to create two continuous blocks.
+					if limit := uint64(2); number < limit || seen > number-limit {
+						// Only take into account the non-epoch blocks
+						if number%x.config.Epoch != 0 {
+							log.Info("Signed recently, must wait for others ", "len(masternodes)", len(masternodes), "number", number, "limit", limit, "seen", seen, "recent", recent.String(), "snap.Recents", snap.Recents)
+							<-stop
+							return nil, nil
+						}
 					}
 				}
 			}
 		}
-	}
+	*/
 	select {
 	case <-stop:
 		return nil, nil
@@ -493,7 +506,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 			for i := 0; i < len(signers); i++ {
 				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
 			}
-			snap = newSnapshot(x.config, x.signatures, 0, genesis.Hash(), x.currentRound, *x.highestQuorumCert, signers)
+			snap = newSnapshot(x.config, x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
 			if err := snap.store(x.db); err != nil {
 				return nil, err
 			}
@@ -530,7 +543,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 	x.recents.Add(snap.Hash, snap)
 
 	// If we've generated a new checkpoint snapshot, save to disk
-	if (snap.Number+x.config.Gap)%x.config.Epoch == 0 {
+	if snap.Number%x.config.Epoch == x.config.Gap {
 		if err = snap.store(x.db); err != nil {
 			return nil, err
 		}
@@ -814,4 +827,9 @@ func (x *XDPoS_v2) broadcastToBftChannel(msg interface{}) {
 
 func (x *XDPoS_v2) getCurrentRoundMasterNodes() []common.Address {
 	return []common.Address{}
+}
+
+// methods for testing
+func (x *XDPoS_v2) SetHighestQuorumCert(qc *utils.QuorumCert) {
+	x.highestQuorumCert = qc
 }

@@ -17,29 +17,29 @@ type SnapshotV2 struct {
 	config   *params.XDPoSConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
 
-	Number     uint64           `json:"number"`     // Block number where the snapshot was created
-	Hash       common.Hash      `json:"hash"`       // Block hash where the snapshot was created
-	EpochRound utils.Round      `json:"epochRound"` // Block BTF Epoch start round
-	QuorumCert utils.QuorumCert `json:"quorumCert"` // Block's QC
+	Number uint64      `json:"number"` // Block number where the snapshot was created
+	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
+	//BlockRound utils.Round      `json:"blockRound"` // Block BTF Block Round
+	//QuorumCert utils.QuorumCert `json:"quorumCert"` // Block's QC
 
 	MasterNodes map[common.Address]struct{} `json:"masterNodes"` // Set of authorized master nodes at this moment
-	Recents     map[uint64]common.Address   `json:"recents"`     // Set of recent signers for spam protections
+	//Recents     map[uint64]common.Address   `json:"recents"`     // Set of recent signers for spam protections
 }
 
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent signers, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, round utils.Round, qc utils.QuorumCert, signers []common.Address) *SnapshotV2 {
+func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, signers []common.Address) *SnapshotV2 {
 	snap := &SnapshotV2{
-		config:     config,
-		sigcache:   sigcache,
-		Number:     number,
-		Hash:       hash,
-		EpochRound: round,
-		QuorumCert: qc,
+		config:   config,
+		sigcache: sigcache,
+		Number:   number,
+		Hash:     hash,
+		//BlockRound: round,
+		//QuorumCert: qc,
 
 		MasterNodes: make(map[common.Address]struct{}),
-		Recents:     make(map[uint64]common.Address),
+		//Recents:     make(map[uint64]common.Address),
 	}
 	for _, signer := range signers {
 		snap.MasterNodes[signer] = struct{}{}
@@ -80,14 +80,16 @@ func (s *SnapshotV2) copy() *SnapshotV2 {
 		Number:      s.Number,
 		Hash:        s.Hash,
 		MasterNodes: make(map[common.Address]struct{}),
-		Recents:     make(map[uint64]common.Address),
+		//Recents:     make(map[uint64]common.Address),
 	}
 	for signer := range s.MasterNodes {
 		cpy.MasterNodes[signer] = struct{}{}
 	}
-	for block, signer := range s.Recents {
-		cpy.Recents[block] = signer
-	}
+	/*
+		for block, signer := range s.Recents {
+			cpy.Recents[block] = signer
+		}
+	*/
 
 	return cpy
 }
@@ -111,20 +113,23 @@ func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
 	// Iterate through the headers and create a new SnapshotV2
 	snap := s.copy()
 
-	for _, header := range headers {
-		// Remove any votes on checkpoint blocks
-		number := header.Number.Uint64()
-		// Delete the oldest signer from the recent list to allow it signing again
-		if limit := uint64(len(snap.MasterNodes)/2 + 1); number >= limit {
-			delete(snap.Recents, number-limit)
+	//TOBE Delete once confirm this is not necessary
+	/*
+		for _, header := range headers {
+			// Remove any votes on checkpoint blocks
+			number := header.Number.Uint64()
+			// Delete the oldest signer from the recent list to allow it signing again
+			if limit := uint64(len(snap.MasterNodes)/2 + 1); number >= limit {
+				delete(snap.Recents, number-limit)
+			}
+			// Resolve the authorization key and check against signers
+			signer, err := utils.Ecrecover(header, s.sigcache)
+			if err != nil {
+				return nil, err
+			}
+			snap.Recents[number] = signer
 		}
-		// Resolve the authorization key and check against signers
-		signer, err := utils.Ecrecover(header, s.sigcache)
-		if err != nil {
-			return nil, err
-		}
-		snap.Recents[number] = signer
-	}
+	*/
 	snap.Number += uint64(len(headers))
 	snap.Hash = headers[len(headers)-1].Hash()
 	// TODO snap.QuorumCert = headers[len(headers)-1].QC()

@@ -168,6 +168,8 @@ func (x *XDPoS) VerifySeal(chain consensus.ChainReader, header *types.Header) er
 // header for running the transactions on top.
 func (x *XDPoS) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	switch x.config.BlockConsensusVersion(header.Number) {
+	case params.ConsensusEngineVersion2:
+		return x.EngineV2.Prepare(chain, header)
 	default: // Default "v1"
 		return x.EngineV1.Prepare(chain, header)
 	}
@@ -298,10 +300,7 @@ func (x *XDPoS) GetSnapshot(chain consensus.ChainReader, header *types.Header) (
 		return &utils.PublicApiSnapshot{
 			Number:  sp.Number,
 			Hash:    sp.Hash,
-			Signers: sp.Signers,
-			Recents: sp.Recents,
-			Votes:   sp.Votes,
-			Tally:   sp.Tally,
+			Signers: sp.MasterNodes,
 		}, err
 	default: // Default "v1"
 		sp, err := x.EngineV1.GetSnapshot(chain, header)

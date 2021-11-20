@@ -153,16 +153,6 @@ func SigHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
-// Encode XDPoS 2.0 extra fields into bytes
-func (e *ExtraFields_v2) EncodeToBytes() ([]byte, error) {
-	bytes, err := rlp.EncodeToBytes(e)
-	if err != nil {
-		return nil, err
-	}
-	versionByte := []byte{2}
-	return append(versionByte, bytes...), nil
-}
-
 // Decode extra fields for consensus version >= 2 (XDPoS 2.0 and future versions)
 func DecodeBytesExtraFields(b []byte, val interface{}) error {
 	if len(b) == 0 {

@@ -71,7 +71,7 @@ type BlockInfo struct {
 
 // Vote message in XDPoS 2.0
 type Vote struct {
-	ProposedBlockInfo BlockInfo
+	ProposedBlockInfo *BlockInfo
 	Signature         []byte
 }
 
@@ -83,13 +83,13 @@ type Timeout struct {
 
 // BFT Sync Info message in XDPoS 2.0
 type SyncInfo struct {
-	HighestQuorumCert  QuorumCert
-	HighestTimeoutCert TimeoutCert
+	HighestQuorumCert  *QuorumCert
+	HighestTimeoutCert *TimeoutCert
 }
 
 // Quorum Certificate struct in XDPoS 2.0
 type QuorumCert struct {
-	ProposedBlockInfo BlockInfo
+	ProposedBlockInfo *BlockInfo
 	Signatures        [][]byte
 }
 
@@ -103,7 +103,17 @@ type TimeoutCert struct {
 // The version byte (consensus version) is the first byte in header's extra and it's only valid with value >= 2
 type ExtraFields_v2 struct {
 	Round      Round
-	QuorumCert QuorumCert
+	QuorumCert *QuorumCert
+}
+
+// Encode XDPoS 2.0 extra fields into bytes
+func (e *ExtraFields_v2) EncodeToBytes() ([]byte, error) {
+	bytes, err := rlp.EncodeToBytes(e)
+	if err != nil {
+		return nil, err
+	}
+	versionByte := []byte{2}
+	return append(versionByte, bytes...), nil
 }
 
 func rlpHash(x interface{}) (h common.Hash) {

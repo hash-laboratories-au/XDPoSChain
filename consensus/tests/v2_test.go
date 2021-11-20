@@ -264,3 +264,7 @@ func TestProcessVoteMsgThenTimeoutMsg(t *testing.T) {
 	// Round shall be +1 now
 	assert.Equal(t, utils.Round(3), engineV2.GetCurrentRound())
 }
+
+func TestBlockPrepareFunction(t *testing.T) {
+
+}

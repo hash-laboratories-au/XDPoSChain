@@ -86,22 +86,6 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	return engine
 }
 
-/*
-	Testing tools
-*/
-func (x *XDPoS_v2) SetNewRoundFaker(newRound utils.Round, resetTimer bool) {
-	// Reset a bunch of things
-	if resetTimer {
-		x.timeoutWorker.Reset()
-	}
-	x.currentRound = newRound
-}
-
-// Utils for test to check currentRound value
-func (x *XDPoS_v2) GetCurrentRound() utils.Round {
-	return x.currentRound
-}
-
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
@@ -110,37 +94,6 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
-	// TODO to be confirmed
-	/*
-
-		// Assemble the voting snapshot to check which votes make sense
-		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
-		if err != nil {
-			return err
-		}
-
-		if number%x.config.Epoch != 0 {
-			x.lock.RLock()
-
-			// Gather all the proposals that make sense voting on
-			addresses := make([]common.Address, 0, len(x.proposals))
-			for address, authorize := range x.proposals {
-				if snap.validVote(address, authorize) {
-					addresses = append(addresses, address)
-				}
-			}
-			// If there's pending proposals, cast a vote on them
-			if len(addresses) > 0 {
-				header.Coinbase = addresses[rand.Intn(len(addresses))]
-				if x.proposals[header.Coinbase] {
-					copy(header.Nonce[:], utils.NonceAuthVote)
-				} else {
-					copy(header.Nonce[:], utils.NonceDropVote)
-				}
-			}
-			x.lock.RUnlock()
-		}
-	*/
 	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
@@ -308,6 +261,7 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 	// If we're amongst the recent signers, wait for the next block
 	// only check recent signers if there are more than one signer.
+	// TOBE confirm do we still need this?
 	/*
 		if len(masternodes) > 1 {
 			for seen, recent := range snap.Recents {
@@ -354,10 +308,12 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 	return x.calcDifficulty(chain, parent, x.signer)
 }
 
+// TODO: what should be new difficulty
 func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
 	return big.NewInt(1)
 }
 
+// Copy from v1
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
 	masternodes := x.GetMasternodes(chain, parent)
 
@@ -392,6 +348,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	return len(masternodes), preIndex, curIndex, false, nil
 }
 
+//Copy from v1
 func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error) {
 	if header.Number.Uint64() == 0 {
 		return common.Address{}, errors.New("Don't take block 0")
@@ -403,6 +360,7 @@ func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error
 	return m, nil
 }
 
+//Copy from v1
 func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Header) []common.Address {
 	n := header.Number.Uint64()
 	e := x.config.Epoch
@@ -417,6 +375,7 @@ func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 	}
 }
 
+// Copy from v1
 func (x *XDPoS_v2) GetValidator(creator common.Address, chain consensus.ChainReader, header *types.Header) (common.Address, error) {
 	epoch := x.config.Epoch
 	no := header.Number.Uint64()
@@ -442,6 +401,7 @@ func (x *XDPoS_v2) GetValidator(creator common.Address, chain consensus.ChainRea
 	return m[creator], nil
 }
 
+//Copy from v1
 func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV2, error) {
 	number := header.Number.Uint64()
 	log.Trace("get snapshot", "number", number, "hash", header.Hash())
@@ -903,7 +863,10 @@ func (x *XDPoS_v2) getCurrentRoundMasterNodes() []common.Address {
 	return []common.Address{}
 }
 
-// methods for testing
+/*
+	Testing tools
+*/
+
 func (x *XDPoS_v2) SetHighestQuorumCert(qc *utils.QuorumCert) {
 	x.highestQuorumCert = qc
 }
@@ -913,4 +876,17 @@ func (x *XDPoS_v2) getSyncInfo() utils.SyncInfo {
 		HighestQuorumCert:  x.highestQuorumCert,
 		HighestTimeoutCert: x.highestTimeoutCert,
 	}
+}
+
+func (x *XDPoS_v2) SetNewRoundFaker(newRound utils.Round, resetTimer bool) {
+	// Reset a bunch of things
+	if resetTimer {
+		x.timeoutWorker.Reset()
+	}
+	x.currentRound = newRound
+}
+
+// Utils for test to check currentRound value
+func (x *XDPoS_v2) GetCurrentRound() utils.Round {
+	return x.currentRound
 }

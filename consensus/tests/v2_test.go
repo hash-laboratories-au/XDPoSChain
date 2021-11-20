@@ -1,4 +1,4 @@
-package consensus
+package tests
 
 import (
 	"math/big"
@@ -113,7 +113,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedQC(t *testing.T) {
 	engineV2.SetNewRoundFaker(utils.Round(1), false)
 	// Create two timeout message which will not reach vote pool threshold
 	voteMsg := &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
 	}
 
@@ -121,7 +121,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedQC(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, utils.Round(1), engineV2.GetCurrentRound())
 	voteMsg = &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{2},
 	}
 	err = engineV2.VoteHandler(*voteMsg)
@@ -130,7 +130,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedQC(t *testing.T) {
 
 	// Create a vote message that should trigger vote pool hook
 	voteMsg = &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{3},
 	}
 
@@ -153,7 +153,7 @@ func TestThrowErrorIfVoteMsgRoundNotEqualToCurrentRound(t *testing.T) {
 	// Set round to 3
 	engineV2.SetNewRoundFaker(utils.Round(3), false)
 	voteMsg := &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
 	}
 
@@ -185,7 +185,7 @@ func TestProcessVoteMsgThenTimeoutMsg(t *testing.T) {
 	}
 	// Create two timeout message which will not reach vote pool threshold
 	voteMsg := &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
 	}
 
@@ -193,7 +193,7 @@ func TestProcessVoteMsgThenTimeoutMsg(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, utils.Round(1), engineV2.GetCurrentRound())
 	voteMsg = &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{2},
 	}
 	err = engineV2.VoteHandler(*voteMsg)
@@ -202,7 +202,7 @@ func TestProcessVoteMsgThenTimeoutMsg(t *testing.T) {
 
 	// Create a vote message that should trigger vote pool hook
 	voteMsg = &utils.Vote{
-		ProposedBlockInfo: *blockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{3},
 	}
 

@@ -355,15 +355,7 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 }
 
 func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
-	// If we're running a engine faking, skip calculation
-	if x.config.SkipValidation {
-		return big.NewInt(1)
-	}
-	len, preIndex, curIndex, _, err := x.YourTurn(chain, parent, signer)
-	if err != nil {
-		return big.NewInt(int64(len + curIndex - preIndex))
-	}
-	return big.NewInt(int64(len - utils.Hop(len, preIndex, curIndex)))
+	return big.NewInt(1)
 }
 
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {

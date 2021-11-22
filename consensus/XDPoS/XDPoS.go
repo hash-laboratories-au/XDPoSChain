@@ -132,9 +132,17 @@ func (x *XDPoS) Author(header *types.Header) (common.Address, error) {
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
 func (x *XDPoS) VerifyHeader(chain consensus.ChainReader, header *types.Header, fullVerify bool) error {
+
 	switch x.config.BlockConsensusVersion(header.Number) {
+	case params.ConsensusEngineVersion2:
+		return nil
 	default: // Default "v1"
+		if header.Number.Uint64() == 3 {
+			// TODO: HACK!!!!
+			x.EngineV2.SetNewRoundFaker(0, true)
+		}
 		return x.EngineV1.VerifyHeader(chain, header, fullVerify)
+
 	}
 }
 
@@ -150,6 +158,8 @@ func (x *XDPoS) VerifyHeaders(chain consensus.ChainReader, headers []*types.Head
 // uncles as this consensus mechanism doesn't permit uncles.
 func (x *XDPoS) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
 	switch x.config.BlockConsensusVersion(block.Number()) {
+	case params.ConsensusEngineVersion2:
+		return nil
 	default: // Default "v1"
 		return x.EngineV1.VerifyUncles(chain, block)
 	}
@@ -159,6 +169,8 @@ func (x *XDPoS) VerifyUncles(chain consensus.ChainReader, block *types.Block) er
 // in the header satisfies the consensus protocol requirements.
 func (x *XDPoS) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
 	switch x.config.BlockConsensusVersion(header.Number) {
+	case params.ConsensusEngineVersion2:
+		return nil
 	default: // Default "v1"
 		return x.EngineV1.VerifySeal(chain, header)
 	}
@@ -227,6 +239,8 @@ func (x *XDPoS) GetPeriod() uint64 {
 
 func (x *XDPoS) IsAuthorisedAddress(header *types.Header, chain consensus.ChainReader, address common.Address) bool {
 	switch x.config.BlockConsensusVersion(header.Number) {
+	case params.ConsensusEngineVersion2:
+		return true
 	default: // Default "v1"
 		return x.EngineV1.IsAuthorisedAddress(header, chain, address)
 	}

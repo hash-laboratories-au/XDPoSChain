@@ -195,12 +195,12 @@ type XDPoSConfig struct {
 	Gap                 uint64         `json:"gap"`                 // Gap time preparing for the next epoch
 	FoudationWalletAddr common.Address `json:"foudationWalletAddr"` // Foundation Address Wallet
 	SkipValidation      bool           //Skip Block Validation for testing purpose
-	XDPoSV2Block        *big.Int
-	V2                  V2
+	XDPoSV2Block        *big.Int       `json:"v2Block"`
+	V2                  V2             `json:"v2"`
 }
 
 type V2 struct {
-	TimeoutWorkerDuration int64 `json:"TimeoutWorkerDuration"` // Duration in ms
+	TimeoutWorkerDuration int64 `json:"timeoutWorkerDuration"` // Duration in ms
 	CertThreshold         int   `json:"certificateThreshold"`  // Necessary number of messages from master nodes to form a certificate
 }
 
@@ -214,6 +214,7 @@ ConsensusVersion will return the consensus version to use for the provided block
 TODO: It's a dummy value for now until the 2.0 consensus engine is fully implemented.
 */
 func (c *XDPoSConfig) BlockConsensusVersion(num *big.Int) string {
+	fmt.Printf("@@@@@@Checking block number %v \n", num)
 	if c.XDPoSV2Block != nil && num.Cmp(c.XDPoSV2Block) > 0 {
 		return ConsensusEngineVersion2
 	}

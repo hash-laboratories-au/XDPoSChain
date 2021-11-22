@@ -21,25 +21,21 @@ type VerifyTimeoutFn func(utils.Timeout) error
 type broadcastVoteFn func(utils.Vote)
 type broadcastTimeoutFn func(utils.Timeout)
 type broadcastSyncInfoFn func(utils.SyncInfo)
-
 type Bfter struct {
 	broadcastCh chan interface{}
 	quit        chan struct{}
-	consensus   ConsensusFns
+	consensus   *XDPoS.XDPoS
 	broadcast   BroadcastFns
-
 	// Message Cache
 	knownVotes     *lru.ARCCache
 	knownSyncInfos *lru.ARCCache
 	knownTimeouts  *lru.ARCCache
 }
-
 type ConsensusFns struct {
 	verifySyncInfo VerifySyncInfoFn
 	verifyVote     VerifyVoteFn
 	verifyTimeout  VerifyTimeoutFn
 }
-
 type BroadcastFns struct {
 	Vote     broadcastVoteFn
 	Timeout  broadcastTimeoutFn
@@ -59,68 +55,55 @@ func New(broadcasts BroadcastFns) *Bfter {
 		knownTimeouts:  knownTimeouts,
 	}
 }
-
 func (b *Bfter) SetConsensusFuns(engine consensus.Engine) {
 	e := engine.(*XDPoS.XDPoS)
 	b.broadcastCh = e.EngineV2.BroadcastCh
-	b.consensus = ConsensusFns{
-		verifySyncInfo: e.VerifySyncInfo,
-		verifyVote:     e.VerifyVote,
-		verifyTimeout:  e.VerifyTimeout,
-	}
+	b.consensus = e
 }
 
 // TODO: rename
 func (b *Bfter) Vote(vote utils.Vote) {
 	log.Trace("Receive Vote", "vote", vote)
-
 	if b.knownVotes.Contains(vote.Hash()) {
 		log.Trace("Discarded vote, known vote", "Signature", vote.Signature, "hash", vote.Hash())
 		return
 	}
-
-	err := b.consensus.verifyVote(vote)
+	err := b.consensus.VerifyVote(vote)
 	if err != nil {
 		log.Error("Verify BFT Vote", "error", err)
 		return
 	}
-
+	b.consensus.EngineV2.VoteHandler(vote)
 	b.knownVotes.Add(vote.Hash(), true)
 	b.broadcastCh <- vote
 }
-
 func (b *Bfter) Timeout(timeout utils.Timeout) {
 	log.Trace("Receive Timeout", "timeout", timeout)
-
 	if b.knownVotes.Contains(timeout.Hash()) {
 		log.Trace("Discarded Timeout, known Timeout", "Signature", timeout.Signature, "hash", timeout.Hash(), "round", timeout.Round)
 		return
 	}
-
-	err := b.consensus.verifyTimeout(timeout)
+	err := b.consensus.VerifyTimeout(timeout)
 	if err != nil {
 		log.Error("Verify BFT Timeout", "error", err)
 		return
 	}
-
+	b.consensus.EngineV2.TimeoutHandler(&timeout)
 	b.knownTimeouts.Add(timeout.Hash(), true)
 	b.broadcastCh <- timeout
 }
-
 func (b *Bfter) SyncInfo(syncInfo utils.SyncInfo) {
 	log.Trace("Receive SyncInfo", "syncInfo", syncInfo)
-
 	if b.knownVotes.Contains(syncInfo.Hash()) {
 		log.Trace("Discarded SyncInfo, known SyncInfo", "hash", syncInfo.Hash())
 		return
 	}
-
-	err := b.consensus.verifySyncInfo(syncInfo)
+	err := b.consensus.VerifySyncInfo(syncInfo)
 	if err != nil {
 		log.Error("Verify BFT SyncInfo", "error", err)
 		return
 	}
-
+	//b.consensus.EngineV2.SyncInfoHandler(&syncInfo)
 	b.knownSyncInfos.Add(syncInfo.Hash(), true)
 	b.broadcastCh <- syncInfo
 }
@@ -129,13 +112,10 @@ func (b *Bfter) SyncInfo(syncInfo utils.SyncInfo) {
 func (b *Bfter) Start() {
 	go b.loop()
 }
-
 func (b *Bfter) Stop() {
 	close(b.quit)
 }
-
 func (b *Bfter) loop() {
-
 	for {
 		select {
 		case <-b.quit:
@@ -149,7 +129,7 @@ func (b *Bfter) loop() {
 			case utils.SyncInfo:
 				go b.broadcast.SyncInfo(v)
 			default:
-				log.Error("Unknown message type received, value: %v", v)
+				log.Error("Unknown message type received", "type", v)
 			}
 		}
 	}

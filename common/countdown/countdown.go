@@ -36,6 +36,7 @@ func (t *CountdownTimer) StopTimer() {
 
 // Reset will start the countdown timer if it's already stopped, or simply reset the countdown time back to the defual `duration`
 func (t *CountdownTimer) Reset() {
+	log.Info("Reset timmer")
 	if !t.isInitilised() {
 		t.setInitilised(true)
 		go t.startTimer()
@@ -53,17 +54,17 @@ func (t *CountdownTimer) startTimer() {
 	for {
 		select {
 		case q := <-t.quitc:
-			log.Debug("Quit countdown timer")
+			log.Info("Quit countdown timer")
 			close(q)
 			return
 		case <-timer.C:
-			log.Debug("Countdown time reached!")
+			log.Info("Countdown time reached!")
 			err := t.OnTimeoutFn(time.Now())
 			if err != nil {
 				log.Error("OnTimeoutFn error", err)
 			}
 		case <-t.resetc:
-			log.Debug("Reset countdown timer")
+			log.Info("Reset countdown timer")
 			timer.Reset(t.timeoutDuration)
 		}
 	}

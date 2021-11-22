@@ -153,6 +153,35 @@ func SigHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
+func SigHashV2(header *types.Header) (hash common.Hash) {
+	hasher := sha3.NewKeccak256()
+
+	err := rlp.Encode(hasher, []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
+		header.Extra, // Yes, this will panic if extra is too short
+		header.MixDigest,
+		header.Nonce,
+		header.Validators,
+		header.Penalties,
+	})
+	if err != nil {
+		log.Debug("Fail to encode", err)
+	}
+	hasher.Sum(hash[:0])
+	return hash
+}
+
 // Decode extra fields for consensus version >= 2 (XDPoS 2.0 and future versions)
 func DecodeBytesExtraFields(b []byte, val interface{}) error {
 	if len(b) == 0 {
@@ -175,14 +204,26 @@ func Ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	if address, known := sigcache.Get(hash); known {
 		return address.(common.Address), nil
 	}
-	// Retrieve the signature from the header extra-data
-	if len(header.Extra) < ExtraSeal {
-		return common.Address{}, ErrMissingSignature
-	}
-	signature := header.Extra[len(header.Extra)-ExtraSeal:]
+
+	// TEMP
+	pubkey := []byte{}
+	var err error
+	var signature []byte
 
 	// Recover the public key and the Ethereum address
-	pubkey, err := crypto.Ecrecover(SigHash(header).Bytes(), signature)
+	if header.Number.Uint64() > 3 {
+		// v2
+		pubkey, err = crypto.Ecrecover(SigHashV2(header).Bytes(), header.Validator)
+	} else {
+		// v1
+		// Retrieve the signature from the header extra-data
+		if len(header.Extra) < ExtraSeal {
+			return common.Address{}, ErrMissingSignature
+		}
+		signature = header.Extra[len(header.Extra)-ExtraSeal:]
+		pubkey, err = crypto.Ecrecover(SigHash(header).Bytes(), signature)
+	}
+
 	if err != nil {
 		return common.Address{}, err
 	}

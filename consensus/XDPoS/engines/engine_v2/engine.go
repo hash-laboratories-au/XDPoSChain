@@ -159,6 +159,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	if err != nil {
 		return err
 	}
+	log.Info("extraByte", "len", len(extraByte), "extra byte", common.Bytes2Hex(extraByte))
 
 	header.Extra = extraByte
 
@@ -286,18 +287,19 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	default:
 	}
 	// Sign all the things!
-	sighash, err := signFn(accounts.Account{Address: signer}, utils.SigHash(header).Bytes())
+	sighash, err := signFn(accounts.Account{Address: signer}, utils.SigHashV2(header).Bytes())
+	log.Info("seal sighash", "sighash", common.Bytes2Hex(sighash))
 	if err != nil {
 		return nil, err
 	}
-	copy(header.Extra[len(header.Extra)-utils.ExtraSeal:], sighash)
-	m2, err := x.GetValidator(signer, chain, header)
-	if err != nil {
-		return nil, fmt.Errorf("can't get block validator: %v", err)
-	}
-	if m2 == signer {
-		header.Validator = sighash
-	}
+	// copy(header.Extra[len(header.Extra)-utils.ExtraSeal:], sighash)
+	// m2, err := x.GetValidator(signer, chain, header)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("can't get block validator: %v", err)
+	// }
+	// if m2 == signer {
+	header.Validator = sighash
+	// }
 	return block.WithSeal(header), nil
 }
 
@@ -793,7 +795,7 @@ func (x *XDPoS_v2) sendTimeout() error {
 	if err != nil {
 		return err
 	}
-	timeoutMsg := &utils.Timeout{
+	timeoutMsg := utils.Timeout{
 		Round:     x.currentRound,
 		Signature: signedHash,
 	}
@@ -884,6 +886,7 @@ func (x *XDPoS_v2) SetNewRoundFaker(newRound utils.Round, resetTimer bool) {
 		x.timeoutWorker.Reset()
 	}
 	x.currentRound = newRound
+	x.timeoutPool.Clear()
 }
 
 // Utils for test to check currentRound value

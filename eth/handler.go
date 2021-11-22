@@ -398,6 +398,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	if err != nil {
 		return err
 	}
+	log.Info("[DEBUGGGGG] recevie message", "code", msg.Code)
 	if msg.Size > ProtocolMaxMsgSize {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
 	}
@@ -826,7 +827,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		// Mark the peer as owning the vote and process it
-		p.MarkVote(vote)
+		p.MarkVote(vote.Hash())
 		pm.bfter.Vote(vote)
 	case msg.Code == TimeoutMsg:
 		var timeout utils.Timeout
@@ -835,7 +836,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 		// Mark the peer as owning the timeout and process it
-		p.MarkTimeout(timeout)
+		p.MarkTimeout(timeout.Hash())
 		pm.bfter.Timeout(timeout)
 	case msg.Code == SyncInfoMsg:
 		var syncInfo utils.SyncInfo
@@ -843,7 +844,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		// Mark the peer as owning the syncInfo and process it
-		p.MarkSyncInfo(syncInfo)
+		p.MarkSyncInfo(syncInfo.Hash())
 		pm.bfter.SyncInfo(syncInfo)
 
 	default:
@@ -899,37 +900,41 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 // BroadcastVote will propagate a Vote to all peers which are not known to
 // already have the given vote.
 func (pm *ProtocolManager) BroadcastVote(vote utils.Vote) {
-	//hash := Vote.Hash()
-	hash := common.Hash{}
+	hash := vote.Hash()
+	// hash := common.Hash{}
 	peers := pm.peers.PeersWithoutVote(hash)
 	for _, peer := range peers {
 		peer.SendVote(vote)
 	}
-	log.Trace("Propagated Vote", "hash", hash, "recipients", len(peers))
+	log.Info("Propagated Vote", "hash", hash, "recipients", len(peers))
 }
 
 // BroadcastTimeout will propagate a Timeout to all peers which are not known to
 // already have the given timeout.
 func (pm *ProtocolManager) BroadcastTimeout(timeout utils.Timeout) {
-	//hash := timeout.Hash()
-	hash := common.Hash{}
+	hash := timeout.Hash()
+	log.Info("[DEBUG] BroadcastTimeout", "hash: ", hash)
+	// hash := common.Hash{}
 	peers := pm.peers.PeersWithoutTimeout(hash)
 	for _, peer := range peers {
-		peer.SendTimeout(timeout)
+		err := peer.SendTimeout(timeout)
+		if err != nil {
+			log.Error("[ERROR] BroadcastTimeout", "BroadcastTimeout", err.Error())
+		}
 	}
-	log.Trace("Propagated Timeout", "hash", hash, "recipients", len(peers))
+	log.Info("Propagated Timeout", "hash", hash, "recipients", len(peers))
 }
 
 // BroadcastSyncInfo will propagate a SyncInfo to all peers which are not known to
 // already have the given SyncInfo.
 func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo utils.SyncInfo) {
-	//hash := syncInfo.Hash()
-	hash := common.Hash{}
+	hash := syncInfo.Hash()
+	// hash := common.Hash{}
 	peers := pm.peers.PeersWithoutSyncInfo(hash)
 	for _, peer := range peers {
 		peer.SendSyncInfo(syncInfo)
 	}
-	log.Trace("Propagated SyncInfo", "hash", hash, "recipients", len(peers))
+	log.Info("Propagated SyncInfo", "hash", hash, "recipients", len(peers))
 }
 
 // OrderBroadcastTx will propagate a transaction to all peers which are not known to

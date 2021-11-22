@@ -50,7 +50,8 @@ type XDPoS_v2 struct {
 	highestTimeoutCert *utils.TimeoutCert
 	highestCommitBlock *utils.BlockInfo
 
-	HookReward func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
+	HookReward    func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
+	HookValidator func(header *types.Header, signers []common.Address) ([]byte, error)
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
@@ -102,53 +103,52 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	header.Difficulty = x.calcDifficulty(chain, parent, x.signer)
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
 	/*
-			masternodes := snap.GetMasterNodes()
-			if number >= x.config.Epoch && number%x.config.Epoch == 0 {
-				if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
-					var penMasternodes []common.Address
-					var err error
-					if chain.Config().IsTIPSigning(header.Number) {
-						penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
-					} else {
-						penMasternodes, err = x.HookPenalty(chain, number)
-					}
-					if err != nil {
-						return err
-					}
-					if len(penMasternodes) > 0 {
-						// penalize bad masternode(s)
-						masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
-						for _, address := range penMasternodes {
-							log.Debug("Penalty status", "address", address, "number", number)
-						}
-						header.Penalties = common.ExtractAddressToBytes(penMasternodes)
-					}
+		masternodes := snap.GetMasterNodes()
+		if number >= x.config.Epoch && number%x.config.Epoch == 0 {
+			if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
+				var penMasternodes []common.Address
+				var err error
+				if chain.Config().IsTIPSigning(header.Number) {
+					penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
+				} else {
+					penMasternodes, err = x.HookPenalty(chain, number)
 				}
-				// Prevent penalized masternode(s) within 4 recent epochs
-				for i := 1; i <= common.LimitPenaltyEpoch; i++ {
-					if number > uint64(i)*x.config.Epoch {
-						masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
-					}
+				if err != nil {
+					return err
 				}
-				for _, masternode := range masternodes {
-					header.Extra = append(header.Extra, masternode[:]...)
-				}
-				if x.HookValidator != nil {
-					validators, err := x.HookValidator(header, masternodes)
-					if err != nil {
-						return err
+				if len(penMasternodes) > 0 {
+					// penalize bad masternode(s)
+					masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
+					for _, address := range penMasternodes {
+						log.Debug("Penalty status", "address", address, "number", number)
 					}
-					header.Validators = validators
+					header.Penalties = common.ExtractAddressToBytes(penMasternodes)
 				}
 			}
-		if x.HookValidator != nil {
-			validators, err := x.HookValidator(header, masternodes)
-			if err != nil {
-				return err
+			// Prevent penalized masternode(s) within 4 recent epochs
+			for i := 1; i <= common.LimitPenaltyEpoch; i++ {
+				if number > uint64(i)*x.config.Epoch {
+					masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
+				}
 			}
-			header.Validators = validators
+			for _, masternode := range masternodes {
+				header.Extra = append(header.Extra, masternode[:]...)
+			}
 		}
+
 	*/
+	snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		return err
+	}
+	masternodes := snap.GetMasterNodes()
+	if number%x.config.Epoch == 0 && x.HookValidator != nil {
+		validators, err := x.HookValidator(header, masternodes)
+		if err != nil {
+			return err
+		}
+		header.Validators = validators
+	}
 
 	extra := utils.ExtraFields_v2{
 		Round:      x.currentRound,
@@ -348,7 +348,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	return len(masternodes), preIndex, curIndex, false, nil
 }
 
-//Copy from v1
+// Copy from v1
 func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error) {
 	if header.Number.Uint64() == 0 {
 		return common.Address{}, errors.New("Don't take block 0")
@@ -360,7 +360,7 @@ func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error
 	return m, nil
 }
 
-//Copy from v1
+// Copy from v1
 func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Header) []common.Address {
 	n := header.Number.Uint64()
 	e := x.config.Epoch
@@ -401,7 +401,7 @@ func (x *XDPoS_v2) GetValidator(creator common.Address, chain consensus.ChainRea
 	return m[creator], nil
 }
 
-//Copy from v1
+// Copy from v1
 func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV2, error) {
 	number := header.Number.Uint64()
 	log.Trace("get snapshot", "number", number, "hash", header.Hash())
@@ -445,7 +445,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
 			}
 			snap = newSnapshot(x.config, x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
-			if err := snap.store(x.db); err != nil {
+			if err := storeSnapshot(snap, x.db); err != nil {
 				return nil, err
 			}
 			log.Trace("Stored genesis voting snapshot to disk")
@@ -482,7 +482,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 
 	// If we've generated a new checkpoint snapshot, save to disk
 	if snap.Number%x.config.Epoch == x.config.Gap {
-		if err = snap.store(x.db); err != nil {
+		if err = storeSnapshot(snap, x.db); err != nil {
 			return nil, err
 		}
 		log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)

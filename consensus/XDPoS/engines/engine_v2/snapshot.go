@@ -1,8 +1,8 @@
 package engine_v2
 
 import (
-	"bytes"
 	"encoding/json"
+	"sort"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
@@ -12,18 +12,15 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
-// Snapshot is the state of the authorization voting at a given point in time.
+// Snapshot is the state of the smart contract validator list
 type SnapshotV2 struct {
 	config   *params.XDPoSConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
 
 	Number uint64      `json:"number"` // Block number where the snapshot was created
 	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
-	//BlockRound utils.Round      `json:"blockRound"` // Block BTF Block Round
-	//QuorumCert utils.QuorumCert `json:"quorumCert"` // Block's QC
 
 	MasterNodes map[common.Address]struct{} `json:"masterNodes"` // Set of authorized master nodes at this moment
-	//Recents     map[uint64]common.Address   `json:"recents"`     // Set of recent signers for spam protections
 }
 
 // newSnapshot creates a new snapshot with the specified startup parameters. This
@@ -35,11 +32,8 @@ func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint
 		sigcache: sigcache,
 		Number:   number,
 		Hash:     hash,
-		//BlockRound: round,
-		//QuorumCert: qc,
 
 		MasterNodes: make(map[common.Address]struct{}),
-		//Recents:     make(map[uint64]common.Address),
 	}
 	for _, signer := range signers {
 		snap.MasterNodes[signer] = struct{}{}
@@ -64,7 +58,7 @@ func loadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.D
 }
 
 // store inserts the SnapshotV2 into the database.
-func (s *SnapshotV2) store(db ethdb.Database) error {
+func storeSnapshot(s *SnapshotV2, db ethdb.Database) error {
 	blob, err := json.Marshal(s)
 	if err != nil {
 		return err
@@ -80,16 +74,10 @@ func (s *SnapshotV2) copy() *SnapshotV2 {
 		Number:      s.Number,
 		Hash:        s.Hash,
 		MasterNodes: make(map[common.Address]struct{}),
-		//Recents:     make(map[uint64]common.Address),
 	}
 	for signer := range s.MasterNodes {
 		cpy.MasterNodes[signer] = struct{}{}
 	}
-	/*
-		for block, signer := range s.Recents {
-			cpy.Recents[block] = signer
-		}
-	*/
 
 	return cpy
 }
@@ -113,42 +101,23 @@ func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
 	// Iterate through the headers and create a new SnapshotV2
 	snap := s.copy()
 
-	//TOBE Delete once confirm this is not necessary
-	/*
-		for _, header := range headers {
-			// Remove any votes on checkpoint blocks
-			number := header.Number.Uint64()
-			// Delete the oldest signer from the recent list to allow it signing again
-			if limit := uint64(len(snap.MasterNodes)/2 + 1); number >= limit {
-				delete(snap.Recents, number-limit)
-			}
-			// Resolve the authorization key and check against signers
-			signer, err := utils.Ecrecover(header, s.sigcache)
-			if err != nil {
-				return nil, err
-			}
-			snap.Recents[number] = signer
-		}
-	*/
 	snap.Number += uint64(len(headers))
 	snap.Hash = headers[len(headers)-1].Hash()
-	// TODO snap.QuorumCert = headers[len(headers)-1].QC()
-	// TODO snap.EpochRound = getEpochRound(header)
 	return snap, nil
 }
 
-// signers retrieves the list of authorized signers in ascending order.
+// signers retrieves the list of authorized signers in ascending order, convert into strings then use native sort lib
 func (s *SnapshotV2) GetMasterNodes() []common.Address {
 	signers := make([]common.Address, 0, len(s.MasterNodes))
+	signerStrs := make([]string, 0, len(s.MasterNodes))
+
 	for signer := range s.MasterNodes {
-		signers = append(signers, signer)
+		signerStrs = append(signerStrs, signer.Str())
 	}
-	for i := 0; i < len(signers); i++ {
-		for j := i + 1; j < len(signers); j++ {
-			if bytes.Compare(signers[i][:], signers[j][:]) > 0 {
-				signers[i], signers[j] = signers[j], signers[i]
-			}
-		}
+	sort.Strings(signerStrs)
+	for _, str := range signerStrs {
+		signers = append(signers, common.StringToAddress(str))
 	}
+
 	return signers
 }

@@ -60,6 +60,9 @@ var (
 	// be modified via out-of-range or non-contiguous headers.
 	ErrInvalidVotingChain = errors.New("invalid voting chain")
 
+	ErrInvalidHeaderOrder = errors.New("invalid header order")
+	ErrInvalidChild       = errors.New("invalid header child")
+
 	// errUnauthorized is returned if a header is signed by a non-authorized entity.
 	ErrUnauthorized = errors.New("unauthorized")
 

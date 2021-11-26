@@ -428,7 +428,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 		// If an on-disk checkpoint snapshot can be found, use that
 		// checkpoint snapshot = checkpoint - gap
 		if (number+x.config.Gap)%x.config.Epoch == 0 {
-			if s, err := loadSnapshot(x.config, x.signatures, x.db, hash); err == nil {
+			if s, err := loadSnapshot(x.signatures, x.db, hash); err == nil {
 				log.Trace("Loaded snapshot form disk", "number", number, "hash", hash)
 				snap = s
 				break
@@ -444,7 +444,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 			for i := 0; i < len(signers); i++ {
 				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
 			}
-			snap = newSnapshot(x.config, x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
+			snap = newSnapshot(x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
 			if err := storeSnapshot(snap, x.db); err != nil {
 				return nil, err
 			}

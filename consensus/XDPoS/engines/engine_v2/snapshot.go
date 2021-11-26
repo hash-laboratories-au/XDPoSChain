@@ -8,14 +8,12 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
-	"github.com/XinFinOrg/XDPoSChain/params"
 	lru "github.com/hashicorp/golang-lru"
 )
 
 // Snapshot is the state of the smart contract validator list
 type SnapshotV2 struct {
-	config   *params.XDPoSConfig // Consensus engine parameters to fine tune behavior
-	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
+	sigcache *lru.ARCCache // Cache of recent block signatures to speed up ecrecover
 
 	Number uint64      `json:"number"` // Block number where the snapshot was created
 	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
@@ -26,23 +24,22 @@ type SnapshotV2 struct {
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent signers, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, signers []common.Address) *SnapshotV2 {
+func newSnapshot(sigcache *lru.ARCCache, number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, masternodes []common.Address) *SnapshotV2 {
 	snap := &SnapshotV2{
-		config:   config,
 		sigcache: sigcache,
 		Number:   number,
 		Hash:     hash,
 
 		MasterNodes: make(map[common.Address]struct{}),
 	}
-	for _, signer := range signers {
+	for _, signer := range masternodes {
 		snap.MasterNodes[signer] = struct{}{}
 	}
 	return snap
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*SnapshotV2, error) {
+func loadSnapshot(sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*SnapshotV2, error) {
 	blob, err := db.Get(append([]byte("XDPoS-"), hash[:]...))
 	if err != nil {
 		return nil, err
@@ -51,7 +48,6 @@ func loadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.D
 	if err := json.Unmarshal(blob, snap); err != nil {
 		return nil, err
 	}
-	snap.config = config
 	snap.sigcache = sigcache
 
 	return snap, nil
@@ -69,7 +65,6 @@ func storeSnapshot(s *SnapshotV2, db ethdb.Database) error {
 // copy creates a deep copy of the SnapshotV2, though not the individual votes.
 func (s *SnapshotV2) copy() *SnapshotV2 {
 	cpy := &SnapshotV2{
-		config:      s.config,
 		sigcache:    s.sigcache,
 		Number:      s.Number,
 		Hash:        s.Hash,
@@ -92,11 +87,11 @@ func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
 	// Sanity check that the headers can be applied
 	for i := 0; i < len(headers)-1; i++ {
 		if headers[i+1].Number.Uint64() != headers[i].Number.Uint64()+1 {
-			return nil, utils.ErrInvalidVotingChain
+			return nil, utils.ErrInvalidHeaderOrder
 		}
 	}
 	if headers[0].Number.Uint64() != s.Number+1 {
-		return nil, utils.ErrInvalidVotingChain
+		return nil, utils.ErrInvalidChild
 	}
 	// Iterate through the headers and create a new SnapshotV2
 	snap := s.copy()
@@ -108,16 +103,16 @@ func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
 
 // signers retrieves the list of authorized signers in ascending order, convert into strings then use native sort lib
 func (s *SnapshotV2) GetMasterNodes() []common.Address {
-	signers := make([]common.Address, 0, len(s.MasterNodes))
-	signerStrs := make([]string, 0, len(s.MasterNodes))
+	nodes := make([]common.Address, 0, len(s.MasterNodes))
+	nodeStrs := make([]string, 0, len(s.MasterNodes))
 
-	for signer := range s.MasterNodes {
-		signerStrs = append(signerStrs, signer.Str())
+	for node := range s.MasterNodes {
+		nodeStrs = append(nodeStrs, node.Str())
 	}
-	sort.Strings(signerStrs)
-	for _, str := range signerStrs {
-		signers = append(signers, common.StringToAddress(str))
+	sort.Strings(nodeStrs)
+	for _, str := range nodeStrs {
+		nodes = append(nodes, common.StringToAddress(str))
 	}
 
-	return signers
+	return nodes
 }

@@ -38,4 +38,6 @@ var (
 	ErrFailValidatorSignature = errors.New("missing validator in header")
 
 	ErrNoValidatorSignature = errors.New("no validator in header")
+
+	ErrNotReadyToPurpose = errors.New("not ready to purpose, QC is not ready")
 )

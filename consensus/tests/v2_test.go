@@ -62,9 +62,9 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	syncInfoMsg := <-engineV2.BroadcastCh
 	assert.NotNil(t, syncInfoMsg)
 
-	// Should have QC, however, we did not inilise it, hence will show default empty value
+	// Should have QC, however, we did not inilise it, hence will show default nil value
 	qc := syncInfoMsg.(utils.SyncInfo).HighestQuorumCert
-	assert.NotNil(t, qc)
+	assert.Nil(t, qc)
 
 	tc := syncInfoMsg.(utils.SyncInfo).HighestTimeoutCert
 	assert.NotNil(t, tc)

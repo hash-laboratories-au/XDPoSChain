@@ -581,6 +581,10 @@ func (self *worker) commitNewWork() {
 	}
 
 	if err := self.engine.Prepare(self.chain, header); err != nil {
+		if err == consensus.ErrNotReadyToPurpose {
+			log.Info("Wait... Not ready to purpose", "err", err)
+			return
+		}
 		log.Error("Failed to prepare header for new block", "err", err)
 		return
 	}

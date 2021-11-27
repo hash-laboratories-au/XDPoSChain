@@ -50,6 +50,9 @@ type XDPoS_v2 struct {
 	highestTimeoutCert *utils.TimeoutCert
 	highestCommitBlock *utils.BlockInfo
 
+	//usedQuorumCert bool // To be discussed
+	readyToPurpose bool // boolean value to indicate ready to attach QC and mine block
+
 	HookReward    func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
 	HookValidator func(header *types.Header, signers []common.Address) ([]byte, error)
 }
@@ -75,8 +78,10 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 		timeoutPool:   timeoutPool,
 		votePool:      votePool,
 
-		highestTimeoutCert: &utils.TimeoutCert{},
-		highestQuorumCert:  &utils.QuorumCert{},
+		readyToPurpose: true, //init true as no QC at the beginning
+
+		highestTimeoutCert: nil,
+		highestQuorumCert:  nil,
 	}
 	// Add callback to the timer
 	timer.OnTimeoutFn = engine.onCountdownTimeout
@@ -90,7 +95,10 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
-	// If the block isn't a checkpoint, cast a random vote (good enough for now)
+	if !x.readyToPurpose {
+		return consensus.ErrNotReadyToPurpose
+	}
+
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
 
@@ -102,52 +110,21 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	// Set the correct difficulty
 	header.Difficulty = x.calcDifficulty(chain, parent, x.signer)
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
-	/*
-		masternodes := snap.GetMasterNodes()
-		if number >= x.config.Epoch && number%x.config.Epoch == 0 {
-			if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
-				var penMasternodes []common.Address
-				var err error
-				if chain.Config().IsTIPSigning(header.Number) {
-					penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
-				} else {
-					penMasternodes, err = x.HookPenalty(chain, number)
-				}
-				if err != nil {
-					return err
-				}
-				if len(penMasternodes) > 0 {
-					// penalize bad masternode(s)
-					masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
-					for _, address := range penMasternodes {
-						log.Debug("Penalty status", "address", address, "number", number)
-					}
-					header.Penalties = common.ExtractAddressToBytes(penMasternodes)
-				}
-			}
-			// Prevent penalized masternode(s) within 4 recent epochs
-			for i := 1; i <= common.LimitPenaltyEpoch; i++ {
-				if number > uint64(i)*x.config.Epoch {
-					masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
-				}
-			}
-			for _, masternode := range masternodes {
-				header.Extra = append(header.Extra, masternode[:]...)
-			}
-		}
 
-	*/
-	snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
-	if err != nil {
-		return err
-	}
-	masternodes := snap.GetMasterNodes()
-	if number%x.config.Epoch == 0 && x.HookValidator != nil {
-		validators, err := x.HookValidator(header, masternodes)
+	if number >= x.config.Epoch && number%x.config.Epoch == 0 {
+		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
 		if err != nil {
 			return err
 		}
-		header.Validators = validators
+		masternodes := snap.GetMasterNodes()
+		if number%x.config.Epoch == 0 && x.HookValidator != nil {
+			validators, err := x.HookValidator(header, masternodes)
+			if err != nil {
+				return err
+			}
+			//TODO: remove penalty nodes and add comeback nodes
+			header.Validators = validators
+		}
 	}
 
 	extra := utils.ExtraFields_v2{
@@ -155,12 +132,12 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		QuorumCert: x.highestQuorumCert,
 	}
 
-	extraByte, err := extra.EncodeToBytes()
+	extraBytes, err := extra.EncodeToBytes()
 	if err != nil {
 		return err
 	}
 
-	header.Extra = extraByte
+	header.Extra = extraBytes
 
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
@@ -659,6 +636,7 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(pooledTimeouts map[common.Hash]
 	Process Block workflow
 */
 func (x *XDPoS_v2) ProcessBlockHandler() {
+	x.readyToPurpose = false
 	/*
 		1. processQC()
 		2. verifyVotingRule()
@@ -718,6 +696,7 @@ func (x *XDPoS_v2) processQC(quorumCert *utils.QuorumCert) error {
 	//TODO: find parent and grandparent and grandgrandparent block, check round number, if so, commit grandgrandparent
 	if quorumCert.ProposedBlockInfo.Round >= x.currentRound {
 		x.setNewRound(quorumCert.ProposedBlockInfo.Round + 1)
+		x.readyToPurpose = true
 	}
 	return nil
 }
@@ -746,6 +725,7 @@ func (x *XDPoS_v2) processTC(timeoutCert *utils.TimeoutCert) error {
 */
 func (x *XDPoS_v2) setNewRound(round utils.Round) error {
 	x.currentRound = round
+
 	//TODO: tell miner now it's a new round and start mine if it's leader
 	x.timeoutWorker.Reset()
 	//TODO: vote pools

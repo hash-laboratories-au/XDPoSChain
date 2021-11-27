@@ -11,16 +11,8 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb/leveldb"
-	lru "github.com/hashicorp/golang-lru"
+	"gotest.tools/assert"
 )
-
-func initSnapshot() {
-	signatures, _ := lru.NewARC(utils.InmemorySnapshots)
-	hash := common.Hash{0x00}
-	round := utils.Round(1)
-	newSnapshot(signatures, 1, hash, round, nil, []common.Address{})
-
-}
 
 func TestGetMasterNodes(t *testing.T) {
 	masterNodes := []common.Address{
@@ -45,7 +37,7 @@ func TestApplyNewSnapshot(t *testing.T) {
 	}
 	newSnap, _ := snap.apply(headers)
 	if newSnap.Number != 5 {
-		t.Error("newSnapshot number is wrong")
+		t.Error("newSnapshot number should have last header number")
 	}
 	if newSnap.Hash != headers[3].Hash() {
 		t.Error("newSnapshot hash should equal the last header given")
@@ -58,9 +50,7 @@ func TestApplyWithWrongHeader(t *testing.T) {
 		{Number: big.NewInt(3)},
 	}
 	_, err := snap.apply(headers)
-	if err != utils.ErrInvalidChild {
-		t.Error("Error should return as invalid child")
-	}
+	assert.Equal(t, err, utils.ErrInvalidChild)
 
 	snap = newSnapshot(nil, 1, common.Hash{}, utils.Round(1), nil, nil)
 	headers = []*types.Header{
@@ -68,10 +58,7 @@ func TestApplyWithWrongHeader(t *testing.T) {
 		{Number: big.NewInt(4)},
 	}
 	_, err = snap.apply(headers)
-	if err != utils.ErrInvalidHeaderOrder {
-		t.Error("Error should return as invalid header order")
-	}
-
+	assert.Equal(t, err, utils.ErrInvalidHeaderOrder)
 }
 
 // Should perform deep copy

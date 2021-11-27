@@ -11,7 +11,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb/leveldb"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetMasterNodes(t *testing.T) {
@@ -29,18 +29,34 @@ func TestGetMasterNodes(t *testing.T) {
 }
 func TestApplyNewSnapshot(t *testing.T) {
 	snap := newSnapshot(nil, 1, common.Hash{}, utils.Round(1), nil, nil)
+	extra := utils.ExtraFields_v2{
+		Round: 10,
+		QuorumCert: &utils.QuorumCert{
+			ProposedBlockInfo: &utils.BlockInfo{},
+		},
+	}
+	extraBytes, err := extra.EncodeToBytes()
+	assert.Nil(t, err)
+
 	headers := []*types.Header{
 		{Number: big.NewInt(2)},
 		{Number: big.NewInt(3)},
 		{Number: big.NewInt(4)},
-		{Number: big.NewInt(5)},
+		{
+			Number: big.NewInt(5),
+			Extra:  extraBytes,
+		},
 	}
-	newSnap, _ := snap.apply(headers)
+	newSnap, err := snap.apply(headers)
+	assert.Nil(t, err)
 	if newSnap.Number != 5 {
 		t.Error("newSnapshot number should have last header number")
 	}
 	if newSnap.Hash != headers[3].Hash() {
 		t.Error("newSnapshot hash should equal the last header given")
+	}
+	if newSnap.Round != 10 {
+		t.Error("newSnapshot round number should also have last header round number")
 	}
 }
 

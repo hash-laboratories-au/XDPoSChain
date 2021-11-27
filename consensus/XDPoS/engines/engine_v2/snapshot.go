@@ -15,6 +15,7 @@ import (
 type SnapshotV2 struct {
 	sigcache *lru.ARCCache // Cache of recent block signatures to speed up ecrecover
 
+	Round  utils.Round `json:"round"`  // Round number
 	Number uint64      `json:"number"` // Block number where the snapshot was created
 	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
 
@@ -27,6 +28,7 @@ type SnapshotV2 struct {
 func newSnapshot(sigcache *lru.ARCCache, number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, masternodes []common.Address) *SnapshotV2 {
 	snap := &SnapshotV2{
 		sigcache: sigcache,
+		Round:    round,
 		Number:   number,
 		Hash:     hash,
 
@@ -66,6 +68,7 @@ func storeSnapshot(s *SnapshotV2, db ethdb.Database) error {
 func (s *SnapshotV2) copy() *SnapshotV2 {
 	cpy := &SnapshotV2{
 		sigcache:    s.sigcache,
+		Round:       s.Round,
 		Number:      s.Number,
 		Hash:        s.Hash,
 		MasterNodes: make(map[common.Address]struct{}),
@@ -95,9 +98,17 @@ func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
 	}
 	// Iterate through the headers and create a new SnapshotV2
 	snap := s.copy()
+	lastHeader := headers[len(headers)-1]
 
 	snap.Number += uint64(len(headers))
-	snap.Hash = headers[len(headers)-1].Hash()
+	snap.Hash = lastHeader.Hash()
+
+	extraV2 := new(utils.ExtraFields_v2)
+	err := utils.DecodeBytesExtraFields(lastHeader.Extra, &extraV2)
+	if err != nil {
+		return nil, err
+	}
+	snap.Round = extraV2.Round
 	return snap, nil
 }
 

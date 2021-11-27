@@ -412,22 +412,24 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 			}
 		}
 		// If we're at block zero, make a snapshot
-		if number == 0 {
-			genesis := chain.GetHeaderByNumber(0)
-			if err := x.VerifyHeader(chain, genesis, true); err != nil {
-				return nil, err
+		/*
+			if number == 0 {
+				genesis := chain.GetHeaderByNumber(0)
+				if err := x.VerifyHeader(chain, genesis, true); err != nil {
+					return nil, err
+				}
+				signers := make([]common.Address, (len(genesis.Extra)-utils.ExtraVanity-utils.ExtraSeal)/common.AddressLength)
+				for i := 0; i < len(signers); i++ {
+					copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
+				}
+				snap = newSnapshot(x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
+				if err := storeSnapshot(snap, x.db); err != nil {
+					return nil, err
+				}
+				log.Trace("Stored genesis voting snapshot to disk")
+				break
 			}
-			signers := make([]common.Address, (len(genesis.Extra)-utils.ExtraVanity-utils.ExtraSeal)/common.AddressLength)
-			for i := 0; i < len(signers); i++ {
-				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
-			}
-			snap = newSnapshot(x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
-			if err := storeSnapshot(snap, x.db); err != nil {
-				return nil, err
-			}
-			log.Trace("Stored genesis voting snapshot to disk")
-			break
-		}
+		*/
 		// No snapshot for this header, gather the header and move backward
 		var header *types.Header
 		if len(parents) > 0 {
@@ -458,11 +460,12 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 	x.recents.Add(snap.Hash, snap)
 
 	// If we've generated a new checkpoint snapshot, save to disk
-	if snap.Number%x.config.Epoch == x.config.Gap {
+	// TODO how to save correct snapshot
+	if uint64(snap.Round)%x.config.Epoch == x.config.Gap {
 		if err = storeSnapshot(snap, x.db); err != nil {
 			return nil, err
 		}
-		log.Trace("Stored snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+		log.Trace("Stored snapshot to disk", "round number", snap.Round, "hash", snap.Hash)
 	}
 	return snap, err
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
+	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/log"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -18,10 +19,11 @@ type broadcastTimeoutFn func(*utils.Timeout)
 type broadcastSyncInfoFn func(*utils.SyncInfo)
 
 type Bfter struct {
-	broadcastCh chan interface{}
-	quit        chan struct{}
-	consensus   ConsensusFns
-	broadcast   BroadcastFns
+	blockCahinReader consensus.ChainReader
+	broadcastCh      chan interface{}
+	quit             chan struct{}
+	consensus        ConsensusFns
+	broadcast        BroadcastFns
 
 	// Message Cache
 	knownVotes     *lru.ARCCache
@@ -31,7 +33,7 @@ type Bfter struct {
 
 type ConsensusFns struct {
 	verifyVote  func(*utils.Vote) error
-	voteHandler func(*utils.Vote) error
+	voteHandler func(consensus.ChainReader, *utils.Vote) error
 
 	verifyTimeout  func(*utils.Timeout) error
 	timeoutHandler func(*utils.Timeout) error
@@ -46,17 +48,18 @@ type BroadcastFns struct {
 	SyncInfo broadcastSyncInfoFn
 }
 
-func New(broadcasts BroadcastFns) *Bfter {
+func New(broadcasts BroadcastFns, blockCahinReader *core.BlockChain) *Bfter {
 	knownVotes, _ := lru.NewARC(messageLimit)
 	knownSyncInfos, _ := lru.NewARC(messageLimit)
 	knownTimeouts, _ := lru.NewARC(messageLimit)
 	return &Bfter{
-		quit:           make(chan struct{}),
-		broadcastCh:    make(chan interface{}),
-		broadcast:      broadcasts,
-		knownVotes:     knownVotes,
-		knownSyncInfos: knownSyncInfos,
-		knownTimeouts:  knownTimeouts,
+		quit:             make(chan struct{}),
+		broadcastCh:      make(chan interface{}),
+		broadcast:        broadcasts,
+		knownVotes:       knownVotes,
+		knownSyncInfos:   knownSyncInfos,
+		knownTimeouts:    knownTimeouts,
+		blockCahinReader: blockCahinReader,
 	}
 }
 
@@ -75,63 +78,70 @@ func (b *Bfter) SetConsensusFuns(engine consensus.Engine) {
 }
 
 // TODO: rename
-func (b *Bfter) Vote(vote *utils.Vote) {
+func (b *Bfter) Vote(vote *utils.Vote) error {
 	log.Trace("Receive Vote", "vote", vote)
 	if b.knownVotes.Contains(vote.Hash()) {
 		log.Trace("Discarded vote, known vote", "Signature", vote.Signature, "hash", vote.Hash())
-		return
+		return nil
 	}
 
 	err := b.consensus.verifyVote(vote)
 	if err != nil {
 		log.Error("Verify BFT Vote", "error", err)
-		return
-	}
-	err = b.consensus.voteHandler(vote)
-	if err != nil {
-		log.Error("handle BFT Vote", "error", err)
-		return
+		return err
 	}
 	b.knownVotes.Add(vote.Hash(), true)
 	b.broadcastCh <- vote
+
+	err = b.consensus.voteHandler(b.blockCahinReader, vote)
+	if err != nil {
+		log.Error("handle BFT Vote", "error", err)
+		return err
+	}
+	return nil
 }
-func (b *Bfter) Timeout(timeout *utils.Timeout) {
+func (b *Bfter) Timeout(timeout *utils.Timeout) error {
 	log.Trace("Receive Timeout", "timeout", timeout)
 	if b.knownVotes.Contains(timeout.Hash()) {
 		log.Trace("Discarded Timeout, known Timeout", "Signature", timeout.Signature, "hash", timeout.Hash(), "round", timeout.Round)
-		return
+		return nil
 	}
 	err := b.consensus.verifyTimeout(timeout)
 	if err != nil {
 		log.Error("Verify BFT Timeout", "error", err)
-		return
-	}
-	err = b.consensus.timeoutHandler(timeout)
-	if err != nil {
-		log.Error("handle BFT Timeout", "error", err)
-		return
+		return err
 	}
 	b.knownTimeouts.Add(timeout.Hash(), true)
 	b.broadcastCh <- timeout
+
+	err = b.consensus.timeoutHandler(timeout)
+	if err != nil {
+		log.Error("handle BFT Timeout", "error", err)
+		return err
+	}
+	return nil
 }
-func (b *Bfter) SyncInfo(syncInfo *utils.SyncInfo) {
+func (b *Bfter) SyncInfo(syncInfo *utils.SyncInfo) error {
 	log.Trace("Receive SyncInfo", "syncInfo", syncInfo)
 	if b.knownVotes.Contains(syncInfo.Hash()) {
 		log.Trace("Discarded SyncInfo, known SyncInfo", "hash", syncInfo.Hash())
-		return
+		return nil
 	}
 	err := b.consensus.verifySyncInfo(syncInfo)
 	if err != nil {
 		log.Error("Verify BFT SyncInfo", "error", err)
-		return
+		return err
 	}
+
+	b.knownSyncInfos.Add(syncInfo.Hash(), true)
+	b.broadcastCh <- syncInfo
+
 	err = b.consensus.syncInfoHandler(syncInfo)
 	if err != nil {
 		log.Error("handle BFT SyncInfo", "error", err)
-		return
+		return err
 	}
-	b.knownSyncInfos.Add(syncInfo.Hash(), true)
-	b.broadcastCh <- syncInfo
+	return nil
 }
 
 // Start Bft receiver

@@ -163,7 +163,7 @@ func (x *XDPoS_v2) VoteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 		log.Debug("Vote pool threashold reached: %v, number of items in the pool: %v", thresholdReached, numberOfVotesInPool)
 		err := x.onVotePoolThresholdReached(chain, pooledVotes, voteMsg)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -314,24 +314,24 @@ func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
 }
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
-func (x *XDPoS_v2) processQC(blockCahinReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
+func (x *XDPoS_v2) processQC(blockchainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
 	// 1. Update HighestQC
 	if x.highestQuorumCert == nil || (quorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round) {
-		//TODO: do I need a clone?
 		x.highestQuorumCert = quorumCert
 	}
 	// 2. Get QC from header and update lockQuorumCert(lockQuorumCert is the parent of highestQC)
-	proposedBlockHeader := blockCahinReader.GetHeaderByHash(quorumCert.ProposedBlockInfo.Hash)
+	proposedBlockHeader := blockchainReader.GetHeaderByHash(quorumCert.ProposedBlockInfo.Hash)
 	var decodedExtraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(proposedBlockHeader.Extra, &decodedExtraField)
 	if err != nil {
 		return err
 	}
-	x.lockQuorumCert = &decodedExtraField.QuorumCert
+	if x.lockQuorumCert == nil || (decodedExtraField.QuorumCert.ProposedBlockInfo.Round > x.lockQuorumCert.ProposedBlockInfo.Round) {
+		x.lockQuorumCert = &decodedExtraField.QuorumCert
+	}
 
-	proposedBlockRound := &decodedExtraField.Round
 	// 3. Update commit block info
-	_, err = x.commitBlocks(blockCahinReader, proposedBlockHeader, proposedBlockRound)
+	_, err = x.commitBlocks(blockchainReader, proposedBlockHeader, decodedExtraField.Round)
 	if err != nil {
 		return err
 	}
@@ -493,29 +493,29 @@ func (x *XDPoS_v2) getSyncInfo() utils.SyncInfo {
 }
 
 //TODO: find parent and grandparent and grandgrandparent block, check round number, if so, commit grandgrandparent
-func (x *XDPoS_v2) commitBlocks(blockCahinReader consensus.ChainReader, proposedBlockHeader *types.Header, proposedBlockRound *utils.Round) (bool, error) {
+func (x *XDPoS_v2) commitBlocks(blockchainReader consensus.ChainReader, proposedBlockHeader *types.Header, proposedBlockRound utils.Round) (bool, error) {
 	// Find the last two parent block and check their rounds are the continous
-	parentBlock := blockCahinReader.GetHeaderByHash(proposedBlockHeader.ParentHash)
+	parentBlock := blockchainReader.GetHeaderByHash(proposedBlockHeader.ParentHash)
 
 	var decodedExtraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(parentBlock.Extra, &decodedExtraField)
 	if err != nil {
 		return false, err
 	}
-	if *proposedBlockRound-1 != decodedExtraField.Round {
+	if proposedBlockRound-1 != decodedExtraField.Round {
 		return false, nil
 	}
 
 	// If parent round is continous, we check grandparent
-	grandParentBlock := blockCahinReader.GetHeaderByHash(parentBlock.ParentHash)
+	grandParentBlock := blockchainReader.GetHeaderByHash(parentBlock.ParentHash)
 	err = utils.DecodeBytesExtraFields(grandParentBlock.Extra, &decodedExtraField)
 	if err != nil {
 		return false, err
 	}
-	if *proposedBlockRound-2 != decodedExtraField.Round {
+	if proposedBlockRound-2 != decodedExtraField.Round {
 		return false, nil
 	}
-	// TODO: Commit the grandParent block
+	// TODO: Commit the grandParent block and all blocks before it
 
 	return true, nil
 }

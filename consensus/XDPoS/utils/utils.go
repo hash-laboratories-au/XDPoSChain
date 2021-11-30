@@ -153,6 +153,33 @@ func SigHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
+func SigHashV2(header *types.Header) (hash common.Hash) {
+	hasher := sha3.NewKeccak256()
+
+	err := rlp.Encode(hasher, []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
+		header.Extra,
+		header.MixDigest,
+		header.Nonce,
+	})
+	if err != nil {
+		log.Debug("Fail to encode", err)
+	}
+	hasher.Sum(hash[:0])
+	return hash
+}
+
 // Decode extra fields for consensus version >= 2 (XDPoS 2.0 and future versions)
 func DecodeBytesExtraFields(b []byte, val interface{}) error {
 	if len(b) == 0 {
@@ -183,6 +210,25 @@ func Ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(SigHash(header).Bytes(), signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	var signer common.Address
+	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
+
+	sigcache.Add(hash, signer)
+	return signer, nil
+}
+
+func EcrecoverV2(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
+	// If the signature's already cached, return that
+	hash := header.Hash()
+	if address, known := sigcache.Get(hash); known {
+		return address.(common.Address), nil
+	}
+
+	// Recover the public key and the Ethereum address
+	pubkey, err := crypto.Ecrecover(SigHashV2(header).Bytes(), header.Validator)
 	if err != nil {
 		return common.Address{}, err
 	}

@@ -245,8 +245,13 @@ func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params
 	for i := 1; i <= numOfBlocks; i++ {
 		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
 		merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-
-		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock, merkleRoot, nil)
+		header := types.Header{
+			Root:       common.HexToHash(merkleRoot),
+			Number:     big.NewInt(int64(i)),
+			ParentHash: currentBlock.Hash(),
+			Coinbase:   common.HexToAddress(blockCoinBase),
+		}
+		block, err := insertBlock(blockchain, header)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -309,7 +314,15 @@ func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainCon
 			panic(fmt.Errorf("Error encode extra into bytes: %v", err))
 		}
 
-		block, err := insertBlock(blockchain, i, blockCoinBase, currentBlock, merkleRoot, extraInBytes)
+		header := types.Header{
+			Root:       common.HexToHash(merkleRoot),
+			Number:     big.NewInt(int64(i)),
+			ParentHash: currentBlock.Hash(),
+			Coinbase:   common.HexToAddress(blockCoinBase),
+			Extra:      extraInBytes,
+			Validator:  signer[:],
+		}
+		block, err := insertBlock(blockchain, header)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -325,34 +338,20 @@ func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainCon
 }
 
 // insert Block without transcation attached
-func insertBlock(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, root string, customExtra []byte) (*types.Block, error) {
+func insertBlock(blockchain *BlockChain, header types.Header) (*types.Block, error) {
+	/*
+		header := types.Header{
+			Root:       common.HexToHash(root),
+			Number:     big.NewInt(int64(blockNum)),
+			ParentHash: parentBlock.Hash(),
+			Coinbase:   common.HexToAddress(blockCoinBase),
+			Extra:      customExtra,
+		}
+	*/
+	header.ReceiptHash = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 	block, err := createXDPoSTestBlock(
 		blockchain,
-		parentBlock.Hash().Hex(),
-		blockCoinBase, blockNum, nil,
-		"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-		common.HexToHash(root),
-		customExtra,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = blockchain.InsertBlock(block)
-	if err != nil {
-		return nil, err
-	}
-	return block, nil
-}
-
-// insert Block with transcation attached
-func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, parentBlock *types.Block, txs []*types.Transaction, root string) (*types.Block, error) {
-	block, err := createXDPoSTestBlock(
-		blockchain,
-		parentBlock.Hash().Hex(),
-		blockCoinBase, blockNum, txs,
-		"0x9319777b782ba2c83a33c995481ff894ac96d9a92a1963091346a3e1e386705c",
-		common.HexToHash(root),
+		header,
 		nil,
 	)
 	if err != nil {
@@ -366,36 +365,79 @@ func insertBlockTxs(blockchain *BlockChain, blockNum int, blockCoinBase string, 
 	return block, nil
 }
 
-func createXDPoSTestBlock(bc *BlockChain, parentHash, coinbase string, number int, txs []*types.Transaction, receiptHash string, root common.Hash, customExtra []byte) (*types.Block, error) {
-	if customExtra == nil {
-		extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101" // Grabbed from existing mainnet block, it does not have any meaning except for the length validation
-		//ReceiptHash = "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
-		//Root := "0xc99c095e53ff1afe3b86750affd13c7550a2d24d51fb8e41b3c3ef2ea8274bcc"
-		customExtra, _ = hex.DecodeString(extraSubstring)
+// insert Block with transcation attached
+func insertBlockTxs(blockchain *BlockChain, header types.Header, txs []*types.Transaction) (*types.Block, error) {
+	/*
+		header := types.Header{
+			Root:       common.HexToHash(root),
+			Number:     big.NewInt(int64(blockNum)),
+			ParentHash: parentBlock.Hash(),
+			Coinbase:   common.HexToAddress(blockCoinBase),
+		}
+	*/
+	header.ReceiptHash = common.HexToHash("0x9319777b782ba2c83a33c995481ff894ac96d9a92a1963091346a3e1e386705c")
+	block, err := createXDPoSTestBlock(
+		blockchain,
+		header,
+		txs,
+	)
+	if err != nil {
+		return nil, err
 	}
 
+	err = blockchain.InsertBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+//func createXDPoSTestBlock(bc *BlockChain, parentHash, coinbase string, number int, txs []*types.Transaction, receiptHash string, root common.Hash, customExtra []byte, signer common.Address) (*types.Block, error) {
+func createXDPoSTestBlock(bc *BlockChain, customHeader types.Header, txs []*types.Transaction) (*types.Block, error) {
+	if customHeader.Extra == nil {
+		extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101" // Grabbed from existing mainnet block, it does not have any meaning except for the length validation
+		customHeader.Extra, _ = hex.DecodeString(extraSubstring)
+	}
+	/*
+		header := types.Header{
+			ParentHash: common.HexToHash(parentHash),
+			UncleHash:  types.EmptyUncleHash,
+			TxHash:     types.EmptyRootHash,
+			// ReceiptHash: types.EmptyRootHash,
+			ReceiptHash: common.HexToHash(receiptHash),
+			Root:        root,
+			Coinbase:    common.HexToAddress(coinbase),
+			Difficulty:  big.NewInt(int64(1)),
+			Number:      big.NewInt(int64(number)),
+			GasLimit:    1200000000,
+			Time:        big.NewInt(int64(number * 10)),
+			Extra:       customExtra,
+			Validator:   signer[:],
+		}
+	*/
+
 	header := types.Header{
-		ParentHash: common.HexToHash(parentHash),
+		ParentHash: customHeader.ParentHash,
 		UncleHash:  types.EmptyUncleHash,
 		TxHash:     types.EmptyRootHash,
 		// ReceiptHash: types.EmptyRootHash,
-		ReceiptHash: common.HexToHash(receiptHash),
-		Root:        root,
-		Coinbase:    common.HexToAddress(coinbase),
+		ReceiptHash: customHeader.ReceiptHash,
+		Root:        customHeader.Root,
+		Coinbase:    customHeader.Coinbase,
 		Difficulty:  big.NewInt(int64(1)),
-		Number:      big.NewInt(int64(number)),
+		Number:      customHeader.Number,
 		GasLimit:    1200000000,
-		Time:        big.NewInt(int64(number * 10)),
-		Extra:       customExtra,
+		Time:        big.NewInt(customHeader.Number.Int64() * 10),
+		Extra:       customHeader.Extra,
+		Validator:   customHeader.Validator,
 	}
-
 	var block *types.Block
 	if len(txs) == 0 {
 		block = types.NewBlockWithHeader(&header)
 	} else {
 
 		// Prepare Receipt
-		statedb, err := bc.StateAt(bc.GetBlockByNumber(uint64(number - 1)).Root()) //Get parent root
+		statedb, err := bc.StateAt(bc.GetBlockByNumber(customHeader.Number.Uint64() - 1).Root()) //Get parent root
 		if err != nil {
 			return nil, fmt.Errorf("%v when get state", err)
 		}

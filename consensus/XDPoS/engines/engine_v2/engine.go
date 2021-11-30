@@ -199,7 +199,7 @@ func (x *XDPoS_v2) Authorize(signer common.Address, signFn clique.SignerFn) {
 }
 
 func (x *XDPoS_v2) Author(header *types.Header) (common.Address, error) {
-	return utils.Ecrecover(header, x.signatures)
+	return utils.EcrecoverV2(header, x.signatures)
 }
 
 // Seal implements consensus.Engine, attempting to create a sealed block using
@@ -218,9 +218,9 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 		return nil, utils.ErrWaitTransactions
 	}
 	// Don't hold the signer fields for the entire sealing procedure
-	x.lock.RLock()
+	x.signLock.RLock()
 	signer, signFn := x.signer, x.signFn
-	x.lock.RUnlock()
+	x.signLock.RUnlock()
 
 	// Bail out if we're unauthorized to sign a block
 	snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
@@ -266,19 +266,14 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 		return nil, nil
 	default:
 	}
+
 	// Sign all the things!
-	sighash, err := signFn(accounts.Account{Address: signer}, utils.SigHash(header).Bytes())
+	sighash, err := signFn(accounts.Account{Address: signer}, utils.SigHashV2(header).Bytes())
 	if err != nil {
 		return nil, err
 	}
-	copy(header.Extra[len(header.Extra)-utils.ExtraSeal:], sighash)
-	m2, err := x.GetValidator(signer, chain, header)
-	if err != nil {
-		return nil, fmt.Errorf("can't get block validator: %v", err)
-	}
-	if m2 == signer {
-		header.Validator = sighash
-	}
+	header.Validator = sighash
+
 	return block.WithSeal(header), nil
 }
 
@@ -334,7 +329,7 @@ func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error
 	if header.Number.Uint64() == 0 {
 		return common.Address{}, errors.New("Don't take block 0")
 	}
-	m, err := utils.Ecrecover(header, snap.sigcache)
+	m, err := utils.EcrecoverV2(header, snap.sigcache)
 	if err != nil {
 		return common.Address{}, err
 	}

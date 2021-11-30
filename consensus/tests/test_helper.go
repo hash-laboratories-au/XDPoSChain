@@ -283,19 +283,19 @@ func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainCon
 		merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
 
 		// Build engine v2 compatible extra data field
-		proposedBlockInfo := utils.BlockInfo{
+		proposedBlockInfo := &utils.BlockInfo{
 			Hash:   currentBlock.Hash(),
 			Round:  utils.Round(i),
 			Number: big.NewInt(int64(i)),
 		}
 		// Genrate QC
-		signedHash, err := signFn(accounts.Account{Address: signer}, utils.VoteSigHash(&proposedBlockInfo).Bytes())
+		signedHash, err := signFn(accounts.Account{Address: signer}, utils.VoteSigHash(proposedBlockInfo).Bytes())
 		if err != nil {
 			panic(fmt.Errorf("Error generate QC by creating signedHash: %v", err))
 		}
 		var signatures []utils.Signature
 		signatures = append(signatures, signedHash)
-		quorumCert := utils.QuorumCert{
+		quorumCert := &utils.QuorumCert{
 			ProposedBlockInfo: proposedBlockInfo,
 			Signatures:        signatures,
 		}

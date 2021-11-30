@@ -887,6 +887,7 @@ func (x *XDPoS_v2) SetNewRoundFaker(newRound utils.Round, resetTimer bool) {
 	if resetTimer {
 		x.timeoutWorker.Reset()
 	}
+	x.currentRound = newRound
 }
 
 // Utils for test to check currentRound value

@@ -172,6 +172,8 @@ func SigHashV2(header *types.Header) (hash common.Hash) {
 		header.Extra,
 		header.MixDigest,
 		header.Nonce,
+		header.Validators,
+		header.Penalties,
 	})
 	if err != nil {
 		log.Debug("Fail to encode", err)

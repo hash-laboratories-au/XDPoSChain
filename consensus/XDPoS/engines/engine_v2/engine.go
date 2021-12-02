@@ -87,11 +87,23 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
-	if header.ParentHash != x.highestQuorumCert.ProposedBlockInfo.Hash {
+
+	// Verify mined block parent matches highest QC
+	x.lock.RLock()
+	currentRound := x.currentRound
+	highestQC := x.highestQuorumCert
+	x.lock.Unlock()
+
+	//parentRound := highestQC.ProposedBlockInfo.Round
+	if header.ParentHash != highestQC.ProposedBlockInfo.Hash {
 		return consensus.ErrNotReadyToPurpose
 	}
 
-	header.Coinbase = common.Address{}
+	extra := utils.ExtraFields_v2{
+		Round:      currentRound,
+		QuorumCert: highestQC,
+	}
+
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
@@ -103,7 +115,8 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	header.Difficulty = x.calcDifficulty(chain, parent, x.signer)
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
 
-	if number >= x.config.Epoch && number%x.config.Epoch == 0 {
+	// TODO: previous round should sit on previous Epoch and x.currentRound should >= Epoch number
+	if number%x.config.Epoch == 0 {
 		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
 		if err != nil {
 			return err
@@ -119,11 +132,6 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		}
 	}
 
-	extra := utils.ExtraFields_v2{
-		Round:      x.currentRound,
-		QuorumCert: x.highestQuorumCert,
-	}
-
 	extraBytes, err := extra.EncodeToBytes()
 	if err != nil {
 		return err
@@ -136,6 +144,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 
 	// Ensure the timestamp has the correct delay
 
+	//　TODO: if timestamp > current time, how to deal with future timestamp
 	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(x.config.Period))
 	if header.Time.Int64() < time.Now().Unix() {
 		header.Time = big.NewInt(time.Now().Unix())
@@ -235,27 +244,7 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 			return nil, utils.ErrUnauthorized
 		}
 	}
-	// If we're amongst the recent signers, wait for the next block
-	// only check recent signers if there are more than one signer.
-	// TOBE confirm do we still need this?
-	/*
-		if len(masternodes) > 1 {
-			for seen, recent := range snap.Recents {
-				if recent == signer {
-					// Signer is among recents, only wait if the current block doesn't shift it out
-					// There is only case that we don't allow signer to create two continuous blocks.
-					if limit := uint64(2); number < limit || seen > number-limit {
-						// Only take into account the non-epoch blocks
-						if number%x.config.Epoch != 0 {
-							log.Info("Signed recently, must wait for others ", "len(masternodes)", len(masternodes), "number", number, "limit", limit, "seen", seen, "recent", recent.String(), "snap.Recents", snap.Recents)
-							<-stop
-							return nil, nil
-						}
-					}
-				}
-			}
-		}
-	*/
+
 	select {
 	case <-stop:
 		return nil, nil
@@ -281,6 +270,7 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 
 // TODO: what should be new difficulty
 func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
+	// TODO: The difference of round number between parent round and current round
 	return big.NewInt(1)
 }
 

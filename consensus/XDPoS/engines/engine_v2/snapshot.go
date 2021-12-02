@@ -19,6 +19,7 @@ type SnapshotV2 struct {
 	Number uint64      `json:"number"` // Block number where the snapshot was created
 	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
 
+	// MasterNodes will get assigned on updateM1
 	MasterNodes map[common.Address]struct{} `json:"masterNodes"` // Set of authorized master nodes at this moment
 }
 
@@ -82,6 +83,8 @@ func (s *SnapshotV2) copy() *SnapshotV2 {
 
 // apply creates a new authorization SnapshotV2 by applying the given headers to
 // the original one.
+// TODO: maybe remove apply or refactor it
+
 func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {

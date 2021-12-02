@@ -50,9 +50,6 @@ type XDPoS_v2 struct {
 	highestTimeoutCert *utils.TimeoutCert
 	highestCommitBlock *utils.BlockInfo
 
-	//usedQuorumCert bool // To be discussed
-	readyToPurpose bool // boolean value to indicate ready to attach QC and mine block
-
 	HookReward    func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
 	HookValidator func(header *types.Header, signers []common.Address) ([]byte, error)
 }
@@ -78,8 +75,6 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 		timeoutPool:   timeoutPool,
 		votePool:      votePool,
 
-		readyToPurpose: true, //init true as no QC at the beginning
-
 		highestTimeoutCert: nil,
 		highestQuorumCert:  nil,
 	}
@@ -92,7 +87,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
-	if !x.readyToPurpose {
+	if header.ParentHash != x.highestQuorumCert.ProposedBlockInfo.Hash {
 		return consensus.ErrNotReadyToPurpose
 	}
 
@@ -268,11 +263,11 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 
 	// Sign all the things!
-	sighash, err := signFn(accounts.Account{Address: signer}, utils.SigHashV2(header).Bytes())
+	signature, err := signFn(accounts.Account{Address: signer}, utils.SigHashV2(header).Bytes())
 	if err != nil {
 		return nil, err
 	}
-	header.Validator = sighash
+	header.Validator = signature
 
 	return block.WithSeal(header), nil
 }
@@ -643,7 +638,6 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(pooledTimeouts map[common.Hash]
 	Process Block workflow
 */
 func (x *XDPoS_v2) ProcessBlockHandler() {
-	x.readyToPurpose = false
 	/*
 		1. processQC()
 		2. verifyVotingRule()

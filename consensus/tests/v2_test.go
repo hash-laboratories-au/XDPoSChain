@@ -12,7 +12,7 @@ import (
 )
 
 func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
-	blockchain, _, _, _ := PrepareXDCTestBlockChain(t, 11, params.TestXDPoSMockChainConfigWithV2Engine)
+	blockchain, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 11, params.TestXDPoSMockChainConfigWithV2Engine)
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 
 	engineV2.SetNewRoundFaker(utils.Round(1), true)
@@ -29,7 +29,7 @@ func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
 
 // Timeout handler
 func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
-	blockchain, _, _, _ := PrepareXDCTestBlockChain(t, 11, params.TestXDPoSMockChainConfigWithV2Engine)
+	blockchain, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 11, params.TestXDPoSMockChainConfigWithV2Engine)
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 
 	// Set round to 1
@@ -80,7 +80,7 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 }
 
 func TestThrowErrorIfTimeoutMsgRoundNotEqualToCurrentRound(t *testing.T) {
-	blockchain, _, _, _ := PrepareXDCTestBlockChain(t, 11, params.TestXDPoSMockChainConfigWithV2Engine)
+	blockchain, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 11, params.TestXDPoSMockChainConfigWithV2Engine)
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 
 	// Set round to 3
@@ -130,7 +130,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedAndProcessQC(t *testing.T) {
 	currentRound, lockQuorumCert, highestQuorumCert := engineV2.GetProperties()
 	// Inilised with nil and 0 round
 	assert.Nil(t, lockQuorumCert)
-	assert.Equal(t, utils.Round(0), highestQuorumCert.ProposedBlockInfo.Round)
+	assert.Nil(t, highestQuorumCert)
 	assert.Equal(t, utils.Round(11), currentRound)
 	voteMsg = &utils.Vote{
 		ProposedBlockInfo: blockInfo,
@@ -141,7 +141,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedAndProcessQC(t *testing.T) {
 	currentRound, lockQuorumCert, highestQuorumCert = engineV2.GetProperties()
 	// Still using the initlised value because we did not yet go to the next round
 	assert.Nil(t, lockQuorumCert)
-	assert.Equal(t, utils.Round(0), highestQuorumCert.ProposedBlockInfo.Round)
+	assert.Nil(t, highestQuorumCert)
 
 	assert.Equal(t, utils.Round(11), currentRound)
 
@@ -216,7 +216,7 @@ func TestProcessVoteMsgThenTimeoutMsg(t *testing.T) {
 	currentRound, lockQuorumCert, highestQuorumCert := engineV2.GetProperties()
 	// Inilised with nil and 0 round
 	assert.Nil(t, lockQuorumCert)
-	assert.Equal(t, utils.Round(0), highestQuorumCert.ProposedBlockInfo.Round)
+	assert.Nil(t, highestQuorumCert)
 
 	assert.Equal(t, utils.Round(11), currentRound)
 	voteMsg = &utils.Vote{

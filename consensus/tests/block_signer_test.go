@@ -27,7 +27,7 @@ func TestNotUpdateSignerListIfNotOnGapBlock(t *testing.T) {
 
 	//Get from block validator error message
 	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(401)),
 		ParentHash: parentBlock.Hash(),
@@ -61,7 +61,7 @@ func TestNotChangeSingerListIfNothingProposedOrVoted(t *testing.T) {
 	// Insert block 450
 	blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", 450)
 	merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: parentBlock.Hash(),
@@ -102,7 +102,7 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 
 	//Get from block validator error message
 	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(449)),
 		ParentHash: parentBlock.Hash(),
@@ -132,7 +132,7 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 	// Now, let's mine another block to trigger the GAP block signerList update
 	block450CoinbaseAddress := "0xaaa0000000000000000000000000000000000450"
 	merkleRoot = "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: parentBlock.Hash(),
@@ -172,7 +172,7 @@ func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 
 	//Get from block validator error message
 	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: currentBlock.Hash(),
@@ -220,7 +220,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	}
 
 	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: currentBlock.Hash(),
@@ -254,7 +254,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	}
 
 	merkleRoot = "068dfa09d7b4093441c0cc4d9807a71bc586f6101c072d939b214c21cd136eb3"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: currentBlock.Hash(),
@@ -283,7 +283,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 
 	blockCoinBase451B := "0xbbb0000000000000000000000000000000000451"
 	merkleRoot = "068dfa09d7b4093441c0cc4d9807a71bc586f6101c072d939b214c21cd136eb3"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(451)),
 		ParentHash: block450B.Hash(),
@@ -365,7 +365,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 	transferTransaction := transferTx(t, acc1Addr, 999)
 
 	merkleRoot := "ea465415b60d88429f181fec9fae67c0f19cbf5a4fa10971d96d4faa57d96ffa"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: parentBlock.Hash(),
@@ -406,7 +406,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 	transferTransaction = transferTx(t, acc1Addr, 888)
 
 	merkleRoot = "184edaddeafc2404248f896ae46be503ae68949896c8eb6b6ad43695581e5022"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: parentBlock.Hash(),
@@ -439,7 +439,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 
 	blockCoinBase451B := "0xbbb0000000000000000000000000000000000451"
 	merkleRoot = "184edaddeafc2404248f896ae46be503ae68949896c8eb6b6ad43695581e5022"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(451)),
 		ParentHash: block450B.Hash(),
@@ -507,7 +507,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	// Insert normal blocks 450 A
 	blockCoinBase450A := "0xaaa0000000000000000000000000000000000450"
 	merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-	header := types.Header{
+	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: parentBlock.Hash(),
@@ -526,7 +526,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	}
 
 	merkleRoot = "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(451)),
 		ParentHash: block450A.Hash(),
@@ -555,7 +555,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	// Insert forked Block 450 B
 	blockCoinBase450B := "0xbbb0000000000000000000000000000000000450"
 	merkleRoot = "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(450)),
 		ParentHash: parentBlock.Hash(),
@@ -568,7 +568,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 
 	blockCoinBase451B := "0xbbb0000000000000000000000000000000000451"
 	merkleRoot = "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(451)),
 		ParentHash: block450B.Hash(),
@@ -581,7 +581,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 
 	blockCoinBase452B := "0xbbb0000000000000000000000000000000000452"
 	merkleRoot = "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-	header = types.Header{
+	header = &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(452)),
 		ParentHash: block451B.Hash(),

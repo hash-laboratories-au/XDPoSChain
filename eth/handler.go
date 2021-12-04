@@ -29,6 +29,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus"
+	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/consensus/misc"
 	"github.com/XinFinOrg/XDPoSChain/core"
@@ -198,6 +199,10 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	validator := func(header *types.Header) error {
 		return engine.VerifyHeader(blockchain, header, true)
 	}
+	handleProposedBlock := func(header *types.Header) error {
+		return engine.(*XDPoS.XDPoS).HandleProposedBlock(blockchain, header)
+	}
+
 	heighter := func() uint64 {
 		return blockchain.CurrentBlock().NumberU64()
 	}
@@ -220,7 +225,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		atomic.StoreUint32(&manager.acceptTxs, 1) // Mark initial sync done on any fetcher import
 		return manager.blockchain.PrepareBlock(block)
 	}
-	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, prepare, manager.removePeer)
+	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, handleProposedBlock, manager.BroadcastBlock, heighter, inserter, prepare, manager.removePeer)
 	//Define bft function
 	broadcasts := bfter.BroadcastFns{
 		Vote:     manager.BroadcastVote,

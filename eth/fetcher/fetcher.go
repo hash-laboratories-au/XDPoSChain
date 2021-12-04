@@ -19,9 +19,10 @@ package fetcher
 
 import (
 	"errors"
-	"github.com/hashicorp/golang-lru"
 	"math/rand"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus"
@@ -721,6 +722,7 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 				return
 			}
 		}
+		// TODO: (XIN-101) Add propose block handler
 		// If import succeeded, broadcast the block
 		propAnnounceOutTimer.UpdateSince(block.ReceivedAt)
 		if !fastBroadCast {

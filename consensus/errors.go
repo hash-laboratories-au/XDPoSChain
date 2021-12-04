@@ -39,5 +39,5 @@ var (
 
 	ErrNoValidatorSignature = errors.New("no validator in header")
 
-	ErrNotReadyToPurpose = errors.New("not ready to purpose, QC is not ready")
+	ErrNotReadyToPropose = errors.New("not ready to propose, QC is not ready")
 )

@@ -88,16 +88,31 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
-
 	// Verify mined block parent matches highest QC
-	x.lock.RLock()
+	x.lock.Lock()
+	// Check header if it is the first consensus v2 block, if so, assign initial values to current round and highestQC
+	if header.Number.Cmp(big.NewInt(0).Add(x.config.XDPoSV2Block, big.NewInt(1))) == 0 {
+		log.Info("[Prepare] Initilising highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
+		// Generate new parent blockInfo and put it into QC
+		parentBlockInfo := &utils.BlockInfo{
+			Hash:   header.ParentHash,
+			Round:  utils.Round(0),
+			Number: big.NewInt(0).Sub(header.Number, big.NewInt(1)),
+		}
+		quorumCert := &utils.QuorumCert{
+			ProposedBlockInfo: parentBlockInfo,
+			Signatures:        nil,
+		}
+		x.currentRound = 1
+		x.highestQuorumCert = quorumCert
+	}
+
 	currentRound := x.currentRound
 	highestQC := x.highestQuorumCert
 	x.lock.Unlock()
-
 	//parentRound := highestQC.ProposedBlockInfo.Round
-	if header.ParentHash != highestQC.ProposedBlockInfo.Hash {
-		return consensus.ErrNotReadyToPurpose
+	if (highestQC == nil) || (header.ParentHash != highestQC.ProposedBlockInfo.Hash) {
+		return consensus.ErrNotReadyToPropose
 	}
 
 	extra := utils.ExtraFields_v2{
@@ -109,6 +124,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 
 	number := header.Number.Uint64()
 	parent := chain.GetHeader(header.ParentHash, number-1)
+	log.Info("Preparing new block!", "Number", number, "Parent Hash", parent.Hash())
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
@@ -270,13 +286,12 @@ func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Hea
 
 // Copy from v1
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
-	masternodes := x.GetMasternodes(chain, parent)
-
 	snap, err := x.GetSnapshot(chain, parent)
 	if err != nil {
-		log.Warn("Failed when trying to commit new work", "err", err)
+		log.Error("[YourTurn] Failed while getting snapshot", "parentHash", parent.Hash(), "err", err)
 		return 0, -1, -1, false, err
 	}
+	masternodes := x.GetMasternodes(chain, parent)
 	if len(masternodes) == 0 {
 		return 0, -1, -1, false, errors.New("Masternodes not found")
 	}
@@ -389,25 +404,24 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 				break
 			}
 		}
-		// If we're at block zero, make a snapshot
-		/*
-			if number == 0 {
-				genesis := chain.GetHeaderByNumber(0)
-				if err := x.VerifyHeader(chain, genesis, true); err != nil {
-					return nil, err
-				}
-				signers := make([]common.Address, (len(genesis.Extra)-utils.ExtraVanity-utils.ExtraSeal)/common.AddressLength)
-				for i := 0; i < len(signers); i++ {
-					copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
-				}
-				snap = newSnapshot(x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
-				if err := storeSnapshot(snap, x.db); err != nil {
-					return nil, err
-				}
-				log.Trace("Stored genesis voting snapshot to disk")
-				break
+		// If we're at 0 block, make a snapshot
+		// TODO: We may need to store snapshot at the v1 -> v2 switch block
+		if number == 0 {
+			genesis := chain.GetHeaderByNumber(0)
+			if err := x.VerifyHeader(chain, genesis, true); err != nil {
+				return nil, err
 			}
-		*/
+			signers := make([]common.Address, (len(genesis.Extra)-utils.ExtraVanity-utils.ExtraSeal)/common.AddressLength)
+			for i := 0; i < len(signers); i++ {
+				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
+			}
+			snap = newSnapshot(x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
+			if err := storeSnapshot(snap, x.db); err != nil {
+				return nil, err
+			}
+			log.Trace("Stored genesis voting snapshot to disk")
+			break
+		}
 		// No snapshot for this header, gather the header and move backward
 		var header *types.Header
 		if len(parents) > 0 {
@@ -421,6 +435,7 @@ func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash com
 			// No explicit parents (or no more left), reach out to the database
 			header = chain.GetHeader(hash, number)
 			if header == nil {
+				log.Error("[Seal] Failed due to no header found", "hash", hash, "number", number)
 				return nil, consensus.ErrUnknownAncestor
 			}
 		}

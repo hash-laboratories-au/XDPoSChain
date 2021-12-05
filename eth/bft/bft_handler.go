@@ -1,4 +1,4 @@
-package bfter
+package bft
 
 import (
 	"github.com/XinFinOrg/XDPoSChain/consensus"
@@ -116,6 +116,10 @@ func (b *Bfter) Timeout(timeout *utils.Timeout) error {
 
 	err = b.consensus.timeoutHandler(timeout)
 	if err != nil {
+		if _, ok := err.(*utils.ErrIncomingMessageRoundNotEqualCurrentRound); ok {
+			log.Debug("timeout message round not equal", "error", err)
+			return err
+		}
 		log.Error("handle BFT Timeout", "error", err)
 		return err
 	}

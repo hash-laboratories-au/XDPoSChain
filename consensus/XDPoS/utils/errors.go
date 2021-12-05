@@ -1,6 +1,9 @@
 package utils
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Various error messages to mark blocks invalid. These should be private to
 // prevent engine specific errors from being referenced in the remainder of the
@@ -75,3 +78,12 @@ var (
 
 	ErrInvalidCheckpointValidators = errors.New("invalid validators list on checkpoint block")
 )
+
+type ErrIncomingMessageRoundNotEqualCurrentRound struct {
+	IncomingRound Round
+	CurrentRound  Round
+}
+
+func (e *ErrIncomingMessageRoundNotEqualCurrentRound) Error() string {
+	return fmt.Sprintf("Timeout message round number: %v does not match currentRound: %v", e.IncomingRound, e.CurrentRound)
+}

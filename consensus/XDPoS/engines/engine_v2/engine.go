@@ -600,7 +600,7 @@ func (x *XDPoS_v2) TimeoutHandler(timeout *utils.Timeout) error {
 
 	// 1. checkRoundNumber
 	if timeout.Round != x.currentRound {
-		return fmt.Errorf("Timeout message round number: %v does not match currentRound: %v", timeout.Round, x.currentRound)
+		return &utils.ErrIncomingMessageRoundNotEqualCurrentRound{timeout.Round, x.currentRound}
 	}
 	// Collect timeout, generate TC
 	isThresholdReached, numberOfTimeoutsInPool, pooledTimeouts := x.timeoutPool.Add(timeout)

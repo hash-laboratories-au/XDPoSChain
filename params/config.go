@@ -36,11 +36,11 @@ var (
 
 var (
 	XDPoSV2Config = &V2{
-		TimeoutWorkerDuration: 50000,
+		TimeoutWorkerDuration: 50,
 		CertThreshold:         common.MaxMasternodesV2*2/3 + 1,
 	}
 	TestXDPoSV2Config = &V2{
-		TimeoutWorkerDuration: 5000,
+		TimeoutWorkerDuration: 5,
 		CertThreshold:         3,
 	}
 

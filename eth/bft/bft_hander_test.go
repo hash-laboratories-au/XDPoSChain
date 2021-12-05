@@ -18,7 +18,10 @@ import (
 func makeVotes(n int) []utils.Vote {
 	var votes []utils.Vote
 	for i := 0; i < n; i++ {
-		votes = append(votes, utils.Vote{Signature: []byte{byte(i)}})
+		votes = append(votes, utils.Vote{
+			ProposedBlockInfo: &utils.BlockInfo{},
+			Signature:         []byte{byte(i)},
+		})
 	}
 	return votes
 }
@@ -102,7 +105,7 @@ func TestDuplicateVotes(t *testing.T) {
 		atomic.AddUint32(&broadcastCounter, 1)
 	}
 
-	vote := utils.Vote{}
+	vote := utils.Vote{ProposedBlockInfo: &utils.BlockInfo{}}
 
 	// send twice
 	tester.bfter.Vote(&vote)
@@ -133,7 +136,7 @@ func TestNotBoardcastInvalidVote(t *testing.T) {
 		atomic.AddUint32(&broadcastCounter, 1)
 	}
 
-	vote := utils.Vote{}
+	vote := utils.Vote{ProposedBlockInfo: &utils.BlockInfo{}}
 	tester.bfter.Vote(&vote)
 
 	time.Sleep(50 * time.Millisecond)

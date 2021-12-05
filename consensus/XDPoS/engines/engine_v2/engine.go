@@ -56,7 +56,7 @@ type XDPoS_v2 struct {
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	// Setup Timer
-	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Millisecond
+	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Second
 	timer := countdown.NewCountDown(duration)
 	timeoutPool := utils.NewPool(config.V2.CertThreshold)
 
@@ -671,7 +671,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, 
 
 	err = x.verifyQC(quorumCert)
 	if err != nil {
-		log.Error("[ProposedBlockHandler] Fail to verify QC", "Extra round", round, "QC propose BlockInfo Hash", quorumCert.ProposedBlockInfo.Hash)
+		log.Error("[ProposedBlockHandler] Fail to verify QC", "Extra round", round, "QC proposed BlockInfo Hash", quorumCert.ProposedBlockInfo.Hash)
 		return err
 	}
 
@@ -731,26 +731,31 @@ func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
 func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
+	log.Trace("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
 	// 1. Update HighestQC
 	if x.highestQuorumCert == nil || (quorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round) {
 		x.highestQuorumCert = quorumCert
 	}
 	// 2. Get QC from header and update lockQuorumCert(lockQuorumCert is the parent of highestQC)
 	proposedBlockHeader := blockChainReader.GetHeaderByHash(quorumCert.ProposedBlockInfo.Hash)
-	// Extra field contain parent information
-	var decodedExtraField utils.ExtraFields_v2
-	err := utils.DecodeBytesExtraFields(proposedBlockHeader.Extra, &decodedExtraField)
-	if err != nil {
-		return err
-	}
-	x.lockQuorumCert = decodedExtraField.QuorumCert
+	if proposedBlockHeader.Number.Cmp(x.config.XDPoSV2Block) > 0 {
+		// Extra field contain parent information
+		var decodedExtraField utils.ExtraFields_v2
+		err := utils.DecodeBytesExtraFields(proposedBlockHeader.Extra, &decodedExtraField)
+		if err != nil {
+			return err
+		}
+		if x.lockQuorumCert == nil || decodedExtraField.QuorumCert.ProposedBlockInfo.Round > x.lockQuorumCert.ProposedBlockInfo.Round {
+			x.lockQuorumCert = decodedExtraField.QuorumCert
+		}
 
-	proposedBlockRound := &decodedExtraField.Round
-	// 3. Update commit block info
-	_, err = x.commitBlocks(blockChainReader, proposedBlockHeader, proposedBlockRound)
-	if err != nil {
-		log.Error("[processQC] Fail to commitBlocks", "proposedBlockRound", proposedBlockRound)
-		return err
+		proposedBlockRound := &decodedExtraField.Round
+		// 3. Update commit block info
+		_, err = x.commitBlocks(blockChainReader, proposedBlockHeader, proposedBlockRound)
+		if err != nil {
+			log.Error("[processQC] Fail to commitBlocks", "proposedBlockRound", proposedBlockRound)
+			return err
+		}
 	}
 	// 4. Set new round
 	if quorumCert.ProposedBlockInfo.Round >= x.currentRound {
@@ -760,6 +765,7 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 			return err
 		}
 	}
+	log.Trace("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
 	return nil
 }
 
@@ -808,6 +814,10 @@ func (x *XDPoS_v2) verifyVotingRule(blockChainReader consensus.ChainReader, bloc
 	*/
 	if blockInfo.Round != x.currentRound {
 		return false, nil
+	}
+	// XDPoS v1.0 switch to v2.0, the proposed block can always pass voting rule
+	if x.lockQuorumCert == nil {
+		return true, nil
 	}
 	isExtended, err := x.isExtendingFromAncestor(blockChainReader, blockInfo, x.lockQuorumCert.ProposedBlockInfo)
 	if err != nil {
@@ -930,8 +940,8 @@ func (x *XDPoS_v2) SetHighestQuorumCert(qc *utils.QuorumCert) {
 	x.highestQuorumCert = qc
 }
 
-func (x *XDPoS_v2) getSyncInfo() utils.SyncInfo {
-	return utils.SyncInfo{
+func (x *XDPoS_v2) getSyncInfo() *utils.SyncInfo {
+	return &utils.SyncInfo{
 		HighestQuorumCert:  x.highestQuorumCert,
 		HighestTimeoutCert: x.highestTimeoutCert,
 	}
@@ -954,6 +964,10 @@ func (x *XDPoS_v2) GetCurrentRound() utils.Round {
 
 //TODO: find parent and grandparent and grandgrandparent block, check round number, if so, commit grandgrandparent
 func (x *XDPoS_v2) commitBlocks(blockCahinReader consensus.ChainReader, proposedBlockHeader *types.Header, proposedBlockRound *utils.Round) (bool, error) {
+	// XDPoS v1.0 switch to v2.0, skip commit
+	if big.NewInt(0).Sub(proposedBlockHeader.Number, big.NewInt(2)).Cmp(x.config.XDPoSV2Block) <= 0 {
+		return false, nil
+	}
 	// Find the last two parent block and check their rounds are the continous
 	parentBlock := blockCahinReader.GetHeaderByHash(proposedBlockHeader.ParentHash)
 

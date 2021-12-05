@@ -50,10 +50,10 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	assert.NotNil(t, syncInfoMsg)
 
 	// Shouldn't have QC, however, we did not inilise it, hence will show default empty value
-	qc := syncInfoMsg.(utils.SyncInfo).HighestQuorumCert
+	qc := syncInfoMsg.(*utils.SyncInfo).HighestQuorumCert
 	assert.Nil(t, qc)
 
-	tc := syncInfoMsg.(utils.SyncInfo).HighestTimeoutCert
+	tc := syncInfoMsg.(*utils.SyncInfo).HighestTimeoutCert
 	assert.NotNil(t, tc)
 	assert.Equal(t, tc.Round, utils.Round(1))
 	sigatures := []utils.Signature{[]byte{1}, []byte{2}, []byte{3}}

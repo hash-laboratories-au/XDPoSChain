@@ -909,7 +909,7 @@ func (pm *ProtocolManager) BroadcastVote(vote *utils.Vote) {
 	for _, peer := range peers {
 		peer.SendVote(vote)
 	}
-	log.Trace("Propagated Vote", "hash", hash, "recipients", len(peers))
+	log.Info("Propagated Vote", "voted block", vote.ProposedBlockInfo, "recipients", len(peers))
 }
 
 // BroadcastTimeout will propagate a Timeout to all peers which are not known to

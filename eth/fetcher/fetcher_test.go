@@ -301,12 +301,11 @@ func verifyImportDone(t *testing.T, imported chan *types.Block) {
 	}
 }
 
-func verifyProposeBlockHandlerCalled(t *testing.T, proposedBlockChan chan *types.Header) bool {
+func verifyProposeBlockHandlerCalled(t *testing.T, proposedBlockChan chan *types.Header) {
 	select {
 	case <-proposedBlockChan:
-		return true
 	case <-time.After(50 * time.Millisecond):
-		return false
+		t.Fatalf("did not call propose block handler")
 	}
 }
 

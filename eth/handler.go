@@ -34,7 +34,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/misc"
 	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
-	"github.com/XinFinOrg/XDPoSChain/eth/bfter"
+	"github.com/XinFinOrg/XDPoSChain/eth/bft"
 	"github.com/XinFinOrg/XDPoSChain/eth/downloader"
 	"github.com/XinFinOrg/XDPoSChain/eth/fetcher"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
@@ -83,7 +83,7 @@ type ProtocolManager struct {
 	downloader *downloader.Downloader
 	fetcher    *fetcher.Fetcher
 	peers      *peerSet
-	bfter      *bfter.Bfter
+	bft        *bft.Bfter
 
 	SubProtocols []p2p.Protocol
 
@@ -227,14 +227,14 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, handleProposedBlock, manager.BroadcastBlock, heighter, inserter, prepare, manager.removePeer)
 	//Define bft function
-	broadcasts := bfter.BroadcastFns{
+	broadcasts := bft.BroadcastFns{
 		Vote:     manager.BroadcastVote,
 		Timeout:  manager.BroadcastTimeout,
 		SyncInfo: manager.BroadcastSyncInfo,
 	}
-	manager.bfter = bfter.New(broadcasts, blockchain)
+	manager.bft = bft.New(broadcasts, blockchain)
 	if blockchain.Config().XDPoS != nil {
-		manager.bfter.SetConsensusFuns(engine)
+		manager.bft.SetConsensusFuns(engine)
 	}
 
 	return manager, nil
@@ -832,7 +832,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Mark the peer as owning the vote and process it
 		p.MarkVote(vote.Hash())
-		pm.bfter.Vote(&vote)
+		pm.bft.Vote(&vote)
 	case msg.Code == TimeoutMsg:
 		var timeout utils.Timeout
 		if err := msg.Decode(&timeout); err != nil {
@@ -841,7 +841,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
 		// Mark the peer as owning the timeout and process it
 		p.MarkTimeout(timeout.Hash())
-		pm.bfter.Timeout(&timeout)
+		pm.bft.Timeout(&timeout)
 	case msg.Code == SyncInfoMsg:
 		var syncInfo utils.SyncInfo
 		if err := msg.Decode(&syncInfo); err != nil {
@@ -849,7 +849,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Mark the peer as owning the syncInfo and process it
 		p.MarkSyncInfo(syncInfo.Hash())
-		pm.bfter.SyncInfo(&syncInfo)
+		pm.bft.SyncInfo(&syncInfo)
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)

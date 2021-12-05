@@ -649,17 +649,41 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(pooledTimeouts map[common.Hash]
 /*
 	Proposed Block workflow
 */
-func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, blockInfo *utils.BlockInfo, quorumCert *utils.QuorumCert) error {
+func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, blockHeader *types.Header) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 
 	/*
-		1. processQC(): process the QC inside the proposed block
-		2. verifyVotingRule(): the proposed block's info is extracted into BlockInfo and verified for voting
-		3. sendVote()
+		1. Verify QC
+		2. Generate blockInfo
+		3. processQC(): process the QC inside the proposed block
+		4. verifyVotingRule(): the proposed block's info is extracted into BlockInfo and verified for voting
+		5. sendVote()
 	*/
-	err := x.processQC(blockChainReader, quorumCert)
+	// Get QC and Round from Extra
+	var decodedExtraField utils.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(blockHeader.Extra, &decodedExtraField)
 	if err != nil {
+		return err
+	}
+	quorumCert := decodedExtraField.QuorumCert
+	round := decodedExtraField.Round
+
+	err = x.verifyQC(quorumCert)
+	if err != nil {
+		log.Error("[ProposedBlockHandler] Fail to verify QC", "Extra round", round, "QC propose BlockInfo Hash", quorumCert.ProposedBlockInfo.Hash)
+		return err
+	}
+
+	// Generate blockInfo
+	blockInfo := &utils.BlockInfo{
+		Hash:   blockHeader.Hash(),
+		Round:  round,
+		Number: blockHeader.Number,
+	}
+	err = x.processQC(blockChainReader, quorumCert)
+	if err != nil {
+		log.Error("[ProposedBlockHandler] Fail to processQC", "QC proposed blockInfo round number", quorumCert.ProposedBlockInfo.Round, "QC proposed blockInfo hash", quorumCert.ProposedBlockInfo.Hash)
 		return err
 	}
 	verified, err := x.verifyVotingRule(blockChainReader, blockInfo, quorumCert)
@@ -678,11 +702,6 @@ func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, 
 /*
 	QC & TC Utils
 */
-
-// Genrate blockInfo which contains Hash, round and blockNumber and send to queue
-func (x *XDPoS_v2) generateBlockInfo() error {
-	return nil
-}
 
 // To be used by different message verification. Verify local DB block info against the received block information(i.e hash, blockNum, round)
 func (x *XDPoS_v2) VerifyBlockInfo(blockInfo *utils.BlockInfo) error {
@@ -730,12 +749,14 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 	// 3. Update commit block info
 	_, err = x.commitBlocks(blockChainReader, proposedBlockHeader, proposedBlockRound)
 	if err != nil {
+		log.Error("[processQC] Fail to commitBlocks", "proposedBlockRound", proposedBlockRound)
 		return err
 	}
 	// 4. Set new round
 	if quorumCert.ProposedBlockInfo.Round >= x.currentRound {
 		err := x.setNewRound(quorumCert.ProposedBlockInfo.Round + 1)
 		if err != nil {
+			log.Error("[processQC] Fail to setNewRound", "new round to set", quorumCert.ProposedBlockInfo.Round+1)
 			return err
 		}
 	}

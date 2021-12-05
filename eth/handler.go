@@ -34,7 +34,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/misc"
 	"github.com/XinFinOrg/XDPoSChain/core"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
-	"github.com/XinFinOrg/XDPoSChain/eth/bfter"
+	"github.com/XinFinOrg/XDPoSChain/eth/bft"
 	"github.com/XinFinOrg/XDPoSChain/eth/downloader"
 	"github.com/XinFinOrg/XDPoSChain/eth/fetcher"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
@@ -83,7 +83,7 @@ type ProtocolManager struct {
 	downloader *downloader.Downloader
 	fetcher    *fetcher.Fetcher
 	peers      *peerSet
-	bfter      *bfter.Bfter
+	bfter      *bft.Bfter
 
 	SubProtocols []p2p.Protocol
 
@@ -227,12 +227,12 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, handleProposedBlock, manager.BroadcastBlock, heighter, inserter, prepare, manager.removePeer)
 	//Define bft function
-	broadcasts := bfter.BroadcastFns{
+	broadcasts := bft.BroadcastFns{
 		Vote:     manager.BroadcastVote,
 		Timeout:  manager.BroadcastTimeout,
 		SyncInfo: manager.BroadcastSyncInfo,
 	}
-	manager.bfter = bfter.New(broadcasts, blockchain)
+	manager.bfter = bft.New(broadcasts, blockchain)
 	if blockchain.Config().XDPoS != nil {
 		manager.bfter.SetConsensusFuns(engine)
 	}
@@ -909,7 +909,7 @@ func (pm *ProtocolManager) BroadcastVote(vote *utils.Vote) {
 	for _, peer := range peers {
 		peer.SendVote(vote)
 	}
-	log.Info("Propagated Vote", "voted block", vote.ProposedBlockInfo, "recipients", len(peers))
+	log.Info("Propagated Vote", "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "recipients", len(peers))
 }
 
 // BroadcastTimeout will propagate a Timeout to all peers which are not known to

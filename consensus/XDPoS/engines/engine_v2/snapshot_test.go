@@ -28,6 +28,7 @@ func TestGetMasterNodes(t *testing.T) {
 	}
 }
 func TestApplyNewSnapshot(t *testing.T) {
+	t.Skip("apply has been temporary commented out")
 	snap := newSnapshot(nil, 1, common.Hash{}, utils.Round(1), nil, nil)
 	extra := utils.ExtraFields_v2{
 		Round: 10,
@@ -61,6 +62,7 @@ func TestApplyNewSnapshot(t *testing.T) {
 }
 
 func TestApplyWithWrongHeader(t *testing.T) {
+	t.Skip("apply has been temporary commented out")
 	snap := newSnapshot(nil, 1, common.Hash{}, utils.Round(1), nil, nil)
 	headers := []*types.Header{
 		{Number: big.NewInt(3)},

@@ -582,7 +582,7 @@ func (self *worker) commitNewWork() {
 	}
 
 	if err := self.engine.Prepare(self.chain, header); err != nil {
-		if err == consensus.ErrNotReadyToPurpose {
+		if err == consensus.ErrNotReadyToPropose {
 			log.Info("Waiting...", "err", err)
 			return
 		}

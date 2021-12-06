@@ -83,36 +83,37 @@ func (s *SnapshotV2) copy() *SnapshotV2 {
 
 // apply creates a new authorization SnapshotV2 by applying the given headers to
 // the original one.
-// TODO: maybe remove apply or refactor it
-
+// TODO: XIN-100
 func (s *SnapshotV2) apply(headers []*types.Header) (*SnapshotV2, error) {
+	return s, nil
+
 	// Allow passing in no headers for cleaner code
-	if len(headers) == 0 {
-		return s, nil
-	}
-	// Sanity check that the headers can be applied
-	for i := 0; i < len(headers)-1; i++ {
-		if headers[i+1].Number.Uint64() != headers[i].Number.Uint64()+1 {
-			return nil, utils.ErrInvalidHeaderOrder
-		}
-	}
-	if headers[0].Number.Uint64() != s.Number+1 {
-		return nil, utils.ErrInvalidChild
-	}
-	// Iterate through the headers and create a new SnapshotV2
-	snap := s.copy()
-	lastHeader := headers[len(headers)-1]
+	// if len(headers) == 0 {
+	// 	return s, nil
+	// }
+	// // Sanity check that the headers can be applied
+	// for i := 0; i < len(headers)-1; i++ {
+	// 	if headers[i+1].Number.Uint64() != headers[i].Number.Uint64()+1 {
+	// 		return nil, utils.ErrInvalidHeaderOrder
+	// 	}
+	// }
+	// if headers[0].Number.Uint64() != s.Number+1 {
+	// 	return nil, utils.ErrInvalidChild
+	// }
+	// // Iterate through the headers and create a new SnapshotV2
+	// snap := s.copy()
+	// lastHeader := headers[len(headers)-1]
 
-	snap.Number += uint64(len(headers))
-	snap.Hash = lastHeader.Hash()
+	// snap.Number += uint64(len(headers))
+	// snap.Hash = lastHeader.Hash()
 
-	extraV2 := new(utils.ExtraFields_v2)
-	err := utils.DecodeBytesExtraFields(lastHeader.Extra, &extraV2)
-	if err != nil {
-		return nil, err
-	}
-	snap.Round = extraV2.Round
-	return snap, nil
+	// extraV2 := new(utils.ExtraFields_v2)
+	// err := utils.DecodeBytesExtraFields(lastHeader.Extra, &extraV2)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// snap.Round = extraV2.Round
+	// return snap, nil
 }
 
 // signers retrieves the list of authorized signers in ascending order, convert into strings then use native sort lib

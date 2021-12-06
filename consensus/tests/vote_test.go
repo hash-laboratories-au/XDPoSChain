@@ -194,11 +194,11 @@ func TestProcessVoteMsgThenTimeoutMsg(t *testing.T) {
 	assert.NotNil(t, syncInfoMsg)
 
 	// Should have HighestQuorumCert from previous round votes
-	qc := syncInfoMsg.(utils.SyncInfo).HighestQuorumCert
+	qc := syncInfoMsg.(*utils.SyncInfo).HighestQuorumCert
 	assert.NotNil(t, qc)
 	assert.Equal(t, utils.Round(11), qc.ProposedBlockInfo.Round)
 
-	tc := syncInfoMsg.(utils.SyncInfo).HighestTimeoutCert
+	tc := syncInfoMsg.(*utils.SyncInfo).HighestTimeoutCert
 	assert.NotNil(t, tc)
 	assert.Equal(t, utils.Round(12), tc.Round)
 	sigatures := []utils.Signature{[]byte{1}, []byte{2}, []byte{3}}

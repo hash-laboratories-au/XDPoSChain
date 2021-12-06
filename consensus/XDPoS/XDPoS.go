@@ -269,9 +269,7 @@ func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, sign
 
 func (x *XDPoS) GetValidator(creator common.Address, chain consensus.ChainReader, header *types.Header) (common.Address, error) {
 	switch x.config.BlockConsensusVersion(header.Number) {
-	case params.ConsensusEngineVersion2:
-		return x.EngineV2.GetValidator(creator, chain, header)
-	default: // Default "v1"
+	default: // Default "v1", v2 does not need this function
 		return x.EngineV1.GetValidator(creator, chain, header)
 	}
 }

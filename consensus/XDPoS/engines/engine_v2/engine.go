@@ -50,8 +50,7 @@ type XDPoS_v2 struct {
 	highestTimeoutCert *utils.TimeoutCert
 	highestCommitBlock *utils.BlockInfo
 
-	HookReward    func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
-	HookValidator func(header *types.Header, signers []common.Address) ([]byte, error)
+	HookReward func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (error, map[string]interface{})
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
@@ -139,13 +138,9 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 			return err
 		}
 		masternodes := snap.GetMasterNodes()
-		if number%x.config.Epoch == 0 && x.HookValidator != nil {
-			validators, err := x.HookValidator(header, masternodes)
-			if err != nil {
-				return err
-			}
-			//TODO: remove penalty nodes and add comeback nodes
-			header.Validators = validators
+		//TODO: remove penalty nodes and add comeback nodes
+		for _, v := range masternodes {
+			header.Validators = append(header.Validators, v[:]...)
 		}
 	}
 
@@ -343,32 +338,6 @@ func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 	default:
 		return []common.Address{}
 	}
-}
-
-// Copy from v1
-func (x *XDPoS_v2) GetValidator(creator common.Address, chain consensus.ChainReader, header *types.Header) (common.Address, error) {
-	epoch := x.config.Epoch
-	no := header.Number.Uint64()
-	cpNo := no
-	if no%epoch != 0 {
-		cpNo = no - (no % epoch)
-	}
-	if cpNo == 0 {
-		return common.Address{}, nil
-	}
-	cpHeader := chain.GetHeaderByNumber(cpNo)
-	if cpHeader == nil {
-		if no%epoch == 0 {
-			cpHeader = header
-		} else {
-			return common.Address{}, fmt.Errorf("couldn't find checkpoint header")
-		}
-	}
-	m, err := utils.GetM1M2FromCheckpointHeader(cpHeader, header, chain.Config())
-	if err != nil {
-		return common.Address{}, err
-	}
-	return m[creator], nil
 }
 
 // Copy from v1

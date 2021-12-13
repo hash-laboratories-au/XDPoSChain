@@ -109,7 +109,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	currentRound := x.currentRound
 	highestQC := x.highestQuorumCert
 	x.lock.Unlock()
-	//parentRound := highestQC.ProposedBlockInfo.Round
+
 	if (highestQC == nil) || (header.ParentHash != highestQC.ProposedBlockInfo.Hash) {
 		return consensus.ErrNotReadyToPropose
 	}

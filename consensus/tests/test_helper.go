@@ -266,7 +266,7 @@ func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params
 	return blockchain, backend, currentBlock, signer
 }
 
-func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainConfig *params.ChainConfig) (*BlockChain, *backends.SimulatedBackend, *types.Block, common.Address) {
+func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainConfig *params.ChainConfig, numOfForkedBlocks int) (*BlockChain, *backends.SimulatedBackend, *types.Block, common.Address, *types.Block) {
 	// Preparation
 	var err error
 	backend := getCommonBackend(t, chainConfig)
@@ -282,16 +282,68 @@ func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainCon
 
 	currentBlock := blockchain.Genesis()
 
+	var currentForkBlock *types.Block
+
 	// Insert initial blocks
 	for i := 1; i <= numOfBlocks; i++ {
 		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
-		merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
+		roundNumber := int64(i) - chainConfig.XDPoS.XDPoSV2Block.Int64()
+		header := createBlock(chainConfig, currentBlock, i, roundNumber, blockCoinBase, signer, signFn)
 
-		// Build engine v2 compatible extra data field
+		block, err := insertBlock(blockchain, header)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Produce forked block for the last numOfForkedBlocks'th blocks
+		if numOfForkedBlocks != 0 && i > numOfBlocks-numOfForkedBlocks {
+			if currentForkBlock == nil {
+				currentForkBlock = currentBlock
+			}
+			forkedBlockCoinBase := fmt.Sprintf("0x222000000000000000000000000000000%03d", i)
+
+			forkedBlockRoundNumber := roundNumber + int64(numOfForkedBlocks)
+
+			forkedBlockHeader := createBlock(chainConfig, currentForkBlock, i, forkedBlockRoundNumber, forkedBlockCoinBase, signer, signFn)
+
+			forkedBlock, err := insertBlock(blockchain, forkedBlockHeader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			currentForkBlock = forkedBlock
+		}
+		currentBlock = block
+	}
+
+	// Update Signer as there is no previous signer assigned
+	err = UpdateSigner(blockchain)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return blockchain, backend, currentBlock, signer, currentForkBlock
+}
+
+func createBlock(chainConfig *params.ChainConfig, startingBlock *types.Block, blockNumIteration int, roundNumber int64, blockCoinBase string, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) *types.Header {
+	currentBlock := startingBlock
+	merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
+	var header *types.Header
+	// Build engine v2 compatible extra data field
+	if big.NewInt(int64(blockNumIteration)).Cmp(chainConfig.XDPoS.XDPoSV2Block) == 1 {
+
+		var extraField utils.ExtraFields_v2
+		var round utils.Round
+		err := utils.DecodeBytesExtraFields(currentBlock.Extra(), &extraField)
+		if err != nil {
+			round = utils.Round(0)
+		} else {
+			round = extraField.Round
+		}
+
 		proposedBlockInfo := &utils.BlockInfo{
 			Hash:   currentBlock.Hash(),
-			Round:  utils.Round(i - 1),
-			Number: big.NewInt(int64(i - 1)),
+			Round:  round,
+			Number: currentBlock.Number(),
 		}
 		// Genrate QC
 		signedHash, err := signFn(accounts.Account{Address: signer}, utils.VoteSigHash(proposedBlockInfo).Bytes())
@@ -306,35 +358,31 @@ func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainCon
 		}
 
 		extra := utils.ExtraFields_v2{
-			Round:      utils.Round(i),
+			Round:      utils.Round(roundNumber),
 			QuorumCert: quorumCert,
 		}
 		extraInBytes, err := extra.EncodeToBytes()
 		if err != nil {
 			panic(fmt.Errorf("Error encode extra into bytes: %v", err))
 		}
-
-		header := &types.Header{
+		header = &types.Header{
 			Root:       common.HexToHash(merkleRoot),
-			Number:     big.NewInt(int64(i)),
+			Number:     big.NewInt(int64(blockNumIteration)),
 			ParentHash: currentBlock.Hash(),
 			Coinbase:   common.HexToAddress(blockCoinBase),
 			Extra:      extraInBytes,
 			Validator:  signedHash,
 		}
-		block, err := insertBlock(blockchain, header)
-		if err != nil {
-			t.Fatal(err)
+	} else {
+		// V1 block
+		header = &types.Header{
+			Root:       common.HexToHash(merkleRoot),
+			Number:     big.NewInt(int64(blockNumIteration)),
+			ParentHash: currentBlock.Hash(),
+			Coinbase:   common.HexToAddress(blockCoinBase),
 		}
-		currentBlock = block
 	}
-	// Update Signer as there is no previous signer assigned
-	err = UpdateSigner(blockchain)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return blockchain, backend, currentBlock, signer
+	return header
 }
 
 func generateSignature(backend *backends.SimulatedBackend, header *types.Header) error {

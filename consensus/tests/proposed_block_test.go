@@ -29,6 +29,9 @@ func TestProposedBlockMessageHandlerSuccessfullyGenerateVote(t *testing.T) {
 	}
 
 	voteMsg := <-engineV2.BroadcastCh
+	poolSize := engineV2.GetVotePoolSize(voteMsg.(*utils.Vote))
+
+	assert.Equal(t, poolSize, 1)
 	assert.NotNil(t, voteMsg)
 	assert.Equal(t, currentBlock.Hash(), voteMsg.(*utils.Vote).ProposedBlockInfo.Hash)
 

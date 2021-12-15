@@ -79,12 +79,11 @@ func (b *Bfter) SetConsensusFuns(engine consensus.Engine) {
 
 // TODO: rename
 func (b *Bfter) Vote(vote *utils.Vote) error {
-	log.Info("Receive Vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "signature", vote.Signature)
+	log.Trace("Receive Vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "signature", vote.Signature)
 	if exist, _ := b.knownVotes.ContainsOrAdd(vote.Hash(), true); exist {
 		log.Info("Discarded vote, known vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round)
 		return nil
 	}
-	log.Info("Process Vote", "vote hash", vote.Hash())
 
 	err := b.consensus.verifyVote(vote)
 	if err != nil {

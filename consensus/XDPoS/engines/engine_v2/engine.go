@@ -1006,3 +1006,32 @@ func (x *XDPoS_v2) GetProperties() (utils.Round, *utils.QuorumCert, *utils.Quoru
 	defer x.lock.Unlock()
 	return x.currentRound, x.lockQuorumCert, x.highestQuorumCert, x.highestVotedRound
 }
+
+// Get master nodes over extra data of epoch switch block.
+func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.Header) []common.Address {
+	if epochSwitchHeader == nil {
+		log.Warn("Use nil epoch switch block to get master nodes")
+		return []common.Address{}
+	}
+	masternodes := make([]common.Address, len(epochSwitchHeader.Validators)/common.AddressLength)
+	for i := 0; i < len(masternodes); i++ {
+		copy(masternodes[i][:], epochSwitchHeader.Validators[i*common.AddressLength:])
+	}
+
+	return masternodes
+}
+
+func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
+	var decodedExtraField utils.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
+	if err != nil {
+		return false, err
+	}
+	parentRound := decodedExtraField.QuorumCert.ProposedBlockInfo.Round
+	round := decodedExtraField.Round
+	epochStart := round - round%utils.Round(x.config.Epoch)
+	if parentRound == 0 && decodedExtraField.QuorumCert.ProposedBlockInfo.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		return true, nil
+	}
+	return parentRound < epochStart, nil
+}

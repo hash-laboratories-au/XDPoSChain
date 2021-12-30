@@ -305,7 +305,7 @@ func (x *XDPoS) RecoverValidator(header *types.Header) (common.Address, error) {
 func (x *XDPoS) GetMasternodesFromCheckpointHeader(preCheckpointHeader *types.Header, n, e uint64) []common.Address {
 	switch x.config.BlockConsensusVersion(preCheckpointHeader.Number) {
 	case params.ConsensusEngineVersion2:
-		return []common.Address{}
+		return x.EngineV2.GetMasternodesFromEpochSwitchHeader(preCheckpointHeader)
 	default: // Default "v1"
 		return x.EngineV1.GetMasternodesFromCheckpointHeader(preCheckpointHeader, n, e)
 	}
@@ -345,6 +345,20 @@ func (x *XDPoS) GetAuthorisedSignersFromSnapshot(chain consensus.ChainReader, he
 		return []common.Address{}, nil
 	default: // Default "v1"
 		return x.EngineV1.GetAuthorisedSignersFromSnapshot(chain, header)
+	}
+}
+
+func (x *XDPoS) IsEpochSwitch(header *types.Header) bool {
+	switch x.config.BlockConsensusVersion(header.Number) {
+	case params.ConsensusEngineVersion2:
+		b, err := x.EngineV2.IsEpochSwitch(header)
+		if err != nil {
+			log.Error("Adaptor v2 IsEpochSwitch has error", "err", err)
+			return false
+		}
+		return b
+	default: // Default "v1"
+		return x.EngineV1.IsEpochSwitch(header)
 	}
 }
 

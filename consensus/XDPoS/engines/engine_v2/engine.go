@@ -29,8 +29,9 @@ type XDPoS_v2 struct {
 	config *params.XDPoSConfig // Consensus engine configuration parameters
 	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
 
-	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
-	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
+	recents       *lru.ARCCache // Snapshots for recent block to speed up reorgs
+	signatures    *lru.ARCCache // Signatures of recent blocks to speed up mining
+	epochSwitches *lru.ARCCache // infos of epoch: master nodes, epoch switch block info, parent of that info
 
 	signer   common.Address  // Ethereum address of the signing key
 	signFn   clique.SignerFn // Signer function to authorize hashes with
@@ -61,6 +62,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 
 	recents, _ := lru.NewARC(utils.InmemorySnapshots)
 	signatures, _ := lru.NewARC(utils.InmemorySnapshots)
+	epochSwitches, _ := lru.NewARC(int(utils.InmemoryEpochs))
 
 	votePool := utils.NewPool(config.V2.CertThreshold)
 	engine := &XDPoS_v2{
@@ -69,6 +71,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 		signatures: signatures,
 
 		recents:       recents,
+		epochSwitches: epochSwitches,
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
 		timeoutPool:   timeoutPool,
@@ -357,21 +360,6 @@ func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error
 		return common.Address{}, err
 	}
 	return m, nil
-}
-
-// Copy from v1
-func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Header) []common.Address {
-	n := header.Number.Uint64()
-	e := x.config.Epoch
-	switch {
-	case n%e == 0:
-		return utils.GetMasternodesFromCheckpointHeader(header)
-	case n%e != 0:
-		h := chain.GetHeaderByNumber(n - (n % e))
-		return utils.GetMasternodesFromCheckpointHeader(h)
-	default:
-		return []common.Address{}
-	}
 }
 
 // Copy from v1
@@ -1052,4 +1040,81 @@ func (x *XDPoS_v2) GetProperties() (utils.Round, *utils.QuorumCert, *utils.Quoru
 	x.lock.Lock()
 	defer x.lock.Unlock()
 	return x.currentRound, x.lockQuorumCert, x.highestQuorumCert, x.highestVotedRound, x.highestCommitBlock
+}
+
+// Get master nodes over extra data of epoch switch block.
+func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.Header) []common.Address {
+	if epochSwitchHeader == nil {
+		log.Warn("Use nil epoch switch block to get master nodes")
+		return []common.Address{}
+	}
+	masternodes := make([]common.Address, len(epochSwitchHeader.Validators)/common.AddressLength)
+	for i := 0; i < len(masternodes); i++ {
+		copy(masternodes[i][:], epochSwitchHeader.Validators[i*common.AddressLength:])
+	}
+
+	return masternodes
+}
+
+func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
+	var decodedExtraField utils.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
+	if err != nil {
+		return false, err
+	}
+	parentRound := decodedExtraField.QuorumCert.ProposedBlockInfo.Round
+	round := decodedExtraField.Round
+	epochStart := round - round%utils.Round(x.config.Epoch)
+	if parentRound == 0 && decodedExtraField.QuorumCert.ProposedBlockInfo.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		return true, nil
+	}
+	return parentRound < epochStart, nil
+}
+
+// Given header, get master node from the epoch switch block of that epoch
+func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Header) []common.Address {
+	hash := header.Hash()
+	e, ok := x.epochSwitches.Get(hash)
+	if ok {
+		epochSwitchInfo := e.(*utils.EpochSwitchInfo)
+		return epochSwitchInfo.Masternodes
+	}
+	//TODO cache
+	isEpochSwitch, err := x.IsEpochSwitch(header)
+	if err != nil {
+		log.Error("[IsEpochSwitch] Adaptor v2 IsEpochSwitch has error", "err", err)
+		return []common.Address{}
+	}
+	for !isEpochSwitch {
+		e, ok := x.epochSwitches.Get(header.ParentHash)
+		if ok {
+			epochSwitchInfo := e.(*utils.EpochSwitchInfo)
+			x.epochSwitches.Add(hash, epochSwitchInfo)
+			return epochSwitchInfo.Masternodes
+		}
+		header = chain.GetHeaderByHash(header.ParentHash)
+		isEpochSwitch, err = x.IsEpochSwitch(header)
+		if err != nil {
+			log.Error("[IsEpochSwitch] Adaptor v2 IsEpochSwitch has error", "err", err)
+			return []common.Address{}
+		}
+	}
+	masternodes := x.GetMasternodesFromEpochSwitchHeader(header)
+	// create the epoch switch info and cache it
+	var decodedExtraField utils.ExtraFields_v2
+	err = utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
+	if err != nil {
+		log.Error("[IsEpochSwitch] Adaptor v2 IsEpochSwitch has error", "err", err)
+		return []common.Address{}
+	}
+	x.epochSwitches.Add(hash, &utils.EpochSwitchInfo{
+		Masternodes: masternodes,
+		EpochSwitchBlockInfo: &utils.BlockInfo{
+			Hash:   header.Hash(),
+			Number: header.Number,
+			Round:  decodedExtraField.Round,
+		},
+		EpochSwitchParentBlockInfo: decodedExtraField.QuorumCert.ProposedBlockInfo,
+	})
+	return masternodes
 }

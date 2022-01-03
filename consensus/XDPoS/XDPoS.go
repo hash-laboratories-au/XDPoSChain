@@ -35,8 +35,13 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
-func SigHash(header *types.Header) (hash common.Hash) {
-	return utils.SigHash(header)
+func (x *XDPoS) SigHash(header *types.Header) (hash common.Hash) {
+	switch x.config.BlockConsensusVersion(header.Number) {
+	case params.ConsensusEngineVersion2:
+		return x.EngineV2.SignHash(header)
+	default: // Default "v1"
+		return x.EngineV1.SigHash(header)
+	}
 }
 
 // XDPoS is the delegated-proof-of-stake consensus engine proposed to support the
@@ -302,25 +307,25 @@ func (x *XDPoS) RecoverValidator(header *types.Header) (common.Address, error) {
 }
 
 // Get master nodes over extra data of previous checkpoint block.
-func (x *XDPoS) GetMasternodesFromCheckpointHeader(preCheckpointHeader *types.Header, n, e uint64) []common.Address {
-	switch x.config.BlockConsensusVersion(preCheckpointHeader.Number) {
+func (x *XDPoS) GetMasternodesFromCheckpointHeader(checkpointHeader *types.Header) []common.Address {
+	switch x.config.BlockConsensusVersion(checkpointHeader.Number) {
 	case params.ConsensusEngineVersion2:
-		return x.EngineV2.GetMasternodesFromEpochSwitchHeader(preCheckpointHeader)
+		return x.EngineV2.GetMasternodesFromEpochSwitchHeader(checkpointHeader)
 	default: // Default "v1"
-		return x.EngineV1.GetMasternodesFromCheckpointHeader(preCheckpointHeader, n, e)
+		return x.EngineV1.GetMasternodesFromCheckpointHeader(checkpointHeader)
 	}
 }
 
 // Check is epoch switch (checkpoint) block
-func (x *XDPoS) IsEpochSwitch(header *types.Header) bool {
+func (x *XDPoS) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 	switch x.config.BlockConsensusVersion(header.Number) {
 	case params.ConsensusEngineVersion2:
-		b, _, err := x.EngineV2.IsEpochSwitch(header)
+		b, epochNum, err := x.EngineV2.IsEpochSwitch(header)
 		if err != nil {
-			log.Error("[IsEpochSwitch] Adaptor v2 IsEpochSwitch has error", "err", err)
-			return false
+			log.Error("[IsEpochSwitch] Adaptor v2 IsEpochSwitch has error", "err", err, "blockNum", header.Number, "Hash", header.Hash())
+			return false, epochNum, err
 		}
-		return b
+		return b, epochNum, nil
 	default: // Default "v1"
 		return x.EngineV1.IsEpochSwitch(header)
 	}

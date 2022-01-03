@@ -1461,7 +1461,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		seals[i] = false
 		bc.downloadingBlock.Add(block.Hash(), true)
 	}
-	abort, results := bc.engine.VerifyHeaders(bc, headers, seals)
+	abort, results := engine.VerifyHeaders(bc, headers, seals)
 	defer close(abort)
 
 	// Iterate over the blocks and insert when the verifier permits
@@ -1565,12 +1565,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		var lendingService utils.LendingService
 		isSDKNode := false
 		if bc.Config().IsTIPXDCX(block.Number()) && bc.chainConfig.XDPoS != nil && engine != nil && block.NumberU64() > bc.chainConfig.XDPoS.Epoch {
-			author, err := bc.Engine().Author(block.Header()) // Ignore error, we're past header validation
+			author, err := engine.Author(block.Header()) // Ignore error, we're past header validation
 			if err != nil {
 				bc.reportBlock(block, nil, err)
 				return i, events, coalescedLogs, err
 			}
-			parentAuthor, _ := bc.Engine().Author(parent.Header())
+			parentAuthor, _ := engine.Author(parent.Header())
 			tradingService = engine.GetXDCXService()
 			lendingService = engine.GetLendingService()
 			if tradingService != nil && lendingService != nil {
@@ -1590,8 +1590,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 					bc.reportBlock(block, nil, err)
 					return i, events, coalescedLogs, err
 				}
-				if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
-					if err := tradingService.UpdateMediumPriceBeforeEpoch(block.NumberU64()/bc.chainConfig.XDPoS.Epoch, tradingState, statedb); err != nil {
+				isEpochSwithBlock, epochNumber, err := engine.IsEpochSwitch(block.Header())
+				if err != nil {
+					log.Error("[insertChain] Error while checking if the incoming block is epoch switch block", "Hash", block.Hash(), "Number", block.Number())
+					bc.reportBlock(block, nil, err)
+				}
+				if isEpochSwithBlock {
+					if err := tradingService.UpdateMediumPriceBeforeEpoch(epochNumber, tradingState, statedb); err != nil {
 						return i, events, coalescedLogs, err
 					}
 				} else {
@@ -1708,9 +1713,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.report(chain, i, dirty)
 		if bc.chainConfig.XDPoS != nil {
 			// epoch block
-			if (chain[i].NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
+			isEpochSwithBlock, _, err := engine.IsEpochSwitch(chain[i].Header())
+			if err != nil {
+				log.Error("[insertChain] Error while checking and notifying channel CheckpointCh if the incoming block is epoch switch block", "Hash", block.Hash(), "Number", block.Number())
+				bc.reportBlock(block, nil, err)
+			}
+			if isEpochSwithBlock {
 				CheckpointCh <- 1
-
 			}
 		}
 	}
@@ -1855,8 +1864,15 @@ func (bc *BlockChain) getResultBlock(block *types.Block, verifiedM2 bool) (*Resu
 				bc.reportBlock(block, nil, err)
 				return nil, err
 			}
-			if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
-				if err := tradingService.UpdateMediumPriceBeforeEpoch(block.NumberU64()/bc.chainConfig.XDPoS.Epoch, tradingState, statedb); err != nil {
+
+			isEpochSwithBlock, epochNumber, err := engine.IsEpochSwitch(block.Header())
+			if err != nil {
+				log.Error("[getResultBlock] Error while checking block is epoch switch block", "Hash", block.Hash(), "Number", block.Number())
+				bc.reportBlock(block, nil, err)
+			}
+
+			if isEpochSwithBlock {
+				if err := tradingService.UpdateMediumPriceBeforeEpoch(epochNumber, tradingState, statedb); err != nil {
 					return nil, err
 				}
 			} else {
@@ -2029,7 +2045,12 @@ func (bc *BlockChain) insertBlock(block *types.Block) ([]interface{}, []*types.L
 	stats.report(types.Blocks{block}, 0, dirty)
 	if bc.chainConfig.XDPoS != nil {
 		// epoch block
-		if (block.NumberU64() % bc.chainConfig.XDPoS.Epoch) == 0 {
+		isEpochSwithBlock, _, err := bc.Engine().(*XDPoS.XDPoS).IsEpochSwitch(block.Header())
+		if err != nil {
+			log.Error("[insertBlock] Error while checking if the incoming block is epoch switch block", "Hash", block.Hash(), "Number", block.Number())
+			bc.reportBlock(block, nil, err)
+		}
+		if isEpochSwithBlock {
 			CheckpointCh <- 1
 
 		}

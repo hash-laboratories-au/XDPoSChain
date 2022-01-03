@@ -385,13 +385,13 @@ func createBlock(chainConfig *params.ChainConfig, startingBlock *types.Block, bl
 	return header
 }
 
-func generateSignature(backend *backends.SimulatedBackend, header *types.Header) error {
+func generateSignature(backend *backends.SimulatedBackend, adaptor *XDPoS.XDPoS, header *types.Header) error {
 	signer, signFn, err := backends.SimulateWalletAddressAndSignFn()
 	if err != nil {
 		panic(fmt.Errorf("Error while creating simulated wallet for generating singer address and signer fn: %v", err))
 	}
 
-	signature, err := signFn(accounts.Account{Address: signer}, utils.SigHashV2(header).Bytes())
+	signature, err := signFn(accounts.Account{Address: signer}, adaptor.SigHash(header).Bytes())
 	if err != nil {
 		return err
 	}

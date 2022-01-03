@@ -697,7 +697,7 @@ func (s *PublicBlockChainAPI) GetMasternodes(ctx context.Context, b *types.Block
 			lastCheckpointNumber := prevBlockNumber - (prevBlockNumber % s.b.ChainConfig().XDPoS.Epoch)
 			prevCheckpointBlock, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(lastCheckpointNumber))
 			if prevCheckpointBlock != nil {
-				masternodes = engine.GetMasternodesFromCheckpointHeader(prevCheckpointBlock.Header(), curBlockNumber, s.b.ChainConfig().XDPoS.Epoch)
+				masternodes = engine.GetMasternodesFromCheckpointHeader(prevCheckpointBlock.Header())
 			}
 		} else {
 			log.Error("Undefined XDPoS consensus engine")
@@ -791,7 +791,7 @@ func (s *PublicBlockChainAPI) GetCandidateStatus(ctx context.Context, coinbaseAd
 
 	// Second, Find candidates that have masternode status
 	if engine, ok := s.b.GetEngine().(*XDPoS.XDPoS); ok {
-		masternodes = engine.GetMasternodesFromCheckpointHeader(header, block.Number().Uint64(), s.b.ChainConfig().XDPoS.Epoch)
+		masternodes = engine.GetMasternodesFromCheckpointHeader(header)
 		if len(masternodes) == 0 {
 			log.Error("Failed to get masternodes", "err", err, "len(masternodes)", len(masternodes), "blockNum", header.Number.Uint64())
 			result[fieldSuccess] = false
@@ -902,7 +902,7 @@ func (s *PublicBlockChainAPI) GetCandidates(ctx context.Context, epoch rpc.Epoch
 
 	// Second, Find candidates that have masternode status
 	if engine, ok := s.b.GetEngine().(*XDPoS.XDPoS); ok {
-		masternodes = engine.GetMasternodesFromCheckpointHeader(header, block.Number().Uint64(), s.b.ChainConfig().XDPoS.Epoch)
+		masternodes = engine.GetMasternodesFromCheckpointHeader(header)
 		if len(masternodes) == 0 {
 			log.Error("Failed to get masternodes", "err", err, "len(masternodes)", len(masternodes), "blockNum", header.Number.Uint64())
 			result[fieldSuccess] = false
@@ -1391,7 +1391,10 @@ func (s *PublicBlockChainAPI) getSigners(ctx context.Context, block *types.Block
 	checkpointNumber := blockNumber - (blockNumber % s.b.ChainConfig().XDPoS.Epoch)
 	checkpointBlock, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(checkpointNumber))
 
-	masternodes := engine.GetMasternodesFromCheckpointHeader(checkpointBlock.Header(), blockNumber, s.b.ChainConfig().XDPoS.Epoch)
+	if checkpointBlock.Header() == nil {
+		log.Warn("[getSigners] CheckpointBlock header is nil", "blockNum", blockNumber)
+	}
+	masternodes := engine.GetMasternodesFromCheckpointHeader(checkpointBlock.Header())
 	signers, err = GetSignersFromBlocks(s.b, block.NumberU64(), block.Hash(), masternodes)
 	if err != nil {
 		log.Error("Fail to get signers from block signer SC.", "error", err)

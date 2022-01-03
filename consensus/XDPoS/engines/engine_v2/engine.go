@@ -98,6 +98,23 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	return engine
 }
 
+/* V2 Block
+SignerFn is a signer callback function to request a hash to be signed by a
+backing account.
+type SignerFn func(accounts.Account, []byte) ([]byte, error)
+
+sigHash returns the hash which is used as input for the delegated-proof-of-stake
+signing. It is the hash of the entire header apart from the 65 byte signature
+contained at the end of the extra data.
+
+Note, the method requires the extra data to be at least 65 bytes, otherwise it
+panics. This is done to avoid accidentally using both forms (signature present
+or not), which could be abused to produce different hashes for the same header.
+*/
+func (x *XDPoS_v2) SignHash(header *types.Header) (hash common.Hash) {
+	return sigHash(header)
+}
+
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
@@ -222,7 +239,7 @@ func (x *XDPoS_v2) Authorize(signer common.Address, signFn clique.SignerFn) {
 }
 
 func (x *XDPoS_v2) Author(header *types.Header) (common.Address, error) {
-	return utils.EcrecoverV2(header, x.signatures)
+	return ecrecover(header, x.signatures)
 }
 
 // Seal implements consensus.Engine, attempting to create a sealed block using
@@ -271,7 +288,7 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 
 	// Sign all the things!
-	signature, err := signFn(accounts.Account{Address: signer}, utils.SigHashV2(header).Bytes())
+	signature, err := signFn(accounts.Account{Address: signer}, sigHash(header).Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +372,7 @@ func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error
 	if header.Number.Uint64() == 0 {
 		return common.Address{}, errors.New("Don't take block 0")
 	}
-	m, err := utils.EcrecoverV2(header, snap.sigcache)
+	m, err := ecrecover(header, snap.sigcache)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -1066,13 +1083,14 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 	parentRound := decodedExtraField.QuorumCert.ProposedBlockInfo.Round
 	round := decodedExtraField.Round
 	epochStart := round - round%utils.Round(x.config.Epoch)
+	epochNum := x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(round)/x.config.Epoch
 	// if parent is last v1 block and this is first v2 block, this is treated as epoch switch
 	if decodedExtraField.QuorumCert.ProposedBlockInfo.Number.Cmp(x.config.XDPoSV2Block) == 0 {
 		log.Info("[IsEpochSwitch] true, parent equals XDPoSV2Block", "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
-		return true, x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(round)/x.config.Epoch, nil
+		return true, epochNum, nil
 	}
 	log.Info("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
-	return parentRound < epochStart, x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(round)/x.config.Epoch, nil
+	return parentRound < epochStart, epochNum, nil
 }
 
 // Given header and its hash, get epoch switch info from the epoch switch block of that epoch,

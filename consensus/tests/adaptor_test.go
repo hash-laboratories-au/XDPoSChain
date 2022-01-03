@@ -40,7 +40,7 @@ func TestAdaptorShouldGetAuthorForDifferentConsensusVersion(t *testing.T) {
 		ParentHash: currentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase),
 	}
-	err := generateSignature(backend, header)
+	err := generateSignature(backend, adaptor, header)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,11 +66,11 @@ func TestAdaptorGetMasternodesFromCheckpointHeader(t *testing.T) {
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 	headerV1 := currentBlock.Header()
 	headerV1.Extra = common.Hex2Bytes("d7830100018358444388676f312e31352e38856c696e757800000000000000000278c350152e15fa6ffc712a5a73d704ce73e2e103d9e17ae3ff2c6712e44e25b09ac5ee91f6c9ff065551f0dcac6f00cae11192d462db709be3758ccef312ee5eea8d7bad5374c6a652150515d744508b61c1a4deb4e4e7bf057e4e3824c11fd2569bcb77a52905cda63b5a58507910bed335e4c9d87ae0ecdfafd400")
-	masternodesV1 := adaptor.GetMasternodesFromCheckpointHeader(headerV1, 0, 0)
+	masternodesV1 := adaptor.GetMasternodesFromCheckpointHeader(headerV1)
 	headerV2 := currentBlock.Header()
 	headerV2.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(1))
 	headerV2.Validators = common.Hex2Bytes("0278c350152e15fa6ffc712a5a73d704ce73e2e103d9e17ae3ff2c6712e44e25b09ac5ee91f6c9ff065551f0dcac6f00cae11192d462db709be3758c")
-	masternodesV2 := adaptor.GetMasternodesFromCheckpointHeader(headerV2, 0, 0)
+	masternodesV2 := adaptor.GetMasternodesFromCheckpointHeader(headerV2)
 	assert.True(t, reflect.DeepEqual(masternodesV1, masternodesV2), "GetMasternodesFromCheckpointHeader in adaptor for v1 v2 not equal", "v1", masternodesV1, "v2", masternodesV2)
 }
 func TestAdaptorIsEpochSwitch(t *testing.T) {
@@ -79,9 +79,19 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header := currentBlock.Header()
 	// v1
 	header.Number.SetUint64(0)
-	assert.True(t, adaptor.IsEpochSwitch(header), "header should be epoch switch", header)
+
+	isEpochSwitchBlock, epochNum, err := adaptor.IsEpochSwitch(header)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.True(t, isEpochSwitchBlock, "header should be epoch switch", header)
+	assert.Equal(t, uint64(0), epochNum)
 	header.Number.SetUint64(1)
-	assert.False(t, adaptor.IsEpochSwitch(header), "header should not be epoch switch", header)
+	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.False(t, isEpochSwitchBlock, "header should not be epoch switch", header)
 	// v2
 	parentBlockInfo := &utils.BlockInfo{
 		Hash:   header.ParentHash,
@@ -100,7 +110,11 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	assert.Nil(t, err)
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(1))
-	assert.True(t, adaptor.IsEpochSwitch(header), "header should be epoch switch", header)
+	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.True(t, isEpochSwitchBlock, "header should be epoch switch", header)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
 		Round:  utils.Round(1),
@@ -118,7 +132,11 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	assert.Nil(t, err)
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(2))
-	assert.False(t, adaptor.IsEpochSwitch(header), "header should not be epoch switch", header)
+	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.False(t, isEpochSwitchBlock, "header should not be epoch switch", header)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
 		Round:  utils.Round(blockchain.Config().XDPoS.Epoch) - 1,
@@ -136,7 +154,11 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	assert.Nil(t, err)
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(101))
-	assert.True(t, adaptor.IsEpochSwitch(header), "header should be epoch switch", header)
+	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.True(t, isEpochSwitchBlock, "header should be epoch switch", header)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
 		Round:  utils.Round(blockchain.Config().XDPoS.Epoch) + 1,
@@ -154,7 +176,11 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	assert.Nil(t, err)
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(101))
-	assert.False(t, adaptor.IsEpochSwitch(header), "header should not be epoch switch", header)
+	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.False(t, isEpochSwitchBlock, "header should not be epoch switch", header)
 }
 
 func TestAdaptorGetMasternodesV2(t *testing.T) {

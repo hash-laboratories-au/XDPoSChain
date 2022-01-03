@@ -328,7 +328,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(header *types.Header, chain consensus.Cha
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &extraField)
 	if err != nil {
-		log.Error("[IsAuthorisedAddress] Fail to decode v2 extra data", "Hash", header.Hash())
+		log.Error("[IsAuthorisedAddress] Fail to decode v2 extra data", "Hash", header.Hash(), "Extra", header.Extra, "Error", err)
 		return false
 	}
 	blockRound := extraField.Round
@@ -336,14 +336,14 @@ func (x *XDPoS_v2) IsAuthorisedAddress(header *types.Header, chain consensus.Cha
 	masterNodes := x.GetMasternodes(chain, header)
 
 	if len(masterNodes) == 0 {
-		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash(), "Round", blockRound, "MN", masterNodes)
+		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash(), "Round", blockRound, "Number", header.Number)
 		return false
 	}
 	leaderIndex := uint64(blockRound) % x.config.Epoch % uint64(len(masterNodes))
 	if masterNodes[leaderIndex] == address {
 		return true
 	}
-	log.Warn("Not authorised address", "Address", address, "MN", masterNodes, "Hash", header.Hash())
+	log.Warn("Not authorised address", "Address", address, "MN", masterNodes, "Hash", header.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "Address", address)
 	return false
 }
 

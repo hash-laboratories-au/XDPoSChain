@@ -17,6 +17,8 @@ var (
 
 	UncleHash      = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
 	InmemoryEpochs = 5 * EpochLength          // Number of mapping from block to epoch switch infos to keep in memory
+	CacheHashPrefix = "H"
+	CacheEpochPrefix = "E"
 )
 
 const (

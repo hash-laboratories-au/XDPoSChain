@@ -85,7 +85,7 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	// v2
 	parentBlockInfo := &utils.BlockInfo{
 		Hash:   header.ParentHash,
-		Round:  utils.Round(0),
+		Round:  0,
 		Number: big.NewInt(0).Set(blockchain.Config().XDPoS.XDPoSV2Block),
 	}
 	quorumCert := &utils.QuorumCert{
@@ -101,9 +101,16 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(1))
 	assert.True(t, adaptor.IsEpochSwitch(header), "header should be epoch switch", header)
+	// test IsEpochSwitchAtRound
+	b, err := adaptor.EngineV2.IsEpochSwitchAtRound(utils.Round(11), header)
+	assert.Nil(t, err)
+	assert.False(t, b, "round should not be epoch switch", header)
+	b, err = adaptor.EngineV2.IsEpochSwitchAtRound(utils.Round(blockchain.Config().XDPoS.Epoch), header)
+	assert.Nil(t, err)
+	assert.True(t, b, "round should be epoch switch", blockchain.Config().XDPoS.Epoch*2)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
-		Round:  utils.Round(1),
+		Round:  1,
 		Number: big.NewInt(0).Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(1)),
 	}
 	quorumCert = &utils.QuorumCert{
@@ -155,6 +162,13 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(101))
 	assert.False(t, adaptor.IsEpochSwitch(header), "header should not be epoch switch", header)
+	// test IsEpochSwitchAtRound
+	b, err = adaptor.EngineV2.IsEpochSwitchAtRound(utils.Round(blockchain.Config().XDPoS.Epoch), header)
+	assert.Nil(t, err)
+	assert.False(t, b, "round should not be epoch switch", header)
+	b, err = adaptor.EngineV2.IsEpochSwitchAtRound(utils.Round(blockchain.Config().XDPoS.Epoch*2), header)
+	assert.Nil(t, err)
+	assert.True(t, b, "round should be epoch switch", blockchain.Config().XDPoS.Epoch*2)
 }
 
 func TestAdaptorGetMasternodesV2(t *testing.T) {
@@ -173,6 +187,7 @@ func TestAdaptorGetMasternodesV2(t *testing.T) {
 	}
 	masternodes1 := adaptor.GetMasternodes(blockchain, currentBlock.Header())
 	assert.Equal(t, 3, len(masternodes1))
+	assert.True(t, reflect.DeepEqual(masternodes1, adaptor.EngineV2.GetMasternodesByHash(blockchain, currentBlock.Hash())))
 	for blockNum = 12; blockNum < 15; blockNum++ {
 		blockHeader = createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, int64(blockNum-10), blockCoinBase, signer, signFn)
 		currentBlock, err = insertBlock(blockchain, blockHeader)
@@ -181,5 +196,70 @@ func TestAdaptorGetMasternodesV2(t *testing.T) {
 		}
 		masternodes2 := adaptor.GetMasternodes(blockchain, currentBlock.Header())
 		assert.True(t, reflect.DeepEqual(masternodes1, masternodes2), "at block number", blockNum)
+		assert.True(t, reflect.DeepEqual(masternodes2, adaptor.EngineV2.GetMasternodesByHash(blockchain, currentBlock.Hash())))
 	}
+}
+
+func TestAdaptorGetMasternodesAtRoundV2(t *testing.T) {
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 10, params.TestXDPoSMockChainConfigWithV2Engine, 0)
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
+	blockNum := 11
+	blockCoinBase := "0x111000000000000000000000000000000123"
+	blockHeader := createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
+	// it contains 3 master nodes
+	blockHeader.Validators = common.Hex2Bytes("0278c350152e15fa6ffc712a5a73d704ce73e2e103d9e17ae3ff2c6712e44e25b09ac5ee91f6c9ff065551f0dcac6f00cae11192d462db709be3758c")
+	// block 11 is the first v2 block, and is treated as epoch switch block
+	currentBlock, err := insertBlock(blockchain, blockHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	masternodes1 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+	assert.Equal(t, 3, len(masternodes1))
+	assert.True(t, reflect.DeepEqual(masternodes1, adaptor.EngineV2.GetMasternodes(blockchain, currentBlock.Header())))
+	for blockNum = 12; blockNum < 15; blockNum++ {
+		blockHeader = createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, int64(blockNum-10), blockCoinBase, signer, signFn)
+		currentBlock, err = insertBlock(blockchain, blockHeader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+		assert.True(t, reflect.DeepEqual(masternodes1, masternodes2), "at block number", blockNum)
+	}
+	for round := 2; round < 900; round++ {
+		masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, utils.Round(round))
+		assert.True(t, reflect.DeepEqual(masternodes1, masternodes2), "at round", round)
+	}
+	// TODO: next epoch (round 900) is unimplemented, cannot test yet
+	masternodes3 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, utils.Round(900))
+	t.Log("MN3", len(masternodes3))
+}
+
+// this test shows under different canonical chain, GetMasternodesAtRound could be different
+func TestAdaptorGetMasternodesAtRoundUnderForking(t *testing.T) {
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 10, params.TestXDPoSMockChainConfigWithV2Engine, 0)
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
+	blockNum := 11
+	blockCoinBase := "0x111000000000000000000000000000000123"
+	blockHeader := createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
+	// it contains 3 master nodes
+	blockHeader.Validators = common.Hex2Bytes("0278c350152e15fa6ffc712a5a73d704ce73e2e103d9e17ae3ff2c6712e44e25b09ac5ee91f6c9ff065551f0dcac6f00cae11192d462db709be3758c")
+	blockHeader2 := createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
+	// it contains 1 master node
+	blockHeader2.Validators = common.Hex2Bytes("0278c350152e15fa6ffc712a5a73d704ce73e2e1")
+	// it has larger difficulty than the other block
+	blockHeader2.Difficulty = big.NewInt(2)
+	// block 11 is the first v2 block, and is treated as epoch switch block
+	_, err := insertBlock(blockchain, blockHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	masternodes1 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+	assert.Equal(t, 3, len(masternodes1))
+	_, err = insertBlock(blockchain, blockHeader2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the forking block2 becomes canonical, so master node should use that
+	masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+	assert.Equal(t, 1, len(masternodes2))
 }

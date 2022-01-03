@@ -1065,6 +1065,7 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
 	parentRound := decodedExtraField.QuorumCert.ProposedBlockInfo.Round
 	round := decodedExtraField.Round
 	epochStart := round - round%utils.Round(x.config.Epoch)
+	// if parent is last v1 block and this is first v2 block, this is treated as epoch switch
 	if parentRound == 0 && decodedExtraField.QuorumCert.ProposedBlockInfo.Number.Cmp(x.config.XDPoSV2Block) == 0 {
 		return true, nil
 	}

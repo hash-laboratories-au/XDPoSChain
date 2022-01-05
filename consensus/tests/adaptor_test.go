@@ -213,7 +213,7 @@ func TestAdaptorGetMasternodesAtRoundV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	masternodes1 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+	masternodes1 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1, currentBlock.Header())
 	assert.Equal(t, 3, len(masternodes1))
 	assert.True(t, reflect.DeepEqual(masternodes1, adaptor.EngineV2.GetMasternodes(blockchain, currentBlock.Header())))
 	for blockNum = 12; blockNum < 15; blockNum++ {
@@ -222,15 +222,15 @@ func TestAdaptorGetMasternodesAtRoundV2(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+		masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1, currentBlock.Header())
 		assert.True(t, reflect.DeepEqual(masternodes1, masternodes2), "at block number", blockNum)
 	}
 	for round := 2; round < 900; round++ {
-		masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, utils.Round(round))
+		masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, utils.Round(round), currentBlock.Header())
 		assert.True(t, reflect.DeepEqual(masternodes1, masternodes2), "at round", round)
 	}
 	// TODO: next epoch (round 900) is unimplemented, cannot test yet
-	masternodes3 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, utils.Round(900))
+	masternodes3 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, utils.Round(900), currentBlock.Header())
 	t.Log("MN3", len(masternodes3))
 }
 
@@ -249,17 +249,17 @@ func TestAdaptorGetMasternodesAtRoundUnderForking(t *testing.T) {
 	// it has larger difficulty than the other block
 	blockHeader2.Difficulty = big.NewInt(2)
 	// block 11 is the first v2 block, and is treated as epoch switch block
-	_, err := insertBlock(blockchain, blockHeader)
+	currentBlock, err := insertBlock(blockchain, blockHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	masternodes1 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+	masternodes1 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1, currentBlock.Header())
 	assert.Equal(t, 3, len(masternodes1))
-	_, err = insertBlock(blockchain, blockHeader2)
+	currentBlock, err = insertBlock(blockchain, blockHeader2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// the forking block2 becomes canonical, so master node should use that
-	masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1)
+	masternodes2 := adaptor.EngineV2.GetMasternodesAtRound(blockchain, 1, currentBlock.Header())
 	assert.Equal(t, 1, len(masternodes2))
 }

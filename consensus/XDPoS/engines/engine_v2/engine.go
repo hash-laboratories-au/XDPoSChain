@@ -584,7 +584,8 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 		2. Broadcast(Not part of consensus)
 */
 func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg *utils.Timeout) (bool, error) {
-	masternodes := x.GetMasternodesAtRound(chain, timeoutMsg.Round)
+	//TODO: question: Do we need lock here?
+	masternodes := x.GetMasternodesAtRound(chain, timeoutMsg.Round, chain.CurrentHeader())
 	return x.verifyMsgSignature(masternodes, utils.TimeoutSigHash(&timeoutMsg.Round), timeoutMsg.Signature)
 }
 
@@ -1057,6 +1058,7 @@ func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.
 	return masternodes
 }
 
+// TODO should put in config, not engine.
 func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
 	var decodedExtraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
@@ -1074,6 +1076,7 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
 }
 
 // IsEpochSwitchAtRound() is used by miner to check whether it mines a block in the same epoch with parent
+// TODO should put in config, not engine.
 func (x *XDPoS_v2) IsEpochSwitchAtRound(round utils.Round, parentHeader *types.Header) (bool, error) {
 	if parentHeader.Number.Cmp(x.config.XDPoSV2Block) == 0 {
 		return true, nil
@@ -1177,8 +1180,7 @@ func (x *XDPoS_v2) GetMasternodesByHash(chain consensus.ChainReader, hash common
 // Given current round, get master node
 // If under attack and forking, network may have different results of this function
 // Should be used only when there is no epoch switch block
-func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round utils.Round) []common.Address {
-	currentHeader := chain.CurrentHeader()
+func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(currentHeader.Extra, &extraField)
 	if err != nil {
@@ -1205,18 +1207,21 @@ func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round util
 		}
 	}
 	// if this round enters a brand new epoch (no epoch switch block to use)
-	return x.GetMasternodesFromSnapshot(chain, round)
+	return x.GetMasternodesAtRoundFromSnapshot(chain, round, currentHeader)
 }
 
-func (x *XDPoS_v2) GetMasternodesFromSnapshot(chain consensus.ChainReader, round utils.Round) []common.Address {
-	//TODO related to epoch switch
-	// epochSwitchInfo, err := x.getEpochSwitchInfo(chain, currentHeader)
-	// if err != nil {
-	// 	log.Error("[getMasternodesAtRound] Adaptor v2 getEpochSwitchInfo has error, potentially bug", "err", err)
-	// 	return []common.Address{}
-	// }
-	// // x.epochSwitches.Add(utils.CacheEpochPrefix+strconv.FormatUint(epoch, 10), epochSwitchInfo)
-	// return epochSwitchInfo.Masternodes
+// get snapshot masternodes for the gap block before round, given the header of the canonical chain
+func (x *XDPoS_v2) GetMasternodesAtRoundFromSnapshot(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
+	if round < utils.Round(x.config.Epoch) {
+		// for the first epoch, we shouldn't need snapshot
+		log.Error("[GetMasternodesAtRoundFromSnapshot]", "shouldn't use round", round)
+	}
+	// gapRound := round - round % utils.Round(x.config.Epoch) - utils.Round(x.config.Gap)
+	// TODO: if currentHeader round <= gapRound then currentHeader is gap block
+	// otherwise, find the gap block that round<=gapRound and child round > gapRound.
+	// TODO: use cache to reduce the look up time
+	// then read from snapshot db for the gap block
+	// if db doesn't have it, calculate it (GetMasterndoes from the gap block's smart contract state!)
 	log.Error("[getMasternodesFromSnapshot] unimplemented!")
 	return []common.Address{}
 }

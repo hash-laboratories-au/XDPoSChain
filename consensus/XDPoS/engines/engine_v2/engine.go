@@ -1060,6 +1060,7 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
 	var decodedExtraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
 	if err != nil {
+		log.Error("[IsEpochSwitch] decode header error", "err", err, "number", header.Number.Uint64(), "hash", header.Hash())
 		return false, err
 	}
 	parentRound := decodedExtraField.QuorumCert.ProposedBlockInfo.Round
@@ -1067,8 +1068,10 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, error) {
 	epochStart := round - round%utils.Round(x.config.Epoch)
 	// if parent is last v1 block and this is first v2 block, this is treated as epoch switch
 	if parentRound == 0 && decodedExtraField.QuorumCert.ProposedBlockInfo.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		log.Info("[IsEpochSwitch] true", "parent equals XDPoSV2Block", "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
 		return true, nil
 	}
+	log.Info("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
 	return parentRound < epochStart, nil
 }
 

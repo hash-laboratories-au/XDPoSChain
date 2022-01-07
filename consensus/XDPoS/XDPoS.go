@@ -315,7 +315,7 @@ func (x *XDPoS) GetMasternodesFromCheckpointHeader(preCheckpointHeader *types.He
 func (x *XDPoS) IsEpochSwitch(header *types.Header) bool {
 	switch x.config.BlockConsensusVersion(header.Number) {
 	case params.ConsensusEngineVersion2:
-		b, err := x.EngineV2.IsEpochSwitch(header)
+		b, _, err := x.EngineV2.IsEpochSwitch(header)
 		if err != nil {
 			log.Error("[IsEpochSwitch] Adaptor v2 IsEpochSwitch has error", "err", err)
 			return false

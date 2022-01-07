@@ -1045,7 +1045,7 @@ func (x *XDPoS_v2) GetProperties() (utils.Round, *utils.QuorumCert, *utils.Quoru
 // Get master nodes over extra data of epoch switch block.
 func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.Header) []common.Address {
 	if epochSwitchHeader == nil {
-		log.Warn("Use nil epoch switch block to get master nodes")
+		log.Error("[GetMasternodesFromEpochSwitchHeader] use nil epoch switch block to get master nodes")
 		return []common.Address{}
 	}
 	masternodes := make([]common.Address, len(epochSwitchHeader.Validators)/common.AddressLength)
@@ -1084,28 +1084,29 @@ func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types
 		epochSwitchInfo := e.(*utils.EpochSwitchInfo)
 		return epochSwitchInfo, nil
 	}
-	if header == nil {
+	h := header
+	if h == nil {
 		log.Debug("[getEpochSwitchInfo] header missing, get header", "hash", hash.Hex())
-		header = chain.GetHeaderByHash(hash)
+		h = chain.GetHeaderByHash(hash)
 	}
-	isEpochSwitch, _, err := x.IsEpochSwitch(header)
+	isEpochSwitch, _, err := x.IsEpochSwitch(h)
 	if err != nil {
 		return nil, err
 	}
 	if isEpochSwitch {
-		log.Debug("[getEpochSwitchInfo] header is epoch switch", "hash", hash.Hex(), "number", header.Number.Uint64())
-		masternodes := x.GetMasternodesFromEpochSwitchHeader(header)
+		log.Debug("[getEpochSwitchInfo] header is epoch switch", "hash", hash.Hex(), "number", h.Number.Uint64())
+		masternodes := x.GetMasternodesFromEpochSwitchHeader(h)
 		// create the epoch switch info and cache it
 		var decodedExtraField utils.ExtraFields_v2
-		err = utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
+		err = utils.DecodeBytesExtraFields(h.Extra, &decodedExtraField)
 		if err != nil {
 			return nil, err
 		}
 		epochSwitchInfo := &utils.EpochSwitchInfo{
 			Masternodes: masternodes,
 			EpochSwitchBlockInfo: &utils.BlockInfo{
-				Hash:   header.Hash(),
-				Number: header.Number,
+				Hash:   hash,
+				Number: h.Number,
 				Round:  decodedExtraField.Round,
 			},
 			EpochSwitchParentBlockInfo: decodedExtraField.QuorumCert.ProposedBlockInfo,
@@ -1113,12 +1114,12 @@ func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types
 		x.epochSwitches.Add(hash, epochSwitchInfo)
 		return epochSwitchInfo, nil
 	}
-	epochSwitchInfo, err := x.getEpochSwitchInfo(chain, nil, header.ParentHash)
+	epochSwitchInfo, err := x.getEpochSwitchInfo(chain, nil, h.ParentHash)
 	if err != nil {
-		log.Error("[getEpochSwitchInfo] recursive error", "err", err, "hash", hash.Hex(), "number", header.Number.Uint64())
+		log.Error("[getEpochSwitchInfo] recursive error", "err", err, "hash", hash.Hex(), "number", h.Number.Uint64())
 		return nil, err
 	}
-	log.Debug("[getEpochSwitchInfo] get epoch switch info recursively", "hash", hash.Hex(), "number", header.Number.Uint64())
+	log.Debug("[getEpochSwitchInfo] get epoch switch info recursively", "hash", hash.Hex(), "number", h.Number.Uint64())
 	x.epochSwitches.Add(hash, epochSwitchInfo)
 	return epochSwitchInfo, nil
 }

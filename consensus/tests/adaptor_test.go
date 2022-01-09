@@ -199,6 +199,8 @@ func TestAdaptorGetMasternodesV2(t *testing.T) {
 	}
 	masternodes1 := adaptor.GetMasternodes(blockchain, currentBlock.Header())
 	assert.Equal(t, 3, len(masternodes1))
+	masternodes1ByNumber := adaptor.GetMasternodesByNumber(blockchain, currentBlock.NumberU64())
+	assert.True(t, reflect.DeepEqual(masternodes1, masternodes1ByNumber), "at block number", blockNum)
 	for blockNum = 12; blockNum < 15; blockNum++ {
 		blockHeader = createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, int64(blockNum-10), blockCoinBase, signer, signFn)
 		currentBlock, err = insertBlock(blockchain, blockHeader)
@@ -207,5 +209,46 @@ func TestAdaptorGetMasternodesV2(t *testing.T) {
 		}
 		masternodes2 := adaptor.GetMasternodes(blockchain, currentBlock.Header())
 		assert.True(t, reflect.DeepEqual(masternodes1, masternodes2), "at block number", blockNum)
+		masternodes2ByNumber := adaptor.GetMasternodesByNumber(blockchain, currentBlock.NumberU64())
+		assert.True(t, reflect.DeepEqual(masternodes2, masternodes2ByNumber), "at block number", blockNum)
+	}
+}
+
+func TestGetCurrentEpochSwitchBlock(t *testing.T) {
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 10, params.TestXDPoSMockChainConfigWithV2Engine, 0)
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
+
+	// V1
+	currentCheckpointNumber, epochNum, err := adaptor.GetCurrentEpochSwitchBlock(blockchain, big.NewInt(9))
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(0), currentCheckpointNumber)
+	assert.Equal(t, uint64(0), epochNum)
+
+	// V2
+	blockNum := 11
+	blockCoinBase := "0x111000000000000000000000000000000123"
+	blockHeader := createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
+	// it contains 3 master nodes
+	blockHeader.Validators = common.Hex2Bytes("0278c350152e15fa6ffc712a5a73d704ce73e2e103d9e17ae3ff2c6712e44e25b09ac5ee91f6c9ff065551f0dcac6f00cae11192d462db709be3758c")
+	// block 11 is the first v2 block, and is treated as epoch switch block
+	currentBlock, err = insertBlock(blockchain, blockHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentCheckpointNumber, epochNum, err = adaptor.GetCurrentEpochSwitchBlock(blockchain, currentBlock.Number())
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(11), currentCheckpointNumber)
+	assert.Equal(t, uint64(0), epochNum)
+
+	for blockNum = 12; blockNum < 15; blockNum++ {
+		blockHeader = createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, int64(blockNum-10), blockCoinBase, signer, signFn)
+		currentBlock, err = insertBlock(blockchain, blockHeader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentCheckpointNumber, epochNum, err := adaptor.GetCurrentEpochSwitchBlock(blockchain, currentBlock.Number())
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(11), currentCheckpointNumber)
+		assert.Equal(t, uint64(0), epochNum)
 	}
 }

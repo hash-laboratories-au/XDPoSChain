@@ -166,6 +166,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	isEpochSwitchBlock, _, err := x.IsEpochSwitch(header)
 	if err != nil {
 		log.Error("[Prepare] Error while trying to determine if header is an epoch switch during Prepare", "header", header, "Error", err)
+		return err
 	}
 	if isEpochSwitchBlock {
 		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
@@ -258,7 +259,10 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
 	// checkpoint blocks have no tx
-	isEpochSwitch, _, _ := x.IsEpochSwitch(header)
+	isEpochSwitch, _, err := x.IsEpochSwitch(header)
+	if err != nil {
+		log.Error("[Seal] Error while checking whether header is a epoch switch during sealing", "Header", header)
+	}
 	if x.config.Period == 0 && len(block.Transactions()) == 0 && !isEpochSwitch {
 		return nil, utils.ErrWaitTransactions
 	}
@@ -349,7 +353,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	return len(masternodes), preIndex, curIndex, false, nil
 }
 
-func (x *XDPoS_v2) IsAuthorisedAddress(header *types.Header, chain consensus.ChainReader, address common.Address) bool {
+func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &extraField)
 	if err != nil {

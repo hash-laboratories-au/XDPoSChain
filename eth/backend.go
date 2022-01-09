@@ -296,7 +296,7 @@ func New(ctx *node.ServiceContext, config *Config, XDCXServ *XDCx.XDCX, lendingS
 				// not genesis block
 				header = parentHeader
 			}
-			return c.IsAuthorisedAddress(header, eth.blockchain, address)
+			return c.IsAuthorisedAddress(eth.blockchain, header, address)
 		}
 
 	}
@@ -464,7 +464,7 @@ func (s *Ethereum) ValidateMasternode() (bool, error) {
 		//check if miner's wallet is in set of validators
 		c := s.engine.(*XDPoS.XDPoS)
 
-		authorized := c.IsAuthorisedAddress(s.blockchain.CurrentHeader(), s.blockchain, eb)
+		authorized := c.IsAuthorisedAddress(s.blockchain, s.blockchain.CurrentHeader(), eb)
 		if !authorized {
 			//This miner doesn't belong to set of validators
 			return false, nil

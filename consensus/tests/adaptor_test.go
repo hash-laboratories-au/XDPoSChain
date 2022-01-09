@@ -81,16 +81,12 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Number.SetUint64(0)
 
 	isEpochSwitchBlock, epochNum, err := adaptor.IsEpochSwitch(header)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.Nil(t, err)
 	assert.True(t, isEpochSwitchBlock, "header should be epoch switch", header)
 	assert.Equal(t, uint64(0), epochNum)
 	header.Number.SetUint64(1)
 	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.Nil(t, err)
 	assert.False(t, isEpochSwitchBlock, "header should not be epoch switch", header)
 	// v2
 	parentBlockInfo := &utils.BlockInfo{
@@ -111,9 +107,7 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(1))
 	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.Nil(t, err)
 	assert.True(t, isEpochSwitchBlock, "header should be epoch switch", header)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
@@ -133,9 +127,7 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(2))
 	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.Nil(t, err)
 	assert.False(t, isEpochSwitchBlock, "header should not be epoch switch", header)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
@@ -155,9 +147,7 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(101))
 	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.Nil(t, err)
 	assert.True(t, isEpochSwitchBlock, "header should be epoch switch", header)
 	parentBlockInfo = &utils.BlockInfo{
 		Hash:   header.ParentHash,
@@ -177,9 +167,7 @@ func TestAdaptorIsEpochSwitch(t *testing.T) {
 	header.Extra = extraBytes
 	header.Number.Add(blockchain.Config().XDPoS.XDPoSV2Block, big.NewInt(101))
 	isEpochSwitchBlock, _, err = adaptor.IsEpochSwitch(header)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	assert.Nil(t, err)
 	assert.False(t, isEpochSwitchBlock, "header should not be epoch switch", header)
 }
 

@@ -406,7 +406,7 @@ func (self *worker) wait() {
 					log.Error("[wait] Unable to handle new proposed block", "err", err, "number", block.Number(), "hash", block.Hash())
 				}
 
-				authorized := c.IsAuthorisedAddress(block.Header(), self.chain, self.coinbase)
+				authorized := c.IsAuthorisedAddress(self.chain, block.Header(), self.coinbase)
 				if !authorized {
 					valid := false
 					masternodes := c.GetMasternodes(self.chain, block.Header())

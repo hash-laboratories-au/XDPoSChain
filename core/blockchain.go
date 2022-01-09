@@ -1461,7 +1461,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		seals[i] = false
 		bc.downloadingBlock.Add(block.Hash(), true)
 	}
-	abort, results := engine.VerifyHeaders(bc, headers, seals)
+	abort, results := bc.engine.VerifyHeaders(bc, headers, seals)
 	defer close(abort)
 
 	// Iterate over the blocks and insert when the verifier permits
@@ -1565,12 +1565,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		var lendingService utils.LendingService
 		isSDKNode := false
 		if bc.Config().IsTIPXDCX(block.Number()) && bc.chainConfig.XDPoS != nil && engine != nil && block.NumberU64() > bc.chainConfig.XDPoS.Epoch {
-			author, err := engine.Author(block.Header()) // Ignore error, we're past header validation
+			author, err := bc.Engine().Author(block.Header()) // Ignore error, we're past header validation
 			if err != nil {
 				bc.reportBlock(block, nil, err)
 				return i, events, coalescedLogs, err
 			}
-			parentAuthor, _ := engine.Author(parent.Header())
+			parentAuthor, _ := bc.Engine().Author(parent.Header())
 			tradingService = engine.GetXDCXService()
 			lendingService = engine.GetLendingService()
 			if tradingService != nil && lendingService != nil {

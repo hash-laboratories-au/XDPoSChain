@@ -163,7 +163,11 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
 
 	// TODO: previous round should sit on previous Epoch and x.currentRound should >= Epoch number
-	if number%x.config.Epoch == 0 {
+	isEpochSwitchBlock, _, err := x.IsEpochSwitch(header)
+	if err != nil {
+		log.Error("[Prepare] Error while trying to determine if header is an epoch switch during Prepare", "header", header, "Error", err)
+	}
+	if isEpochSwitchBlock {
 		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
 		if err != nil {
 			return err
@@ -254,7 +258,8 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
 	// checkpoint blocks have no tx
-	if x.config.Period == 0 && len(block.Transactions()) == 0 && number%x.config.Epoch != 0 {
+	isEpochSwitch, _, _ := x.IsEpochSwitch(header)
+	if x.config.Period == 0 && len(block.Transactions()) == 0 && !isEpochSwitch {
 		return nil, utils.ErrWaitTransactions
 	}
 	// Don't hold the signer fields for the entire sealing procedure
@@ -1150,4 +1155,17 @@ func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 		return []common.Address{}
 	}
 	return epochSwitchInfo.Masternodes
+}
+
+func (x *XDPoS_v2) GetCurrentEpochSwitchBlock(chain consensus.ChainReader, blockNum *big.Int) (uint64, uint64, error) {
+	header := chain.GetHeaderByNumber(blockNum.Uint64())
+	epochSwitchInfo, err := x.getEpochSwitchInfo(chain, header, header.Hash())
+	if err != nil {
+		log.Error("[GetCurrentEpochSwitchBlock] Fail to get epoch switch info", "Num", header.Number, "Hash", header.Hash())
+		return 0, 0, err
+	}
+
+	currentCheckpointNumber := epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64()
+	epochNum := x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(epochSwitchInfo.EpochSwitchBlockInfo.Round)/x.config.Epoch
+	return currentCheckpointNumber, epochNum, nil
 }

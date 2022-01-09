@@ -364,6 +364,13 @@ func (x *XDPoS_v1) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 	}
 }
 
+func (x *XDPoS_v1) GetCurrentEpochSwitchBlock(blockNumber *big.Int) (uint64, uint64, error) {
+	currentBlockNum := blockNumber.Uint64()
+	currentCheckpointNumber := currentBlockNum - currentBlockNum%x.config.Epoch
+	epochNumber := currentBlockNum / x.config.Epoch
+	return currentCheckpointNumber, epochNumber, nil
+}
+
 func (x *XDPoS_v1) GetPeriod() uint64 { return x.config.Period }
 
 func (x *XDPoS_v1) whoIsCreator(snap *SnapshotV1, header *types.Header) (common.Address, error) {
@@ -926,7 +933,7 @@ func (x *XDPoS_v1) RecoverValidator(header *types.Header) (common.Address, error
 // Get master nodes over extra data of checkpoint block.
 func (x *XDPoS_v1) GetMasternodesFromCheckpointHeader(checkpointHeader *types.Header) []common.Address {
 	if checkpointHeader == nil {
-		log.Info("Checkpoint's header is empty", "block number")
+		log.Warn("Checkpoint's header is empty", "Header", checkpointHeader)
 		return []common.Address{}
 	}
 	return decodeMasternodesFromHeaderExtra(checkpointHeader)
@@ -989,5 +996,6 @@ func NewFaker(db ethdb.Database, config *params.XDPoSConfig) *XDPoS_v1 {
 // Epoch Switch is also known as checkpoint in v1
 func (x *XDPoS_v1) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 	epochNumber := header.Number.Uint64() / x.config.Epoch
-	return (header.Number.Uint64() % x.config.Epoch) == 0, epochNumber, nil
+	blockNumInEpoch := header.Number.Uint64() % x.config.Epoch
+	return blockNumInEpoch == 0, epochNumber, nil
 }

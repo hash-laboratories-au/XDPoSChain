@@ -263,6 +263,20 @@ func (x *XDPoS) GetMasternodes(chain consensus.ChainReader, header *types.Header
 	}
 }
 
+func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber uint64) []common.Address {
+	blockHeader := chain.GetHeaderByNumber(blockNumber)
+	if blockHeader == nil {
+		log.Error("[GetMasternodesByNumber] Unable to find block", "Num", blockNumber)
+		return []common.Address{}
+	}
+	switch x.config.BlockConsensusVersion(big.NewInt(int64(blockNumber))) {
+	case params.ConsensusEngineVersion2:
+		return x.EngineV2.GetMasternodes(chain, blockHeader)
+	default: // Default "v1"
+		return x.EngineV1.GetMasternodes(chain, blockHeader)
+	}
+}
+
 func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
 	switch x.config.BlockConsensusVersion(parent.Number) {
 	case params.ConsensusEngineVersion2:
@@ -328,6 +342,15 @@ func (x *XDPoS) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 		return b, epochNum, nil
 	default: // Default "v1"
 		return x.EngineV1.IsEpochSwitch(header)
+	}
+}
+
+func (x *XDPoS) GetCurrentEpochSwitchBlock(chain consensus.ChainReader, blockNumber *big.Int) (uint64, uint64, error) {
+	switch x.config.BlockConsensusVersion(blockNumber) {
+	case params.ConsensusEngineVersion2:
+		return x.EngineV2.GetCurrentEpochSwitchBlock(chain, blockNumber)
+	default: // Default "v1"
+		return x.EngineV1.GetCurrentEpochSwitchBlock(blockNumber)
 	}
 }
 

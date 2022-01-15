@@ -325,7 +325,23 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	defer x.lock.RUnlock()
 
 	round := x.currentRound
-	masterNodes := x.GetMasternodes(chain, parent)
+	isEpochSwitch, _, err := x.IsEpochSwitchAtRound(round, parent)
+	if err != nil {
+		log.Error("[YourTurn]", "Error", err)
+		return 0, -1, -1, false, err
+	}
+	var masterNodes []common.Address
+	if isEpochSwitch {
+		if x.config.XDPoSV2Block.Cmp(parent.Number) == 0 {
+			// TODO: read v1 master nodes
+		} else {
+			// TODO: calc master nodes by smart contract - penalty
+			// TODO: related to snapshot
+		}
+	} else {
+		// this block and parent belong to the same epoch
+		masterNodes = x.GetMasternodes(chain, parent)
+	}
 
 	if len(masterNodes) == 0 {
 		log.Error("[YourTurn] Fail to find any master nodes from current block round epoch", "Hash", parent.Hash(), "CurrentRound", round, "Number", parent.Number)
@@ -1089,6 +1105,24 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 		return true, epochNum, nil
 	}
 	log.Info("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
+	return parentRound < epochStart, epochNum, nil
+}
+
+// IsEpochSwitchAtRound() is used by miner to check whether it mines a block in the same epoch with parent
+func (x *XDPoS_v2) IsEpochSwitchAtRound(round utils.Round, parentHeader *types.Header) (bool, uint64, error) {
+	epochNum := x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(round)/x.config.Epoch
+	// if parent is last v1 block and this is first v2 block, this is treated as epoch switch
+	if parentHeader.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		return true, epochNum, nil
+	}
+	var decodedExtraField utils.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(parentHeader.Extra, &decodedExtraField)
+	if err != nil {
+		log.Error("[IsEpochSwitch] decode header error", "err", err, "header", parentHeader, "extra", common.Bytes2Hex(parentHeader.Extra))
+		return false, 0, err
+	}
+	parentRound := decodedExtraField.Round
+	epochStart := round - round%utils.Round(x.config.Epoch)
 	return parentRound < epochStart, epochNum, nil
 }
 

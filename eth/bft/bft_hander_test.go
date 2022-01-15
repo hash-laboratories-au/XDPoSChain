@@ -201,5 +201,5 @@ func TestTimeoutHandlerRoundNotEqual(t *testing.T) {
 	timeoutMsg := &utils.Timeout{}
 
 	err := tester.bfter.Timeout(timeoutMsg)
-	assert.Equal(t, "Timeout message round number: 1 does not match currentRound: 2", err.Error())
+	assert.Equal(t, "timeout message round number: 1 does not match currentRound: 2", err.Error())
 }

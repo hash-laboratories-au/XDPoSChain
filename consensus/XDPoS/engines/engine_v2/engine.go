@@ -29,7 +29,7 @@ type XDPoS_v2 struct {
 	config *params.XDPoSConfig // Consensus engine configuration parameters
 	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
 
-	recents       *lru.ARCCache // Snapshots for recent block to speed up reorgs
+	snapshots     *lru.ARCCache // Snapshots for gap block
 	signatures    *lru.ARCCache // Signatures of recent blocks to speed up mining
 	epochSwitches *lru.ARCCache // infos of epoch: master nodes, epoch switch block info, parent of that info
 
@@ -60,7 +60,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 	timer := countdown.NewCountDown(duration)
 	timeoutPool := utils.NewPool(config.V2.CertThreshold)
 
-	recents, _ := lru.NewARC(utils.InmemorySnapshots)
+	snapshots, _ := lru.NewARC(utils.InmemorySnapshots)
 	signatures, _ := lru.NewARC(utils.InmemorySnapshots)
 	epochSwitches, _ := lru.NewARC(int(utils.InmemoryEpochs))
 
@@ -70,7 +70,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 		db:         db,
 		signatures: signatures,
 
-		recents:       recents,
+		snapshots:     snapshots,
 		epochSwitches: epochSwitches,
 		timeoutWorker: timer,
 		BroadcastCh:   make(chan interface{}),
@@ -115,31 +115,50 @@ func (x *XDPoS_v2) SignHash(header *types.Header) (hash common.Hash) {
 	return sigHash(header)
 }
 
+func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, masternodes []common.Address) error {
+	if x.highestQuorumCert != nil { //already initialized
+		return nil
+	}
+
+	x.lock.Lock()
+	defer x.lock.RUnlock()
+	// Check header if it is the first consensus v2 block, if so, assign initial values to current round and highestQC
+
+	log.Info("[Initial] Initilising highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
+	// Generate new parent blockInfo and put it into QC
+	parentBlockInfo := &utils.BlockInfo{
+		Hash:   header.ParentHash,
+		Round:  utils.Round(0),
+		Number: big.NewInt(0).Sub(header.Number, big.NewInt(1)),
+	}
+	quorumCert := &utils.QuorumCert{
+		ProposedBlockInfo: parentBlockInfo,
+		Signatures:        nil,
+	}
+	x.currentRound = 1
+	x.highestQuorumCert = quorumCert
+
+	// Initial snapshot
+	lastGapNum := header.Number.Uint64() - header.Number.Uint64()%x.config.Epoch - x.config.Gap
+	lastGapHeader := chain.GetHeaderByNumber(lastGapNum)
+
+	newMasternodes := make(map[common.Address]struct{})
+	for _, m := range masternodes {
+		newMasternodes[m] = struct{}{}
+	}
+
+	newSnapshot(lastGapNum, lastGapHeader.Hash(), x.currentRound, x.highestQuorumCert, newMasternodes)
+	return nil
+}
+
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
-	// Verify mined block parent matches highest QC
-	x.lock.Lock()
-	// Check header if it is the first consensus v2 block, if so, assign initial values to current round and highestQC
-	if header.Number.Cmp(big.NewInt(0).Add(x.config.XDPoSV2Block, big.NewInt(1))) == 0 {
-		log.Info("[Prepare] Initilising highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
-		// Generate new parent blockInfo and put it into QC
-		parentBlockInfo := &utils.BlockInfo{
-			Hash:   header.ParentHash,
-			Round:  utils.Round(0),
-			Number: big.NewInt(0).Sub(header.Number, big.NewInt(1)),
-		}
-		quorumCert := &utils.QuorumCert{
-			ProposedBlockInfo: parentBlockInfo,
-			Signatures:        nil,
-		}
-		x.currentRound = 1
-		x.highestQuorumCert = quorumCert
-	}
 
+	x.lock.RLock()
 	currentRound := x.currentRound
 	highestQC := x.highestQuorumCert
-	x.lock.Unlock()
+	x.lock.RUnlock()
 
 	if (highestQC == nil) || (header.ParentHash != highestQC.ProposedBlockInfo.Hash) {
 		return consensus.ErrNotReadyToPropose
@@ -169,7 +188,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		return err
 	}
 	if isEpochSwitchBlock {
-		snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
+		snap, err := x.getSnapshot(chain, number-1, header.ParentHash)
 		if err != nil {
 			return err
 		}
@@ -193,7 +212,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	// Ensure the timestamp has the correct delay
 
 	// TODO: Proper deal with time
-	//　TODO: if timestamp > current time, how to deal with future timestamp
+	// TODO: if timestamp > current time, how to deal with future timestamp
 	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(x.config.Period))
 	if header.Time.Int64() < time.Now().Unix() {
 		header.Time = big.NewInt(time.Now().Unix())
@@ -273,12 +292,12 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	x.signLock.RUnlock()
 
 	// Bail out if we're unauthorized to sign a block
-	snap, err := x.snapshot(chain, number-1, header.ParentHash, nil)
+	snap, err := x.getSnapshot(chain, number-1, header.ParentHash)
 	if err != nil {
 		return nil, err
 	}
 	masternodes := x.GetMasternodes(chain, header)
-	if _, authorized := snap.MasterNodes[signer]; !authorized {
+	if _, authorized := snap.NextEpochMasterNodes[signer]; !authorized {
 		valid := false
 		for _, m := range masternodes {
 			if m == signer {
@@ -399,7 +418,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV2, error) {
 	number := header.Number.Uint64()
 	log.Trace("get snapshot", "number", number, "hash", header.Hash())
-	snap, err := x.snapshot(chain, number, header.Hash(), nil)
+	snap, err := x.getSnapshot(chain, number, header.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -407,84 +426,52 @@ func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
-func (x *XDPoS_v2) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*SnapshotV2, error) {
-	// Search for a SnapshotV2 in memory or on disk for checkpoints
-	var (
-		headers []*types.Header
-		snap    *SnapshotV2
-	)
-	for snap == nil {
-		// If an in-memory SnapshotV2 was found, use that
-		if s, ok := x.recents.Get(hash); ok {
-			snap = s.(*SnapshotV2)
-			break
-		}
-		// If an on-disk checkpoint snapshot can be found, use that
-		// checkpoint snapshot = checkpoint - gap
-		if (number+x.config.Gap)%x.config.Epoch == 0 {
-			if s, err := loadSnapshot(x.signatures, x.db, hash); err == nil {
-				log.Trace("Loaded snapshot form disk", "number", number, "hash", hash)
-				snap = s
-				break
-			}
-		}
-		// If we're at 0 block, make a snapshot
-		// TODO: We may need to store snapshot at the v1 -> v2 switch block
-		if number == 0 {
-			genesis := chain.GetHeaderByNumber(0)
-			if err := x.VerifyHeader(chain, genesis, true); err != nil {
-				return nil, err
-			}
-			signers := make([]common.Address, (len(genesis.Extra)-utils.ExtraVanity-utils.ExtraSeal)/common.AddressLength)
-			for i := 0; i < len(signers); i++ {
-				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
-			}
-			snap = newSnapshot(x.signatures, 0, genesis.Hash(), x.currentRound, x.highestQuorumCert, signers)
-			if err := storeSnapshot(snap, x.db); err != nil {
-				return nil, err
-			}
-			log.Trace("Stored genesis voting snapshot to disk")
-			break
-		}
-		// No snapshot for this header, gather the header and move backward
-		var header *types.Header
-		if len(parents) > 0 {
-			// If we have explicit parents, pick from there (enforced)
-			header = parents[len(parents)-1]
-			if header.Hash() != hash || header.Number.Uint64() != number {
-				return nil, consensus.ErrUnknownAncestor
-			}
-			parents = parents[:len(parents)-1]
-		} else {
-			// No explicit parents (or no more left), reach out to the database
-			header = chain.GetHeader(hash, number)
-			if header == nil {
-				log.Error("[Seal] Failed due to no header found", "hash", hash, "number", number)
-				return nil, consensus.ErrUnknownAncestor
-			}
-		}
-		headers = append(headers, header)
-		number, hash = number-1, header.ParentHash
+func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64, hash common.Hash) (*SnapshotV2, error) {
+	// checkpoint snapshot = checkpoint - gap
+	gapBlockNum := number - number%x.config.Epoch - x.config.Gap
+	gapBlockHash := chain.GetHeaderByNumber(number).Hash()
+
+	// If an in-memory SnapshotV2 was found, use that
+	if s, ok := x.snapshots.Get(gapBlockHash); ok {
+		snap := s.(*SnapshotV2)
+		log.Trace("Loaded snapshot from memory", "number", gapBlockNum, "hash", gapBlockHash)
+		return snap, nil
 	}
-	// Previous snapshot found, apply any pending headers on top of it
-	for i := 0; i < len(headers)/2; i++ {
-		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
-	}
-	snap, err := snap.apply(headers)
+	// If an on-disk checkpoint snapshot can be found, use that
+	snap, err := loadSnapshot(x.signatures, x.db, gapBlockHash)
 	if err != nil {
+		log.Error("Cannot find snapshot from last gap block", "err", err, "number", gapBlockNum, "hash", gapBlockHash)
 		return nil, err
 	}
-	x.recents.Add(snap.Hash, snap)
 
-	// If we've generated a new checkpoint snapshot, save to disk
-	// TODO how to save correct snapshot
-	if uint64(snap.Round)%x.config.Epoch == x.config.Gap {
-		if err = storeSnapshot(snap, x.db); err != nil {
-			return nil, err
-		}
-		log.Trace("Stored snapshot to disk", "round number", snap.Round, "hash", snap.Hash)
+	log.Trace("Loaded snapshot from disk", "number", gapBlockNum, "hash", gapBlockHash)
+	x.snapshots.Add(snap.Hash, snap)
+	return snap, nil
+}
+
+func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []utils.Masternode) error {
+	number := header.Number.Uint64()
+	log.Trace("take snapshot", "number", number, "hash", header.Hash())
+
+	newMasternodes := make(map[common.Address]struct{})
+	for _, m := range ms {
+		newMasternodes[m.Address] = struct{}{}
 	}
-	return snap, err
+
+	x.lock.RLock()
+	snap := newSnapshot(number, header.Hash(), x.currentRound, x.highestQuorumCert, newMasternodes)
+	x.lock.RUnlock()
+
+	storeSnapshot(snap, x.db)
+	x.snapshots.Add(snap.Hash, snap)
+
+	nm := []string{}
+	for _, n := range ms {
+		nm = append(nm, n.Address.String())
+	}
+	log.Info("New set of masternodes has been updated to snapshot", "number", snap.Number, "hash", snap.Hash, "new masternodes", nm)
+
+	return nil
 }
 
 func (x *XDPoS_v2) VerifyHeader(chain consensus.ChainReader, header *types.Header, fullVerify bool) error {

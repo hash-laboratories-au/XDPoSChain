@@ -180,6 +180,9 @@ func (x *XDPoS) VerifySeal(chain consensus.ChainReader, header *types.Header) er
 func (x *XDPoS) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	switch x.config.BlockConsensusVersion(header.Number) {
 	case params.ConsensusEngineVersion2:
+		if header.Number.Cmp(big.NewInt(0).Add(x.config.XDPoSV2Block, big.NewInt(1))) == 0 {
+			x.initialV2(chain, header)
+		}
 		return x.EngineV2.Prepare(chain, header)
 	default: // Default "v1"
 		return x.EngineV1.Prepare(chain, header)
@@ -280,6 +283,9 @@ func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber 
 func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
 	switch x.config.BlockConsensusVersion(parent.Number) {
 	case params.ConsensusEngineVersion2:
+		if parent.Number.Cmp(x.config.XDPoSV2Block) == 0 { // TODO: Discuss
+			x.initialV2(chain, parent)
+		}
 		return x.EngineV2.YourTurn(chain, parent, signer)
 	default: // Default "v1"
 		return x.EngineV1.YourTurn(chain, parent, signer)
@@ -296,7 +302,7 @@ func (x *XDPoS) GetValidator(creator common.Address, chain consensus.ChainReader
 func (x *XDPoS) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []utils.Masternode) error {
 	switch x.config.BlockConsensusVersion(header.Number) {
 	case params.ConsensusEngineVersion2:
-		return nil
+		return x.EngineV2.UpdateMasternodes(chain, header, ms)
 	default: // Default "v1"
 		return x.EngineV1.UpdateMasternodes(chain, header, ms)
 	}
@@ -361,7 +367,7 @@ func (x *XDPoS) GetSnapshot(chain consensus.ChainReader, header *types.Header) (
 		return &utils.PublicApiSnapshot{
 			Number:  sp.Number,
 			Hash:    sp.Hash,
-			Signers: sp.MasterNodes,
+			Signers: sp.NextEpochMasterNodes,
 		}, err
 	default: // Default "v1"
 		sp, err := x.EngineV1.GetSnapshot(chain, header)
@@ -439,6 +445,14 @@ func (x *XDPoS) GetCachedSigningTxs(hash common.Hash) (interface{}, bool) {
 }
 
 //V2
+func (x *XDPoS) initialV2(chain consensus.ChainReader, header *types.Header) error {
+	checkpointBlockNumber := header.Number.Uint64() - header.Number.Uint64()%x.config.Epoch
+	checkpointHeader := chain.GetHeaderByNumber(checkpointBlockNumber)
+	masternodes := x.EngineV1.GetMasternodesFromCheckpointHeader(checkpointHeader)
+	x.EngineV2.Initial(chain, header, masternodes)
+	return nil
+}
+
 func (x *XDPoS) VerifyVote(*utils.Vote) error {
 	return nil
 }

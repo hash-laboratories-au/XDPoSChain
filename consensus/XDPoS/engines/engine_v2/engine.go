@@ -1207,14 +1207,14 @@ func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round util
 		}
 	}
 	// if this round enters a brand new epoch (no epoch switch block to use)
-	return x.GetMasternodesAtRoundFromSnapshot(chain, round, currentHeader)
+	return x.CalcMasternodes(chain, round, currentHeader)
 }
 
 // get snapshot masternodes for the gap block before round, given the header of the canonical chain
-func (x *XDPoS_v2) GetMasternodesAtRoundFromSnapshot(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
+func (x *XDPoS_v2) CalcMasternodes(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
 	if round < utils.Round(x.config.Epoch) {
 		// for the first epoch, we shouldn't need snapshot
-		log.Error("[GetMasternodesAtRoundFromSnapshot]", "shouldn't use round", round)
+		log.Error("[CalcMasternodes]", "shouldn't use round", round)
 	}
 	// gapRound := round - round % utils.Round(x.config.Epoch) - utils.Round(x.config.Gap)
 	// TODO: if currentHeader round <= gapRound then currentHeader is gap block
@@ -1222,6 +1222,6 @@ func (x *XDPoS_v2) GetMasternodesAtRoundFromSnapshot(chain consensus.ChainReader
 	// TODO: use cache to reduce the look up time
 	// then read from snapshot db for the gap block
 	// if db doesn't have it, calculate it (GetMasterndoes from the gap block's smart contract state!)
-	log.Error("[getMasternodesFromSnapshot] unimplemented!")
+	log.Error("[CalcMasternodes] unimplemented!")
 	return []common.Address{}
 }

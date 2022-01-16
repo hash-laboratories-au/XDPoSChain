@@ -1179,7 +1179,7 @@ func (x *XDPoS_v2) GetMasternodesByHash(chain consensus.ChainReader, hash common
 
 // Given current round, get master node
 // If under attack and forking, network may have different results of this function
-// Should be used only when there is no epoch switch block
+// Should be used only for verifying timeout, TC
 func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(currentHeader.Extra, &extraField)

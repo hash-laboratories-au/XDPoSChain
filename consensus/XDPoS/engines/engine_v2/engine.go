@@ -93,7 +93,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS_v2 {
 		highestCommitBlock: nil,
 	}
 	// Add callback to the timer
-	timer.OnTimeoutFn = engine.onCountdownTimeout
+	timer.OnTimeoutFn = engine.OnCountdownTimeout
 
 	return engine
 }
@@ -192,6 +192,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 
 	// Ensure the timestamp has the correct delay
 
+	// TODO: Proper deal with time
 	//　TODO: if timestamp > current time, how to deal with future timestamp
 	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(x.config.Period))
 	if header.Time.Int64() < time.Now().Unix() {
@@ -319,41 +320,55 @@ func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Hea
 	return big.NewInt(1)
 }
 
-// Copy from v1
+// Check if it's my turm to mine a block. Note: The second return value `preIndex` is useless in V2 engine
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
-	snap, err := x.GetSnapshot(chain, parent)
+	x.lock.RLock()
+	defer x.lock.RUnlock()
+
+	round := x.currentRound
+	isEpochSwitch, _, err := x.IsEpochSwitchAtRound(round, parent)
 	if err != nil {
-		log.Error("[YourTurn] Failed while getting snapshot", "parentHash", parent.Hash(), "err", err)
+		log.Error("[YourTurn]", "Error", err)
 		return 0, -1, -1, false, err
 	}
-	masternodes := x.GetMasternodes(chain, parent)
-	if len(masternodes) == 0 {
+	var masterNodes []common.Address
+	if isEpochSwitch {
+		if x.config.XDPoSV2Block.Cmp(parent.Number) == 0 {
+			// TODO: read v1 master nodes
+		} else {
+			// TODO: calc master nodes by smart contract - penalty
+			// TODO: related to snapshot
+		}
+	} else {
+		// this block and parent belong to the same epoch
+		masterNodes = x.GetMasternodes(chain, parent)
+	}
+
+	if len(masterNodes) == 0 {
+		log.Error("[YourTurn] Fail to find any master nodes from current block round epoch", "Hash", parent.Hash(), "CurrentRound", round, "Number", parent.Number)
 		return 0, -1, -1, false, errors.New("Masternodes not found")
 	}
-	pre := common.Address{}
-	// masternode[0] has chance to create block 1
-	preIndex := -1
-	if parent.Number.Uint64() != 0 {
-		pre, err = whoIsCreator(snap, parent)
-		if err != nil {
-			return 0, 0, 0, false, err
-		}
-		preIndex = utils.Position(masternodes, pre)
-	}
-	curIndex := utils.Position(masternodes, signer)
+	leaderIndex := uint64(round) % x.config.Epoch % uint64(len(masterNodes))
+
+	curIndex := utils.Position(masterNodes, signer)
 	if signer == x.signer {
-		log.Debug("Masternodes cycle info", "number of masternodes", len(masternodes), "previous", pre, "position", preIndex, "current", signer, "position", curIndex)
+		log.Debug("[YourTurn] masterNodes cycle info", "number of masternodes", len(masterNodes), "current", signer, "position", curIndex, "parentBlock", parent)
 	}
-	for i, s := range masternodes {
-		log.Debug("Masternode:", "index", i, "address", s.String())
+	for i, s := range masterNodes {
+		log.Debug("[YourTurn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
 	}
-	if (preIndex+1)%len(masternodes) == curIndex {
-		return len(masternodes), preIndex, curIndex, true, nil
+
+	if masterNodes[leaderIndex] == signer {
+		return len(masterNodes), -1, curIndex, true, nil
 	}
-	return len(masternodes), preIndex, curIndex, false, nil
+	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "MN", masterNodes, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "signer", signer)
+	return len(masterNodes), -1, curIndex, false, nil
 }
 
 func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
+	x.lock.RLock()
+	defer x.lock.RUnlock()
+
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &extraField)
 	if err != nil {
@@ -368,24 +383,16 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash(), "Round", blockRound, "Number", header.Number)
 		return false
 	}
-	leaderIndex := uint64(blockRound) % x.config.Epoch % uint64(len(masterNodes))
-	if masterNodes[leaderIndex] == address {
-		return true
+	// leaderIndex := uint64(blockRound) % x.config.Epoch % uint64(len(masterNodes))
+	for index, masterNodeAddress := range masterNodes {
+		if masterNodeAddress == address {
+			log.Debug("[IsAuthorisedAddress] Found matching master node address", "index", index, "Address", address, "MasterNodes", masterNodes)
+			return true
+		}
 	}
-	log.Warn("Not authorised address", "Address", address, "MN", masterNodes, "Hash", header.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "Address", address)
-	return false
-}
 
-// Copy from v1
-func whoIsCreator(snap *SnapshotV2, header *types.Header) (common.Address, error) {
-	if header.Number.Uint64() == 0 {
-		return common.Address{}, errors.New("Don't take block 0")
-	}
-	m, err := ecrecover(header, snap.sigcache)
-	if err != nil {
-		return common.Address{}, err
-	}
-	return m, nil
+	log.Warn("Not authorised address", "Address", address, "MN", masterNodes, "Hash", header.Hash())
+	return false
 }
 
 // Copy from v1
@@ -519,8 +526,8 @@ func (x *XDPoS_v2) VerifySyncInfoMessage(syncInfo *utils.SyncInfo) error {
 }
 
 func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.SyncInfo) error {
-	x.signLock.Lock()
-	defer x.signLock.Unlock()
+	x.lock.Lock()
+	defer x.lock.Unlock()
 	/*
 		1. processQC
 		2. processTC
@@ -558,13 +565,17 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 
 	// 1. checkRoundNumber
 	if voteMsg.ProposedBlockInfo.Round != x.currentRound {
-		return fmt.Errorf("Vote message round number: %v does not match currentRound: %v", voteMsg.ProposedBlockInfo.Round, x.currentRound)
+		return &utils.ErrIncomingMessageRoundNotEqualCurrentRound{
+			Type:          "vote",
+			IncomingRound: voteMsg.ProposedBlockInfo.Round,
+			CurrentRound:  x.currentRound,
+		}
 	}
 
 	// Collect vote
 	thresholdReached, numberOfVotesInPool, pooledVotes := x.votePool.Add(voteMsg)
 	if thresholdReached {
-		log.Debug("Vote pool threashold reached: %v, number of items in the pool: %v", thresholdReached, numberOfVotesInPool)
+		log.Info(fmt.Sprintf("Vote pool threashold reached: %v, number of items in the pool: %v", thresholdReached, numberOfVotesInPool))
 		err := x.onVotePoolThresholdReached(chain, pooledVotes, voteMsg)
 		if err != nil {
 			return err
@@ -628,14 +639,16 @@ func (x *XDPoS_v2) timeoutHandler(timeout *utils.Timeout) error {
 	// 1. checkRoundNumber
 	if timeout.Round != x.currentRound {
 		return &utils.ErrIncomingMessageRoundNotEqualCurrentRound{
+			Type:          "timeout",
 			IncomingRound: timeout.Round,
-			CurrentRound:  x.currentRound}
+			CurrentRound:  x.currentRound,
+		}
 	}
 	// Collect timeout, generate TC
 	isThresholdReached, numberOfTimeoutsInPool, pooledTimeouts := x.timeoutPool.Add(timeout)
 	// Threshold reached
 	if isThresholdReached {
-		log.Debug("Timeout pool threashold reached: %v, number of items in the pool: %v", isThresholdReached, numberOfTimeoutsInPool)
+		log.Info(fmt.Sprintf("Timeout pool threashold reached: %v, number of items in the pool: %v", isThresholdReached, numberOfTimeoutsInPool))
 		err := x.onTimeoutPoolThresholdReached(pooledTimeouts, timeout)
 		if err != nil {
 			return err
@@ -948,7 +961,7 @@ func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signat
 	Function that will be called by timer when countdown reaches its threshold.
 	In the engine v2, we would need to broadcast timeout messages to other peers
 */
-func (x *XDPoS_v2) onCountdownTimeout(time time.Time) error {
+func (x *XDPoS_v2) OnCountdownTimeout(time time.Time) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 
@@ -1058,13 +1071,15 @@ func (x *XDPoS_v2) SetNewRoundFaker(newRound utils.Round, resetTimer bool) {
 
 // Utils for test to check currentRound value
 func (x *XDPoS_v2) GetCurrentRound() utils.Round {
+	x.lock.RLock()
+	defer x.lock.RUnlock()
 	return x.currentRound
 }
 
 // Utils for test to check currentRound value
 func (x *XDPoS_v2) GetProperties() (utils.Round, *utils.QuorumCert, *utils.QuorumCert, utils.Round, *utils.BlockInfo) {
-	x.lock.Lock()
-	defer x.lock.Unlock()
+	x.lock.RLock()
+	defer x.lock.RUnlock()
 	return x.currentRound, x.lockQuorumCert, x.highestQuorumCert, x.highestVotedRound, x.highestCommitBlock
 }
 
@@ -1099,6 +1114,24 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 		return true, epochNum, nil
 	}
 	log.Info("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
+	return parentRound < epochStart, epochNum, nil
+}
+
+// IsEpochSwitchAtRound() is used by miner to check whether it mines a block in the same epoch with parent
+func (x *XDPoS_v2) IsEpochSwitchAtRound(round utils.Round, parentHeader *types.Header) (bool, uint64, error) {
+	epochNum := x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(round)/x.config.Epoch
+	// if parent is last v1 block and this is first v2 block, this is treated as epoch switch
+	if parentHeader.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		return true, epochNum, nil
+	}
+	var decodedExtraField utils.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(parentHeader.Extra, &decodedExtraField)
+	if err != nil {
+		log.Error("[IsEpochSwitch] decode header error", "err", err, "header", parentHeader, "extra", common.Bytes2Hex(parentHeader.Extra))
+		return false, 0, err
+	}
+	parentRound := decodedExtraField.Round
+	epochStart := round - round%utils.Round(x.config.Epoch)
 	return parentRound < epochStart, epochNum, nil
 }
 

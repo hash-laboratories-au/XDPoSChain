@@ -17,7 +17,9 @@
 package XDPoS
 
 import (
+	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus"
@@ -43,6 +45,13 @@ func (x *XDPoS) SigHash(header *types.Header) (hash common.Hash) {
 		return x.EngineV1.SigHash(header)
 	}
 }
+
+const (
+	// timeout waiting for M1
+	v1WaitPeriod = 10
+	// timeout for checkpoint.
+	v1WaitPeriodCheckpoint = 20
+)
 
 // XDPoS is the delegated-proof-of-stake consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
@@ -277,13 +286,48 @@ func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber 
 	}
 }
 
-func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
+func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
+	var len, preIndex, curIndex int
+	var ok bool
+	var err error
+
 	switch x.config.BlockConsensusVersion(parent.Number) {
 	case params.ConsensusEngineVersion2:
-		return x.EngineV2.YourTurn(chain, parent, signer)
+		len, preIndex, curIndex, ok, err = x.EngineV2.YourTurn(chain, parent, signer)
 	default: // Default "v1"
-		return x.EngineV1.YourTurn(chain, parent, signer)
+		len, preIndex, curIndex, ok, err = x.EngineV1.YourTurn(chain, parent, signer)
+		if err != nil {
+			log.Warn("Failed when trying to commit new work", "err", err)
+			return false, err
+		}
+		if !ok {
+			// in case some nodes are down
+			if preIndex == -1 {
+				// first block
+				return false, nil
+			}
+			if curIndex == -1 {
+				// you're not allowed to create this block
+				return false, nil
+			}
+			h := utils.Hop(len, preIndex, curIndex)
+			gap := v1WaitPeriod * int64(h)
+			// Check nearest checkpoint block in hop range.
+			nearest := x.config.Epoch - (parent.Number.Uint64() % x.config.Epoch)
+			if uint64(h) >= nearest {
+				gap = v1WaitPeriodCheckpoint * int64(h)
+			}
+			log.Info("Distance from the parent block", "seconds", gap, "hops", h)
+			waitedTime := time.Now().Unix() - parent.Time.Int64()
+			if gap > waitedTime {
+				return false, nil
+			}
+			log.Info("Wait enough. It's my turn", "waited seconds", waitedTime)
+		}
+		return true, nil
 	}
+	log.Error("[Yourturn] Unknown version, shouldn't run this line of code", "number", parent.Number)
+	return false, fmt.Errorf("something went wrong")
 }
 
 func (x *XDPoS) GetValidator(creator common.Address, chain consensus.ChainReader, header *types.Header) (common.Address, error) {

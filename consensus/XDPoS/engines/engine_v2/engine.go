@@ -483,14 +483,14 @@ func (x *XDPoS_v2) GetTimeoutPoolSize(timeout *utils.Timeout) int {
 	SyncInfo workflow
 */
 // Verify syncInfo and trigger process QC or TC if successful
-func (x *XDPoS_v2) VerifySyncInfoMessage(syncInfo *utils.SyncInfo) error {
+func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *utils.SyncInfo) error {
 	/*
 		1. Verify items including:
 				- verifyQC
 				- verifyTC
 		2. Broadcast(Not part of consensus)
 	*/
-	err := x.verifyQC(syncInfo.HighestQuorumCert)
+	err := x.verifyQC(chain, syncInfo.HighestQuorumCert)
 	if err != nil {
 		log.Warn("SyncInfo message verification failed due to QC", err)
 		return err
@@ -520,16 +520,21 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 /*
 	Vote workflow
 */
-func (x *XDPoS_v2) VerifyVoteMessage(vote *utils.Vote) (bool, error) {
+func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vote) (bool, error) {
 	/*
-		  1. Check signature:
+		  1. Get masterNode list belong to this epoch by hash
+		  2. Check signature:
 					- Use ecRecover to get the public key
 					- Use the above public key to find out the xdc address
-					- Use the above xdc address to check against the master node list(For the running epoch)
-			2. Verify blockInfo
-			3. Broadcast(Not part of consensus)
+					- Use the above xdc address to check against the master node list from step 1(For the running epoch)
+			3. Verify blockInfo
+			4. Broadcast(Not part of consensus)
 	*/
-	return x.verifyMsgSignature(utils.VoteSigHash(vote.ProposedBlockInfo), vote.Signature)
+	epochInfo, err := x.getEpochSwitchInfo(chain, nil, vote.ProposedBlockInfo.Hash)
+	if err != nil {
+		log.Error("[VerifyVoteMessage] Error when getting epoch switch Info to verify vote message", "Error", err)
+	}
+	return x.verifyMsgSignature(utils.VoteSigHash(vote.ProposedBlockInfo), vote.Signature, epochInfo.Masternodes)
 }
 
 // Consensus entry point for processing vote message to produce QC
@@ -591,14 +596,16 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 */
 // Verify timeout message type from peers in bft.go
 /*
-	  1. Check signature:
+		1. Get current round master node list
+	  2. Check signature:
 				- Use ecRecover to get the public key
 				- Use the above public key to find out the xdc address
-				- Use the above xdc address to check against the master node(For the running epoch)
-		2. Broadcast(Not part of consensus)
+				- Use the above xdc address to check against the master node list from step 1(For the running epoch)
+		3. Broadcast(Not part of consensus)
 */
 func (x *XDPoS_v2) VerifyTimeoutMessage(timeoutMsg *utils.Timeout) (bool, error) {
-	return x.verifyMsgSignature(utils.TimeoutSigHash(&timeoutMsg.Round), timeoutMsg.Signature)
+	masternodes := x.getCurrentRoundMasterNodes()
+	return x.verifyMsgSignature(utils.TimeoutSigHash(&timeoutMsg.Round), timeoutMsg.Signature, masternodes)
 }
 
 /*
@@ -689,7 +696,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, 
 	quorumCert := decodedExtraField.QuorumCert
 	round := decodedExtraField.Round
 
-	err = x.verifyQC(quorumCert)
+	err = x.verifyQC(blockChainReader, quorumCert)
 	if err != nil {
 		log.Error("[ProposedBlockHandler] Fail to verify QC", "Extra round", round, "QC proposed BlockInfo Hash", quorumCert.ProposedBlockInfo.Hash)
 		return err
@@ -728,23 +735,43 @@ func (x *XDPoS_v2) VerifyBlockInfo(blockInfo *utils.BlockInfo) error {
 	return nil
 }
 
-func (x *XDPoS_v2) verifyQC(quorumCert *utils.QuorumCert) error {
+func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
 	/*
-		1. Verify signer signatures: (List of signatures)
+		1. Get epoch master node list by hash
+		2. Verify signer signatures: (List of signatures)
 					- Use ecRecover to get the public key
 					- Use the above public key to find out the xdc address
-					- Use the above xdc address to check against the master node list(For the received QC epoch)
+					- Use the above xdc address to check against the master node list from step 1(For the received QC epoch)
 		2. Verify blockInfo
 	*/
-	return nil
+	epochInfo, err := x.getEpochSwitchInfo(blockChainReader, nil, quorumCert.ProposedBlockInfo.Hash)
+	if err != nil {
+		log.Error("[verifyQC] Error when getting epoch switch Info to verify QC", "Error", err)
+		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")
+	}
+
+	for _, signature := range quorumCert.Signatures {
+		verified, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), signature, epochInfo.Masternodes)
+		if err != nil {
+			log.Error("[verifyQC] Error while verfying QC message signatures", "Error", err)
+			return fmt.Errorf("Error while verfying QC message signatures")
+		}
+		if !verified {
+			log.Warn("[verifyQC] Signature not verified doing QC verification", "QC", quorumCert)
+			return fmt.Errorf("Fail to verify QC due to signature mis-match")
+		}
+	}
+
+	return x.VerifyBlockInfo(quorumCert.ProposedBlockInfo)
 }
 
 func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
 	/*
-		1. Verify signer signature: (List of signatures)
+		1. Get epoch master node list by round/number
+		2. Verify signer signature: (List of signatures)
 					- Use ecRecover to get the public key
 					- Use the above public key to find out the xdc address
-					- Use the above xdc address to check against the master node list(For the received TC epoch)
+					- Use the above xdc address to check against the master node list from step 1(For the received TC epoch)
 	*/
 	return nil
 }
@@ -917,7 +944,7 @@ func (x *XDPoS_v2) signSignature(signingHash common.Hash) (utils.Signature, erro
 	return signedHash, nil
 }
 
-func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signature utils.Signature) (bool, error) {
+func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signature utils.Signature, masternodes []common.Address) (bool, error) {
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(signedHashToBeVerified.Bytes(), signature)
 	if err != nil {
@@ -925,7 +952,6 @@ func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signat
 	}
 	var signerAddress common.Address
 	copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
-	masternodes := x.getCurrentRoundMasterNodes()
 	for _, mn := range masternodes {
 		if mn == signerAddress {
 			return true, nil
@@ -1076,6 +1102,12 @@ func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.
 }
 
 func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
+	// Return true directly if we are examing the last v1 block. This could happen if the calling function is examing parent block
+	if header.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		log.Info("[IsEpochSwitch] examing last v1 block 👯‍♂️")
+		return true, header.Number.Uint64() / x.config.Epoch, nil
+	}
+
 	var decodedExtraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
 	if err != nil {
@@ -1133,22 +1165,38 @@ func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types
 	}
 	if isEpochSwitch {
 		log.Debug("[getEpochSwitchInfo] header is epoch switch", "hash", hash.Hex(), "number", h.Number.Uint64())
-		masternodes := x.GetMasternodesFromEpochSwitchHeader(h)
-		// create the epoch switch info and cache it
-		var decodedExtraField utils.ExtraFields_v2
-		err = utils.DecodeBytesExtraFields(h.Extra, &decodedExtraField)
-		if err != nil {
-			return nil, err
+		var epochSwitchInfo *utils.EpochSwitchInfo
+		// Special case, in case of last v1 block, we manually build the epoch switch info
+		if h.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+			masternodes := decodeMasternodesFromHeaderExtra(h)
+			epochSwitchInfo = &utils.EpochSwitchInfo{
+				Masternodes: masternodes,
+				EpochSwitchBlockInfo: &utils.BlockInfo{
+					Hash:   hash,
+					Number: h.Number,
+					Round:  utils.Round(0),
+				},
+				EpochSwitchParentBlockInfo: nil,
+			}
+		} else { // v2 normal flow
+			masternodes := x.GetMasternodesFromEpochSwitchHeader(h)
+			// create the epoch switch info and cache it
+			var decodedExtraField utils.ExtraFields_v2
+			err = utils.DecodeBytesExtraFields(h.Extra, &decodedExtraField)
+			if err != nil {
+				return nil, err
+			}
+			epochSwitchInfo = &utils.EpochSwitchInfo{
+				Masternodes: masternodes,
+				EpochSwitchBlockInfo: &utils.BlockInfo{
+					Hash:   hash,
+					Number: h.Number,
+					Round:  decodedExtraField.Round,
+				},
+				EpochSwitchParentBlockInfo: decodedExtraField.QuorumCert.ProposedBlockInfo,
+			}
 		}
-		epochSwitchInfo := &utils.EpochSwitchInfo{
-			Masternodes: masternodes,
-			EpochSwitchBlockInfo: &utils.BlockInfo{
-				Hash:   hash,
-				Number: h.Number,
-				Round:  decodedExtraField.Round,
-			},
-			EpochSwitchParentBlockInfo: decodedExtraField.QuorumCert.ProposedBlockInfo,
-		}
+
 		x.epochSwitches.Add(hash, epochSwitchInfo)
 		return epochSwitchInfo, nil
 	}

@@ -180,9 +180,6 @@ func (x *XDPoS) VerifySeal(chain consensus.ChainReader, header *types.Header) er
 func (x *XDPoS) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	switch x.config.BlockConsensusVersion(header.Number) {
 	case params.ConsensusEngineVersion2:
-		if header.Number.Cmp(big.NewInt(0).Add(x.config.XDPoSV2Block, big.NewInt(1))) == 0 {
-			x.initialV2(chain, header)
-		}
 		return x.EngineV2.Prepare(chain, header)
 	default: // Default "v1"
 		return x.EngineV1.Prepare(chain, header)
@@ -281,11 +278,11 @@ func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber 
 }
 
 func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
-	switch x.config.BlockConsensusVersion(parent.Number) {
+	if parent.Number.Cmp(x.config.XDPoSV2Block) == 0 {
+		x.initialV2(chain, parent)
+	}
+	switch x.config.BlockConsensusVersion(big.NewInt(parent.Number.Int64() + 1)) {
 	case params.ConsensusEngineVersion2:
-		if parent.Number.Cmp(x.config.XDPoSV2Block) == 0 { // TODO: Discuss
-			x.initialV2(chain, parent)
-		}
 		return x.EngineV2.YourTurn(chain, parent, signer)
 	default: // Default "v1"
 		return x.EngineV1.YourTurn(chain, parent, signer)
@@ -367,7 +364,7 @@ func (x *XDPoS) GetSnapshot(chain consensus.ChainReader, header *types.Header) (
 		return &utils.PublicApiSnapshot{
 			Number:  sp.Number,
 			Hash:    sp.Hash,
-			Signers: sp.NextEpochMasterNodes,
+			Signers: sp.GetMappedMasterNodes(),
 		}, err
 	default: // Default "v1"
 		sp, err := x.EngineV1.GetSnapshot(chain, header)

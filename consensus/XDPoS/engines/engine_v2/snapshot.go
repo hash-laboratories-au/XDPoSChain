@@ -2,7 +2,6 @@ package engine_v2
 
 import (
 	"encoding/json"
-	"sort"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
@@ -11,19 +10,19 @@ import (
 )
 
 // Snapshot is the state of the smart contract validator list
+// The validator list is used on next epoch master nodes
+// If we don't have the snapshot, then we have to trace back the gap block smart contract state which is very costly
 type SnapshotV2 struct {
 	Round  utils.Round `json:"round"`  // Round number
 	Number uint64      `json:"number"` // Block number where the snapshot was created
 	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
 
 	// MasterNodes will get assigned on updateM1
-	NextEpochMasterNodes map[common.Address]struct{} `json:"masterNodes"` // Set of authorized master nodes at this moment for next epoch
+	NextEpochMasterNodes []common.Address `json:"masterNodes"` // Set of authorized master nodes at this moment for next epoch
 }
 
-// newSnapshot creates a new snapshot with the specified startup parameters. This
-// method does not initialize the set of recent signers, so only ever use if for
-// the genesis block.
-func newSnapshot(number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, masternodes map[common.Address]struct{}) *SnapshotV2 {
+// create new snapshot for next epoch to use
+func newSnapshot(number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, masternodes []common.Address) *SnapshotV2 {
 	snap := &SnapshotV2{
 		Round:                round,
 		Number:               number,
@@ -56,18 +55,11 @@ func storeSnapshot(s *SnapshotV2, db ethdb.Database) error {
 	return db.Put(append([]byte("XDPoS-"), s.Hash[:]...), blob)
 }
 
-// signers retrieves the list of authorized signers in ascending order, convert into strings then use native sort lib
-func (s *SnapshotV2) GetMasterNodes() []common.Address {
-	nodes := make([]common.Address, 0, len(s.NextEpochMasterNodes))
-	nodeStrs := make([]string, 0, len(s.NextEpochMasterNodes))
-
-	for node := range s.NextEpochMasterNodes {
-		nodeStrs = append(nodeStrs, node.Str())
+// retrieves master nodes list in map type
+func (s *SnapshotV2) GetMappedMasterNodes() map[common.Address]struct{} {
+	ms := make(map[common.Address]struct{})
+	for _, n := range s.NextEpochMasterNodes {
+		ms[n] = struct{}{}
 	}
-	sort.Strings(nodeStrs)
-	for _, str := range nodeStrs {
-		nodes = append(nodes, common.StringToAddress(str))
-	}
-
-	return nodes
+	return ms
 }

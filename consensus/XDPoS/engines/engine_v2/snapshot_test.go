@@ -12,23 +12,14 @@ import (
 )
 
 func TestGetMasterNodes(t *testing.T) {
-	masterNodes := map[common.Address]struct{}{
-		{0x4}: {},
-		{0x3}: {},
-		{0x2}: {},
-		{0x1}: {},
-	}
-
+	masterNodes := []common.Address{{0x4}, {0x3}, {0x2}, {0x1}}
 	snap := newSnapshot(1, common.Hash{}, utils.Round(1), nil, masterNodes)
-	sortedNodes := snap.GetMasterNodes()
-	length := len(sortedNodes)
-	i := 1
-	for address := range masterNodes {
-		if address.Hex() != sortedNodes[length-i].Hex() {
-			t.Error("should get sorted master nodes list", address.Hex(), sortedNodes[length-i].Hex())
+
+	for _, address := range masterNodes {
+		if _, ok := snap.GetMappedMasterNodes()[address]; !ok {
+			t.Error("should get master node from map", address.Hex(), snap.GetMappedMasterNodes())
 			return
 		}
-		i++
 	}
 }
 

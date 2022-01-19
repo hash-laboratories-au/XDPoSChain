@@ -142,12 +142,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, ma
 	lastGapNum := header.Number.Uint64() - header.Number.Uint64()%x.config.Epoch - x.config.Gap
 	lastGapHeader := chain.GetHeaderByNumber(lastGapNum)
 
-	newMasternodes := make(map[common.Address]struct{})
-	for _, m := range masternodes {
-		newMasternodes[m] = struct{}{}
-	}
-
-	newSnapshot(lastGapNum, lastGapHeader.Hash(), x.currentRound, x.highestQuorumCert, newMasternodes)
+	newSnapshot(lastGapNum, lastGapHeader.Hash(), x.currentRound, x.highestQuorumCert, masternodes)
 	return nil
 }
 
@@ -188,11 +183,11 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		return err
 	}
 	if isEpochSwitchBlock {
-		snap, err := x.getSnapshot(chain, number-1, header.ParentHash)
+		snap, err := x.getSnapshot(chain, number-1)
 		if err != nil {
 			return err
 		}
-		masternodes := snap.GetMasterNodes()
+		masternodes := snap.NextEpochMasterNodes
 		//TODO: remove penalty nodes and add comeback nodes
 		for _, v := range masternodes {
 			header.Validators = append(header.Validators, v[:]...)
@@ -292,22 +287,16 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	x.signLock.RUnlock()
 
 	// Bail out if we're unauthorized to sign a block
-	snap, err := x.getSnapshot(chain, number-1, header.ParentHash)
-	if err != nil {
-		return nil, err
-	}
 	masternodes := x.GetMasternodes(chain, header)
-	if _, authorized := snap.NextEpochMasterNodes[signer]; !authorized {
-		valid := false
-		for _, m := range masternodes {
-			if m == signer {
-				valid = true
-				break
-			}
+	valid := false
+	for _, m := range masternodes {
+		if m == signer {
+			valid = true
+			break
 		}
-		if !valid {
-			return nil, utils.ErrUnauthorized
-		}
+	}
+	if !valid {
+		return nil, utils.ErrUnauthorized
 	}
 
 	select {
@@ -418,7 +407,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV2, error) {
 	number := header.Number.Uint64()
 	log.Trace("get snapshot", "number", number, "hash", header.Hash())
-	snap, err := x.getSnapshot(chain, number, header.Hash())
+	snap, err := x.getSnapshot(chain, number)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +415,7 @@ func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
-func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64, hash common.Hash) (*SnapshotV2, error) {
+func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64) (*SnapshotV2, error) {
 	// checkpoint snapshot = checkpoint - gap
 	gapBlockNum := number - number%x.config.Epoch - x.config.Gap
 	gapBlockHash := chain.GetHeaderByNumber(number).Hash()
@@ -453,13 +442,13 @@ func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.
 	number := header.Number.Uint64()
 	log.Trace("take snapshot", "number", number, "hash", header.Hash())
 
-	newMasternodes := make(map[common.Address]struct{})
+	masterNodes := []common.Address{}
 	for _, m := range ms {
-		newMasternodes[m.Address] = struct{}{}
+		masterNodes = append(masterNodes, m.Address)
 	}
 
 	x.lock.RLock()
-	snap := newSnapshot(number, header.Hash(), x.currentRound, x.highestQuorumCert, newMasternodes)
+	snap := newSnapshot(number, header.Hash(), x.currentRound, x.highestQuorumCert, masterNodes)
 	x.lock.RUnlock()
 
 	storeSnapshot(snap, x.db)

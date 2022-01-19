@@ -106,25 +106,24 @@ type SignerFn func(accounts.Account, []byte) ([]byte, error)
 sigHash returns the hash which is used as input for the delegated-proof-of-stake
 signing. It is the hash of the entire header apart from the 65 byte signature
 contained at the end of the extra data.
-
-Note, the method requires the extra data to be at least 65 bytes, otherwise it
-panics. This is done to avoid accidentally using both forms (signature present
-or not), which could be abused to produce different hashes for the same header.
 */
 func (x *XDPoS_v2) SignHash(header *types.Header) (hash common.Hash) {
 	return sigHash(header)
 }
 
 func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, masternodes []common.Address) error {
-	if x.highestQuorumCert != nil { //already initialized
+	log.Info("[Initial] initial v2 related parameters")
+
+	if x.highestQuorumCert.ProposedBlockInfo.Round != 0 { //already initialized
+		log.Warn("[Initial] Already initialized")
 		return nil
 	}
 
 	x.lock.Lock()
-	defer x.lock.RUnlock()
+	defer x.lock.Unlock()
 	// Check header if it is the first consensus v2 block, if so, assign initial values to current round and highestQC
 
-	log.Info("[Initial] Initilising highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
+	log.Info("[Initial] highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
 	// Generate new parent blockInfo and put it into QC
 	parentBlockInfo := &utils.BlockInfo{
 		Hash:   header.ParentHash,
@@ -142,7 +141,9 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, ma
 	lastGapNum := header.Number.Uint64() - header.Number.Uint64()%x.config.Epoch - x.config.Gap
 	lastGapHeader := chain.GetHeaderByNumber(lastGapNum)
 
-	newSnapshot(lastGapNum, lastGapHeader.Hash(), x.currentRound, x.highestQuorumCert, masternodes)
+	snap := newSnapshot(lastGapNum, lastGapHeader.Hash(), x.currentRound, x.highestQuorumCert, masternodes)
+	x.snapshots.Add(snap.Hash, snap)
+	storeSnapshot(snap, x.db)
 	return nil
 }
 
@@ -406,7 +407,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 // Copy from v1
 func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV2, error) {
 	number := header.Number.Uint64()
-	log.Trace("get snapshot", "number", number, "hash", header.Hash())
+	log.Trace("get snapshot", "number", number)
 	snap, err := x.getSnapshot(chain, number)
 	if err != nil {
 		return nil, err
@@ -418,7 +419,8 @@ func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header
 func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64) (*SnapshotV2, error) {
 	// checkpoint snapshot = checkpoint - gap
 	gapBlockNum := number - number%x.config.Epoch - x.config.Gap
-	gapBlockHash := chain.GetHeaderByNumber(number).Hash()
+	gapBlockHash := chain.GetHeaderByNumber(gapBlockNum).Hash()
+	log.Debug("get snapshot from gap block", "number", gapBlockNum, "hash", gapBlockHash.Hex())
 
 	// If an in-memory SnapshotV2 was found, use that
 	if s, ok := x.snapshots.Get(gapBlockHash); ok {

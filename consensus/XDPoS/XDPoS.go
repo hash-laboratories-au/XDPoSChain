@@ -277,7 +277,7 @@ func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber 
 	}
 }
 
-func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (int, int, int, bool, error) {
+func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
 	if parent.Number.Cmp(x.config.XDPoSV2Block) == 0 {
 		x.initialV2(chain, parent)
 	}

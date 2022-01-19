@@ -33,10 +33,9 @@ func TestYourTurnInitialV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parentBlock = block900
 
-	// The prepare to mine the first v2 block (11)
-	adaptor.YourTurn(blockchain, parentBlock.Header(), common.HexToAddress("xdc0278C350152e15fa6FFC712a5A73D704Ce73E2E1"))
+	// YourTurn is called before mine first v2 block
+	adaptor.YourTurn(blockchain, block900.Header(), common.HexToAddress("xdc0278C350152e15fa6FFC712a5A73D704Ce73E2E1"))
 	assert.Equal(t, adaptor.EngineV2.GetCurrentRound(), utils.Round(1))
 
 	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, block900.Header())

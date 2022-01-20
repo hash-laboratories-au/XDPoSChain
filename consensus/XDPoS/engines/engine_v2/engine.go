@@ -750,16 +750,29 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(len(quorumCert.Signatures))
+	var haveError error
+
 	for _, signature := range quorumCert.Signatures {
-		verified, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), signature, epochInfo.Masternodes)
-		if err != nil {
-			log.Error("[verifyQC] Error while verfying QC message signatures", "Error", err)
-			return fmt.Errorf("Error while verfying QC message signatures")
-		}
-		if !verified {
-			log.Warn("[verifyQC] Signature not verified doing QC verification", "QC", quorumCert)
-			return fmt.Errorf("Fail to verify QC due to signature mis-match")
-		}
+		go func(sig utils.Signature) {
+			defer wg.Done()
+			verified, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), sig, epochInfo.Masternodes)
+			if err != nil {
+				log.Error("[verifyQC] Error while verfying QC message signatures", "Error", err)
+				haveError = fmt.Errorf("Error while verfying QC message signatures")
+				return
+			}
+			if !verified {
+				log.Warn("[verifyQC] Signature not verified doing QC verification", "QC", quorumCert)
+				haveError = fmt.Errorf("Fail to verify QC due to signature mis-match")
+				return
+			}
+		}(signature)
+	}
+	wg.Wait()
+	if haveError != nil {
+		return haveError
 	}
 
 	return x.VerifyBlockInfo(quorumCert.ProposedBlockInfo)

@@ -596,15 +596,16 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 */
 // Verify timeout message type from peers in bft.go
 /*
-		1. Get current round master node list
+		1. Get master node list by timeout msg round
 	  2. Check signature:
 				- Use ecRecover to get the public key
 				- Use the above public key to find out the xdc address
 				- Use the above xdc address to check against the master node list from step 1(For the running epoch)
 		3. Broadcast(Not part of consensus)
 */
-func (x *XDPoS_v2) VerifyTimeoutMessage(timeoutMsg *utils.Timeout) (bool, error) {
-	masternodes := x.getCurrentRoundMasterNodes()
+func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg *utils.Timeout) (bool, error) {
+
+	masternodes := x.GetMasternodesAtRound(chain, timeoutMsg.Round, chain.CurrentHeader())
 	return x.verifyMsgSignature(utils.TimeoutSigHash(&timeoutMsg.Round), timeoutMsg.Signature, masternodes)
 }
 
@@ -996,7 +997,7 @@ func (x *XDPoS_v2) broadcastToBftChannel(msg interface{}) {
 	}()
 }
 
-func (x *XDPoS_v2) getCurrentRoundMasterNodes() []common.Address {
+func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
 	return []common.Address{}
 }
 

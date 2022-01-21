@@ -738,12 +738,13 @@ func (x *XDPoS_v2) VerifyBlockInfo(blockInfo *utils.BlockInfo) error {
 
 func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
 	/*
-		1. Get epoch master node list by hash
-		2. Verify signer signatures: (List of signatures)
+		1. Check if num of QC signatures is >= x.config.v2.CertThreshold
+		2. Get epoch master node list by hash
+		3. Verify signer signatures: (List of signatures)
 					- Use ecRecover to get the public key
 					- Use the above public key to find out the xdc address
 					- Use the above xdc address to check against the master node list from step 1(For the received QC epoch)
-		2. Verify blockInfo
+		4. Verify blockInfo
 	*/
 	epochInfo, err := x.getEpochSwitchInfo(blockChainReader, nil, quorumCert.ProposedBlockInfo.Hash)
 	if err != nil {

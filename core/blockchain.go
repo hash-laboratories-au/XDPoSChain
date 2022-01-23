@@ -2512,7 +2512,7 @@ func (bc *BlockChain) UpdateM1() error {
 		})
 		log.Info("Ordered list of masternode candidates")
 		for _, m := range ms {
-			log.Info("", "address", m.Address.String(), "stake", m.Stake)
+			log.Info("Master node list!", "address", m.Address.String(), "stake", m.Stake)
 		}
 		// update masternodes
 

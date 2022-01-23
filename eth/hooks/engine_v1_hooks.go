@@ -186,6 +186,7 @@ func AttachConsensusV1Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 			return []byte{}, err
 		}
 		header.Validators = validators
+		log.Info("@@@ HookValidator", "Validators", validators)
 		log.Debug("Time Calculated HookValidator ", "block", header.Number.Uint64(), "time", common.PrettyDuration(time.Since(start)))
 		return validators, nil
 	}

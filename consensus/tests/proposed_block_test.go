@@ -12,6 +12,8 @@ import (
 )
 
 func TestShouldSendVoteMsgAndCommitGrandGrandParentBlock(t *testing.T) {
+	// CreateExtra()
+
 	// Block 11 is the first v2 block with round of 1
 	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 11, params.TestXDPoSMockChainConfigWithV2Engine, 0)
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2

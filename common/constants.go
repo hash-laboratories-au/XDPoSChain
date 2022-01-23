@@ -11,9 +11,9 @@ const (
 	HexSignMethod              = "e341eaa4"
 	HexSetSecret               = "34d38600"
 	HexSetOpening              = "e11f5ba2"
-	EpocBlockSecret            = 800
-	EpocBlockOpening           = 850
-	EpocBlockRandomize         = 900
+	EpocBlockSecret            = 7
+	EpocBlockOpening           = 9
+	EpocBlockRandomize         = 10
 	MaxMasternodes             = 18
 	MaxMasternodesV2           = 108
 	LimitPenaltyEpoch          = 4

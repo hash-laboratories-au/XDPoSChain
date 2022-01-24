@@ -165,6 +165,13 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		QuorumCert: highestQC,
 	}
 
+	extraBytes, err := extra.EncodeToBytes()
+	if err != nil {
+		return err
+	}
+
+	header.Extra = extraBytes
+
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
@@ -173,40 +180,32 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
+
 	// Set the correct difficulty
 	header.Difficulty = x.calcDifficulty(chain, parent, x.signer)
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
 
-	// TODO: previous round should sit on previous Epoch and x.currentRound should >= Epoch number
 	isEpochSwitchBlock, _, err := x.IsEpochSwitch(header)
 	if err != nil {
 		log.Error("[Prepare] Error while trying to determine if header is an epoch switch during Prepare", "header", header, "Error", err)
 		return err
 	}
 	if isEpochSwitchBlock {
-		snap, err := x.getSnapshot(chain, number-1)
+		snap, err := x.getSnapshot(chain, number)
 		if err != nil {
 			return err
 		}
 		masternodes := snap.NextEpochMasterNodes
-		//TODO: remove penalty nodes and add comeback nodes
+		//TODO: remove penalty nodes and add comeback nodes, or change this logic into yourturn function
 		for _, v := range masternodes {
 			header.Validators = append(header.Validators, v[:]...)
 		}
 	}
 
-	extraBytes, err := extra.EncodeToBytes()
-	if err != nil {
-		return err
-	}
-
-	header.Extra = extraBytes
-
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
 
 	// Ensure the timestamp has the correct delay
-
 	// TODO: Proper deal with time
 	// TODO: if timestamp > current time, how to deal with future timestamp
 	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(x.config.Period))
@@ -337,7 +336,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	round := x.currentRound
 	isEpochSwitch, _, err := x.IsEpochSwitchAtRound(round, parent)
 	if err != nil {
-		log.Error("[YourTurn]", "Error", err)
+		log.Error("[YourTurn] check epoch switch at round failed", "Error", err)
 		return false, err
 	}
 	var masterNodes []common.Address
@@ -345,14 +344,19 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 		if x.config.XDPoSV2Block.Cmp(parent.Number) == 0 {
 			snap, err := x.getSnapshot(chain, x.config.XDPoSV2Block.Uint64())
 			if err != nil {
-				log.Error("[YourTurn]Cannot find snapshot at gap num of last V1", "err", err, "number", x.config.XDPoSV2Block.Uint64())
+				log.Error("[YourTurn] Cannot find snapshot at gap num of last V1", "err", err, "number", x.config.XDPoSV2Block.Uint64())
 				return false, err
 			}
 			// the initial snapshot of v1->v2 switch does not need penalty
 			masterNodes = snap.NextEpochMasterNodes
 		} else {
-			// TODO: calc master nodes by smart contract - penalty
-			// TODO: related to snapshot
+			snap, err := x.getSnapshot(chain, parent.Number.Uint64()+1)
+			if err != nil {
+				log.Error("[YourTurn] Cannot find snapshot at gap block", "err", err, "number", x.config.XDPoSV2Block.Uint64())
+				return false, err
+			}
+			masterNodes = snap.NextEpochMasterNodes
+			// TODO: calculate master nodes with penalty and comback
 		}
 	} else {
 		// this block and parent belong to the same epoch
@@ -1137,7 +1141,7 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 	}
 	parentRound := decodedExtraField.QuorumCert.ProposedBlockInfo.Round
 	round := decodedExtraField.Round
-	epochStart := round - round%utils.Round(x.config.Epoch)
+	epochStartRound := round - round%utils.Round(x.config.Epoch)
 	epochNum := x.config.XDPoSV2Block.Uint64()/x.config.Epoch + uint64(round)/x.config.Epoch
 	// if parent is last v1 block and this is first v2 block, this is treated as epoch switch
 	if decodedExtraField.QuorumCert.ProposedBlockInfo.Number.Cmp(x.config.XDPoSV2Block) == 0 {
@@ -1145,7 +1149,7 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 		return true, epochNum, nil
 	}
 	log.Info("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
-	return parentRound < epochStart, epochNum, nil
+	return parentRound < epochStartRound, epochNum, nil
 }
 
 // IsEpochSwitchAtRound() is used by miner to check whether it mines a block in the same epoch with parent
@@ -1162,8 +1166,8 @@ func (x *XDPoS_v2) IsEpochSwitchAtRound(round utils.Round, parentHeader *types.H
 		return false, 0, err
 	}
 	parentRound := decodedExtraField.Round
-	epochStart := round - round%utils.Round(x.config.Epoch)
-	return parentRound < epochStart, epochNum, nil
+	epochStartRound := round - round%utils.Round(x.config.Epoch)
+	return parentRound < epochStartRound, epochNum, nil
 }
 
 // Given header and its hash, get epoch switch info from the epoch switch block of that epoch,

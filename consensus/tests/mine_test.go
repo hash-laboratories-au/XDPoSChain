@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -51,4 +52,73 @@ func TestYourTurnInitialV2(t *testing.T) {
 	for i := 0; i < len(masterNodes); i++ {
 		assert.Equal(t, masterNodes[i].Hex(), snap.NextEpochMasterNodes[i].Hex())
 	}
+}
+
+func TestUpdateMasterNodes(t *testing.T) {
+	config := params.TestXDPoSMockChainConfigWithV2EngineEpochSwitch
+	blockchain, backend, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch+config.XDPoS.Gap)-1, config, 0)
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
+	x := adaptor.EngineV2
+	snap, err := x.GetSnapshot(blockchain, currentBlock.Header())
+
+	assert.Nil(t, err)
+	assert.Equal(t, int(snap.Number), 450)
+
+	// Insert block 1350
+	t.Logf("Inserting block with propose at 1350...")
+	blockCoinbaseA := "0xaaa0000000000000000000000000000000001350"
+	tx, err := voteTX(37117, 0, acc1Addr.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	//Get from block validator error message
+	merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
+	header := &types.Header{
+		Root:       common.HexToHash(merkleRoot),
+		Number:     big.NewInt(int64(1350)),
+		ParentHash: currentBlock.Hash(),
+		Coinbase:   common.HexToAddress(blockCoinbaseA),
+	}
+	// insert header validator
+	err = generateSignature(backend, adaptor, header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentBlock, err := insertBlockTxs(blockchain, header, []*types.Transaction{tx})
+	assert.Nil(t, err)
+
+	t.Logf("Inserting block from 1351 to 1800...")
+	for i := 1351; i <= 1800; i++ {
+		blockCoinbase := fmt.Sprintf("0xaaa000000000000000000000000000000000%4d", i)
+		//Get from block validator error message
+		merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
+		header = &types.Header{
+			Root:       common.HexToHash(merkleRoot),
+			Number:     big.NewInt(int64(i)),
+			ParentHash: parentBlock.Hash(),
+			Coinbase:   common.HexToAddress(blockCoinbase),
+		}
+		err = generateSignature(backend, adaptor, header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		block, err := insertBlock(blockchain, header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parentBlock = block
+	}
+
+	snap, err = x.GetSnapshot(blockchain, parentBlock.Header())
+
+	assert.Nil(t, err)
+	assert.False(t, snap.IsMasterNodes(acc3Addr))
+	assert.True(t, snap.IsMasterNodes(acc1Addr))
+	assert.Equal(t, int(snap.Number), 1350)
+}
+
+func TestPrepare(t *testing.T) {
+}
+
+func TestSeal(t *testing.T) {
 }

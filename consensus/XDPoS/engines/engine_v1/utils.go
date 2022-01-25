@@ -95,6 +95,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	}
 	// Retrieve the signature from the header extra-data
 	if len(header.Extra) < utils.ExtraSeal {
+		log.Error("[ecrecover] Fail when checking extra data length")
 		return common.Address{}, utils.ErrMissingSignature
 	}
 	signature := header.Extra[len(header.Extra)-utils.ExtraSeal:]

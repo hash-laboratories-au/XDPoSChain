@@ -189,6 +189,7 @@ func (x *XDPoS_v1) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		return utils.ErrMissingVanity
 	}
 	if len(header.Extra) < utils.ExtraVanity+utils.ExtraSeal {
+		log.Error("[verifyHeader] fail to verify header due to extra", "extra", header.Extra)
 		return utils.ErrMissingSignature
 	}
 	// Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
@@ -500,6 +501,7 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 			for i := 0; i < len(signers); i++ {
 				copy(signers[i][:], genesis.Extra[utils.ExtraVanity+i*common.AddressLength:])
 			}
+			log.Info("[snapshot] ####Signers", "Signers", signers)
 			snap = newSnapshot(x.config, x.signatures, 0, genesis.Hash(), signers)
 			if err := snap.store(x.db); err != nil {
 				return nil, err

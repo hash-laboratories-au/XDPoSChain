@@ -123,10 +123,10 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, ma
 	defer x.lock.Unlock()
 	// Check header if it is the first consensus v2 block, if so, assign initial values to current round and highestQC
 
-	log.Info("[Initial] highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
+	log.Info("[Initial] highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash(), "parentHash", header.ParentHash)
 	// Generate new parent blockInfo and put it into QC
 	parentBlockInfo := &utils.BlockInfo{
-		Hash:   header.ParentHash,
+		Hash:   header.Hash(),
 		Round:  utils.Round(0),
 		Number: big.NewInt(0).Sub(header.Number, big.NewInt(1)),
 	}
@@ -157,6 +157,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	x.lock.RUnlock()
 
 	if (highestQC == nil) || (header.ParentHash != highestQC.ProposedBlockInfo.Hash) {
+		log.Error("[Prepare]!@#!@#!@", "highestQCProposedBlockHash", highestQC.ProposedBlockInfo.Hash, "parentHash", header.ParentHash)
 		return consensus.ErrNotReadyToPropose
 	}
 
@@ -178,9 +179,17 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	log.Debug("CalcDifficulty ", "number", header.Number, "difficulty", header.Difficulty)
 
 	// TODO: previous round should sit on previous Epoch and x.currentRound should >= Epoch number
+
+	extraBytes, err := extra.EncodeToBytes()
+	if err != nil {
+		return err
+	}
+
+	header.Extra = extraBytes
+
 	isEpochSwitchBlock, _, err := x.IsEpochSwitch(header)
 	if err != nil {
-		log.Error("[Prepare] Error while trying to determine if header is an epoch switch during Prepare", "header", header, "Error", err)
+		log.Error("[Prepare] Error while trying to determine if header is an epoch switch during Prepare", "number", number, "header", header, "Error", err)
 		return err
 	}
 	if isEpochSwitchBlock {
@@ -194,13 +203,6 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 			header.Validators = append(header.Validators, v[:]...)
 		}
 	}
-
-	extraBytes, err := extra.EncodeToBytes()
-	if err != nil {
-		return err
-	}
-
-	header.Extra = extraBytes
 
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
@@ -351,6 +353,11 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 			// the initial snapshot of v1->v2 switch does not need penalty
 			masterNodes = snap.NextEpochMasterNodes
 		} else {
+			snap, err := x.getSnapshot(chain, parent.Number.Uint64()+1)
+			if err != nil {
+				return false, err
+			}
+			masterNodes = snap.NextEpochMasterNodes
 			// TODO: calc master nodes by smart contract - penalty
 			// TODO: related to snapshot
 		}
@@ -374,8 +381,10 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	}
 
 	if masterNodes[leaderIndex] == signer {
+		log.Info("[YourTurn] authorised signer 😬", "signer", signer, "MN", masterNodes, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "signer", signer)
 		return true, nil
 	}
+
 	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "MN", masterNodes, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "signer", signer)
 	return false, nil
 }
@@ -872,6 +881,7 @@ func (x *XDPoS_v2) setNewRound(round utils.Round) error {
 func (x *XDPoS_v2) verifyVotingRule(blockChainReader consensus.ChainReader, blockInfo *utils.BlockInfo, quorumCert *utils.QuorumCert) (bool, error) {
 	// Make sure this node has not voted for this round.
 	if x.currentRound <= x.highestVotedRound {
+		log.Warn("[verifyVotingRule] x.currentRound <= x.highestVotedRound faield", "currentRound", x.currentRound, "highestVotedRound", x.highestVotedRound)
 		return false, nil
 	}
 	/*
@@ -881,6 +891,7 @@ func (x *XDPoS_v2) verifyVotingRule(blockChainReader consensus.ChainReader, bloc
 		header's QC's ProposedBlockInfo.Round > lockQuorumCert's ProposedBlockInfo.Round
 	*/
 	if blockInfo.Round != x.currentRound {
+		log.Warn("[verifyVotingRule] blockInfo.Round != x.currentRound faield", "blockInfo.Round", blockInfo.Round, "x.currentRound", x.currentRound)
 		return false, nil
 	}
 	// XDPoS v1.0 switch to v2.0, the proposed block can always pass voting rule
@@ -889,12 +900,13 @@ func (x *XDPoS_v2) verifyVotingRule(blockChainReader consensus.ChainReader, bloc
 	}
 	isExtended, err := x.isExtendingFromAncestor(blockChainReader, blockInfo, x.lockQuorumCert.ProposedBlockInfo)
 	if err != nil {
+		log.Warn("[verifyVotingRule] Error when checking extending from ancestor", "blockInfo", blockInfo, "x.lockQuorumCert.ProposedBlockInfo", x.lockQuorumCert.ProposedBlockInfo)
 		return false, err
 	}
 	if isExtended || (quorumCert.ProposedBlockInfo.Round > x.lockQuorumCert.ProposedBlockInfo.Round) {
 		return true, nil
 	}
-
+	log.Warn("[verifyVotingRule] Not extended from ancestor", "blockInfo", blockInfo, "x.lockQuorumCert.ProposedBlockInfo", x.lockQuorumCert.ProposedBlockInfo)
 	return false, nil
 }
 
@@ -979,7 +991,7 @@ func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signat
 		}
 	}
 
-	return false, fmt.Errorf("Masternodes does not contain signer address. Master node list %v, Signer address: %v", masternodes, signerAddress)
+	return false, fmt.Errorf("Masternodes does not contain signer address. Master node list %v, Signer address: %v", masternodes, common.Bytes2Hex(signerAddress.Bytes()))
 }
 
 /*

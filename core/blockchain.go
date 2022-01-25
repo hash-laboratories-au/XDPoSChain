@@ -2494,6 +2494,7 @@ func (bc *BlockChain) UpdateM1() error {
 
 	var ms []utils.Masternode
 	for _, candidate := range candidates {
+		log.Info("@#!@#! CANDIDATES", "Candidates", candidate)
 		v, err := validator.GetCandidateCap(opts, candidate)
 		if err != nil {
 			return err

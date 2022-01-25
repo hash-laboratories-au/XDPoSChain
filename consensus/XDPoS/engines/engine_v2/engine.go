@@ -125,13 +125,13 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, ma
 
 	log.Info("[Initial] highest QC for consensus v2 first block", "Block Num", header.Number.String(), "BlockHash", header.Hash())
 	// Generate new parent blockInfo and put it into QC
-	parentBlockInfo := &utils.BlockInfo{
-		Hash:   header.ParentHash,
+	blockInfo := &utils.BlockInfo{
+		Hash:   header.Hash(),
 		Round:  utils.Round(0),
-		Number: big.NewInt(0).Sub(header.Number, big.NewInt(1)),
+		Number: header.Number,
 	}
 	quorumCert := &utils.QuorumCert{
-		ProposedBlockInfo: parentBlockInfo,
+		ProposedBlockInfo: blockInfo,
 		Signatures:        nil,
 	}
 	x.currentRound = 1
@@ -156,7 +156,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	highestQC := x.highestQuorumCert
 	x.lock.RUnlock()
 
-	if (highestQC == nil) || (header.ParentHash != highestQC.ProposedBlockInfo.Hash) {
+	if header.ParentHash != highestQC.ProposedBlockInfo.Hash {
 		return consensus.ErrNotReadyToPropose
 	}
 
@@ -169,7 +169,6 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	if err != nil {
 		return err
 	}
-
 	header.Extra = extraBytes
 
 	header.Nonce = types.BlockNonce{}

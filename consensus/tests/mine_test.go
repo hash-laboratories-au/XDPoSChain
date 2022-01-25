@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
@@ -118,7 +119,37 @@ func TestUpdateMasterNodes(t *testing.T) {
 }
 
 func TestPrepare(t *testing.T) {
-}
+	config := params.TestXDPoSMockChainConfigWithV2EngineEpochSwitch
+	blockchain, _, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch), config, 0)
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 
-func TestSeal(t *testing.T) {
+	adaptor.YourTurn(blockchain, currentBlock.Header(), common.HexToAddress("xdc0278C350152e15fa6FFC712a5A73D704Ce73E2E1"))
+
+	tstamp := time.Now().Unix()
+	header901 := &types.Header{
+		ParentHash: currentBlock.Hash(),
+		Number:     big.NewInt(int64(901)),
+		GasLimit:   params.TargetGasLimit,
+		Time:       big.NewInt(tstamp),
+	}
+
+	err := adaptor.Prepare(blockchain, header901)
+	assert.Nil(t, err)
+
+	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, currentBlock.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	validators := []byte{}
+	for _, v := range snap.NextEpochMasterNodes {
+		validators = append(validators, v[:]...)
+	}
+	assert.Equal(t, validators, header901.Validators)
+
+	var decodedExtraField utils.ExtraFields_v2
+	err = utils.DecodeBytesExtraFields(header901.Extra, &decodedExtraField)
+	assert.Nil(t, err)
+	assert.Equal(t, utils.Round(1), decodedExtraField.Round)
+	assert.Equal(t, utils.Round(0), decodedExtraField.QuorumCert.ProposedBlockInfo.Round)
 }

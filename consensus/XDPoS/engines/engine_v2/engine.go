@@ -346,7 +346,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 				log.Error("[YourTurn] Cannot find snapshot at gap num of last V1", "err", err, "number", x.config.XDPoSV2Block.Uint64())
 				return false, err
 			}
-			// the initial snapshot of v1->v2 switch does not need penalty
+			// the initial snapshot of v1->v2 switch containes penalites node
 			masterNodes = snap.NextEpochMasterNodes
 		} else {
 			snap, err := x.getSnapshot(chain, parent.Number.Uint64()+1)

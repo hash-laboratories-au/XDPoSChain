@@ -65,7 +65,7 @@ const (
 	GetReceiptsMsg = 0x0f
 	ReceiptsMsg    = 0x10
 
-	// Protocol messages belonging to eth/100
+	// Protocol messages belonging to xdpos2/100
 	VoteMsg     = 0xe0
 	TimeoutMsg  = 0xe1
 	SyncInfoMsg = 0xe2

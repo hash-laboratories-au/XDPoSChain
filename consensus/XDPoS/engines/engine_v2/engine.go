@@ -568,10 +568,20 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 	thresholdReached, numberOfVotesInPool, pooledVotes := x.votePool.Add(voteMsg)
 	if thresholdReached {
 		log.Info(fmt.Sprintf("Vote pool threashold reached: %v, number of items in the pool: %v", thresholdReached, numberOfVotesInPool))
+
+		// Check if the block already exist, otherwise we try luck with the next vote
+		proposedBlock := chain.GetHeaderByHash(voteMsg.ProposedBlockInfo.Hash)
+		if proposedBlock == nil {
+			log.Warn("[voteHandler] The proposed block from vote message does not exist yet, wait for the next vote to try again", "Hash", voteMsg.ProposedBlockInfo.Hash, "Round", voteMsg.ProposedBlockInfo.Round)
+			return nil
+		}
+
 		err := x.onVotePoolThresholdReached(chain, pooledVotes, voteMsg)
 		if err != nil {
 			return err
 		}
+		// Clean up the vote at the same round
+		x.votePool.ClearPoolKeyByObj(voteMsg)
 	}
 
 	return nil
@@ -648,6 +658,8 @@ func (x *XDPoS_v2) timeoutHandler(timeout *utils.Timeout) error {
 		if err != nil {
 			return err
 		}
+		// Clean up the timeout pool at the same round
+		x.timeoutPool.ClearPoolKeyByObj(timeout)
 	}
 	return nil
 }

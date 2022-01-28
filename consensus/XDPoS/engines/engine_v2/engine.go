@@ -580,7 +580,7 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 		if err != nil {
 			return err
 		}
-		// Clean up the vote at the same round
+		// clean up vote at the same poolKey. and pookKey is proposed block hash
 		x.votePool.ClearPoolKeyByObj(voteMsg)
 	}
 
@@ -658,7 +658,7 @@ func (x *XDPoS_v2) timeoutHandler(timeout *utils.Timeout) error {
 		if err != nil {
 			return err
 		}
-		// Clean up the timeout pool at the same round
+		// clean up timeout message at the same poolKey. and pookKey is proposed block hash
 		x.timeoutPool.ClearPoolKeyByObj(timeout)
 	}
 	return nil

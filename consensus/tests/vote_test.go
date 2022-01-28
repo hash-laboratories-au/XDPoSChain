@@ -25,7 +25,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedAndProcessQCForFistV2Round(t *te
 
 	// Set round to 5
 	engineV2.SetNewRoundFaker(utils.Round(1), false)
-	// Create two timeout message which will not reach vote pool threshold
+	// Create two vote messages which will not reach vote pool threshold
 	voteMsg := &utils.Vote{
 		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
@@ -80,7 +80,7 @@ func TestVoteMessageHandlerSuccessfullyGeneratedAndProcessQC(t *testing.T) {
 
 	// Set round to 5
 	engineV2.SetNewRoundFaker(utils.Round(5), false)
-	// Create two timeout message which will not reach vote pool threshold
+	// Create two vote messages which will not reach vote pool threshold
 	voteMsg := &utils.Vote{
 		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
@@ -274,17 +274,17 @@ func TestVoteMessageShallNotThrowErrorIfBlockNotYetExist(t *testing.T) {
 	// Create a new block but don't inject it into the chain yet
 	blockNum := 16
 	blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", blockNum)
-	block16Header := createBlock(params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 6, blockCoinBase, signer, signFn)
+	block := CreateBlock(blockchain, params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 6, blockCoinBase, signer, signFn)
 
 	blockInfo := &utils.BlockInfo{
-		Hash:   block16Header.Hash(),
+		Hash:   block.Header().Hash(),
 		Round:  utils.Round(6),
 		Number: big.NewInt(16),
 	}
 
 	// Set round to 6
 	engineV2.SetNewRoundFaker(utils.Round(6), false)
-	// Create two timeout message which will not reach vote pool threshold
+	// Create two vote messages which will not reach vote pool threshold
 	voteMsg := &utils.Vote{
 		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
@@ -316,10 +316,7 @@ func TestVoteMessageShallNotThrowErrorIfBlockNotYetExist(t *testing.T) {
 	assert.Equal(t, utils.Round(6), currentRound)
 
 	// Now, inject the block into the chain
-	_, err = insertBlock(blockchain, block16Header)
-	if err != nil {
-		t.Fatal(err)
-	}
+	blockchain.InsertBlock(block)
 
 	voteMsg = &utils.Vote{
 		ProposedBlockInfo: blockInfo,

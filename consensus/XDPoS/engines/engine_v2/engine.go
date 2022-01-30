@@ -401,7 +401,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash(), "Round", blockRound, "Number", header.Number)
 		return false
 	}
-	// leaderIndex := uint64(blockRound) % x.config.Epoch % uint64(len(masterNodes))
+
 	for index, masterNodeAddress := range masterNodes {
 		if masterNodeAddress == address {
 			log.Debug("[IsAuthorisedAddress] Found matching master node address", "index", index, "Address", address, "MasterNodes", masterNodes)

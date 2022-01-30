@@ -268,6 +268,7 @@ func (x *XDPoS_v1) verifyCascadingFields(chain consensus.ChainReader, header *ty
 }
 
 func (x *XDPoS_v1) checkSignersOnCheckpoint(chain consensus.ChainReader, header *types.Header, signers []common.Address) error {
+	return nil
 	number := header.Number.Uint64()
 	// ignore signerCheck at checkpoint block.
 	if common.IgnoreSignerCheckBlockArray[number] {
@@ -727,32 +728,32 @@ func (x *XDPoS_v1) Prepare(chain consensus.ChainReader, header *types.Header) er
 	header.Extra = header.Extra[:utils.ExtraVanity]
 	masternodes := snap.GetSigners()
 	if number >= x.config.Epoch && number%x.config.Epoch == 0 {
-		if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
-			var penMasternodes []common.Address
-			var err error
-			if chain.Config().IsTIPSigning(header.Number) {
-				penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
-			} else {
-				penMasternodes, err = x.HookPenalty(chain, number)
-			}
-			if err != nil {
-				return err
-			}
-			if len(penMasternodes) > 0 {
-				// penalize bad masternode(s)
-				masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
-				for _, address := range penMasternodes {
-					log.Debug("Penalty status", "address", address, "number", number)
-				}
-				header.Penalties = common.ExtractAddressToBytes(penMasternodes)
-			}
-		}
-		// Prevent penalized masternode(s) within 4 recent epochs
-		for i := 1; i <= common.LimitPenaltyEpoch; i++ {
-			if number > uint64(i)*x.config.Epoch {
-				masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
-			}
-		}
+		// if x.HookPenalty != nil || x.HookPenaltyTIPSigning != nil {
+		// 	var penMasternodes []common.Address
+		// 	var err error
+		// 	if chain.Config().IsTIPSigning(header.Number) {
+		// 		penMasternodes, err = x.HookPenaltyTIPSigning(chain, header, masternodes)
+		// 	} else {
+		// 		penMasternodes, err = x.HookPenalty(chain, number)
+		// 	}
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	if len(penMasternodes) > 0 {
+		// 		// penalize bad masternode(s)
+		// 		masternodes = common.RemoveItemFromArray(masternodes, penMasternodes)
+		// 		for _, address := range penMasternodes {
+		// 			log.Debug("Penalty status", "address", address, "number", number)
+		// 		}
+		// 		header.Penalties = common.ExtractAddressToBytes(penMasternodes)
+		// 	}
+		// }
+		// // Prevent penalized masternode(s) within 4 recent epochs
+		// for i := 1; i <= common.LimitPenaltyEpoch; i++ {
+		// 	if number > uint64(i)*x.config.Epoch {
+		// 		masternodes = removePenaltiesFromBlock(chain, masternodes, number-uint64(i)*x.config.Epoch)
+		// 	}
+		// }
 		for _, masternode := range masternodes {
 			header.Extra = append(header.Extra, masternode[:]...)
 		}

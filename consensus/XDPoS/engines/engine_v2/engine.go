@@ -612,30 +612,37 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 	// Filter out non-Master nodes signatures
 	var wg sync.WaitGroup
 	wg.Add(len(pooledVotes))
-	validSignatureMap := map[common.Hash]utils.Signature{}
+	signatureSlice := make([]utils.Signature, len(pooledVotes))
+	counter := 0
 	for h, vote := range pooledVotes {
-		go func(hash common.Hash, v *utils.Vote) {
+		go func(hash common.Hash, v *utils.Vote, i int) {
 			defer wg.Done()
 			verified, err := x.verifyMsgSignature(utils.VoteSigHash(v.ProposedBlockInfo), v.Signature, masternodes)
 			if !verified || err != nil {
 				log.Warn("[onVotePoolThresholdReached] Skip not verified vote signatures when building QC", "Error", err.Error(), "verified", verified)
 			} else {
-				validSignatureMap[hash] = v.Signature
+				signatureSlice[i] = v.Signature
 			}
-		}(h, vote.(*utils.Vote))
+		}(h, vote.(*utils.Vote), counter)
+		counter++
 	}
 	wg.Wait()
 
-	// Skip and wait for the next vote to process again if valid votes is less than what we required
-	if len(validSignatureMap) < x.config.V2.CertThreshold {
-		log.Warn("[onVotePoolThresholdReached] Not enough valid signatures to generate QC", "VotesSignaturesAfterFilter", validSignatureMap, "NumberOfValidVotes", len(validSignatureMap), "NumberOfVotes", len(pooledVotes))
-		return nil
+	// The signature list may contain empty entey. we only care the ones with values
+	var validSignatureSlice []utils.Signature
+	for _, v := range signatureSlice {
+		if len(v) != 0 {
+			validSignatureSlice = append(validSignatureSlice, v)
+		}
 	}
 
-	signatures := []utils.Signature{}
-	for _, s := range validSignatureMap {
-		signatures = append(signatures, s)
+	// Skip and wait for the next vote to process again if valid votes is less than what we required
+	if len(validSignatureSlice) < x.config.V2.CertThreshold {
+		log.Warn("[onVotePoolThresholdReached] Not enough valid signatures to generate QC", "VotesSignaturesAfterFilter", validSignatureSlice, "NumberOfValidVotes", len(validSignatureSlice), "NumberOfVotes", len(pooledVotes))
+		return nil
 	}
+	signatures := []utils.Signature{}
+	signatures = append(signatures, validSignatureSlice...)
 	// Genrate QC
 	quorumCert := &utils.QuorumCert{
 		ProposedBlockInfo: currentVoteMsg.(*utils.Vote).ProposedBlockInfo,

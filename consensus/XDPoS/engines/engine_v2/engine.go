@@ -641,12 +641,10 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 		log.Warn("[onVotePoolThresholdReached] Not enough valid signatures to generate QC", "VotesSignaturesAfterFilter", validSignatureSlice, "NumberOfValidVotes", len(validSignatureSlice), "NumberOfVotes", len(pooledVotes))
 		return nil
 	}
-	signatures := []utils.Signature{}
-	signatures = append(signatures, validSignatureSlice...)
 	// Genrate QC
 	quorumCert := &utils.QuorumCert{
 		ProposedBlockInfo: currentVoteMsg.(*utils.Vote).ProposedBlockInfo,
-		Signatures:        signatures,
+		Signatures:        validSignatureSlice,
 	}
 	err := x.processQC(chain, quorumCert)
 	if err != nil {

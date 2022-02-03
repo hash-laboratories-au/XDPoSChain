@@ -242,7 +242,6 @@ func doTest(cmdline []string) {
 	if *verbose {
 		gotest.Args = append(gotest.Args, "-v")
 	}
-	gotest.Args = append(gotest.Args, "--race")
 
 	gotest.Args = append(gotest.Args, packages...)
 	build.MustRun(gotest)

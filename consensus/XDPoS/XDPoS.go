@@ -74,9 +74,6 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		conf.Epoch = utils.EpochLength
 	}
 
-	// initial channel
-	WaitPeriodCh := make(chan int)
-
 	// Allocate the snapshot caches and create the engine
 	signingTxsCache, _ := lru.New(utils.BlockSignersCacheLimit)
 
@@ -84,7 +81,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		config: &conf,
 		db:     db,
 
-		WaitPeriodCh: WaitPeriodCh,
+		WaitPeriodCh: make(chan int),
 
 		signingTxsCache: signingTxsCache,
 		EngineV1:        engine_v1.New(&conf, db),
@@ -102,15 +99,15 @@ func NewFaker(db ethdb.Database, chainConfig *params.ChainConfig) *XDPoS {
 		conf = chainConfig.XDPoS
 	}
 
-	// initial channel
-	WaitPeriodCh := make(chan int)
-
 	// Allocate the snapshot caches and create the engine
 	signingTxsCache, _ := lru.New(utils.BlockSignersCacheLimit)
 
 	fakeEngine = &XDPoS{
-		config:            conf,
-		db:                db,
+		config: conf,
+		db:     db,
+
+		WaitPeriodCh: make(chan int),
+
 		GetXDCXService:    func() utils.TradingService { return nil },
 		GetLendingService: func() utils.LendingService { return nil },
 

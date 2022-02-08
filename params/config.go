@@ -196,6 +196,7 @@ type XDPoSConfig struct {
 	RewardCheckpoint    uint64         `json:"rewardCheckpoint"`    // Checkpoint block for calculate rewards.
 	Gap                 uint64         `json:"gap"`                 // Gap time preparing for the next epoch
 	FoudationWalletAddr common.Address `json:"foudationWalletAddr"` // Foundation Address Wallet
+	WaitPeriod          int            `json:"waitPeriod"`          // Miner wait period
 	SkipValidation      bool           //Skip Block Validation for testing purpose
 	XDPoSV2Block        *big.Int       `json:"v2Block"`
 	V2                  V2             `json:"v2"`
@@ -204,6 +205,8 @@ type XDPoSConfig struct {
 type V2 struct {
 	TimeoutWorkerDuration int64 `json:"timeoutWorkerDuration"` // Duration in ms
 	CertThreshold         int   `json:"certificateThreshold"`  // Necessary number of messages from master nodes to form a certificate
+	WaitPeriod            int   `json:"waitPeriod"`            // Miner wait period to check mine event
+	MinePeriod            int   `json:"minePeriod"`            // Miner mine period to mine a block
 }
 
 // String implements the stringer interface, returning the consensus engine details.

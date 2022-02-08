@@ -53,6 +53,9 @@ type XDPoS struct {
 	// Transaction cache, only make sense for adaptor level
 	signingTxsCache *lru.Cache
 
+	// Share Channel
+	WaitPeriodCh chan int //miner wait Period Channel
+
 	// Trading and lending service
 	GetXDCXService    func() utils.TradingService
 	GetLendingService func() utils.LendingService
@@ -71,6 +74,9 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		conf.Epoch = utils.EpochLength
 	}
 
+	// initial channel
+	WaitPeriodCh := make(chan int)
+
 	// Allocate the snapshot caches and create the engine
 	signingTxsCache, _ := lru.New(utils.BlockSignersCacheLimit)
 
@@ -78,9 +84,11 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		config: &conf,
 		db:     db,
 
+		WaitPeriodCh: WaitPeriodCh,
+
 		signingTxsCache: signingTxsCache,
 		EngineV1:        engine_v1.New(&conf, db),
-		EngineV2:        engine_v2.New(&conf, db),
+		EngineV2:        engine_v2.New(&conf, db, WaitPeriodCh),
 	}
 }
 
@@ -94,6 +102,9 @@ func NewFaker(db ethdb.Database, chainConfig *params.ChainConfig) *XDPoS {
 		conf = chainConfig.XDPoS
 	}
 
+	// initial channel
+	WaitPeriodCh := make(chan int)
+
 	// Allocate the snapshot caches and create the engine
 	signingTxsCache, _ := lru.New(utils.BlockSignersCacheLimit)
 
@@ -105,7 +116,7 @@ func NewFaker(db ethdb.Database, chainConfig *params.ChainConfig) *XDPoS {
 
 		signingTxsCache: signingTxsCache,
 		EngineV1:        engine_v1.NewFaker(db, conf),
-		EngineV2:        engine_v2.New(conf, db),
+		EngineV2:        engine_v2.New(conf, db, WaitPeriodCh),
 	}
 	return fakeEngine
 }

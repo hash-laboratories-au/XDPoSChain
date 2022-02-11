@@ -346,6 +346,12 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	x.lock.RLock()
 	defer x.lock.RUnlock()
 
+	waitedTime := time.Now().Unix() - parent.Time.Int64()
+	if waitedTime < int64(x.config.V2.MinePeriod) {
+		log.Trace("[YourTurn] wait after mine period", "minePeriod", x.config.V2.MinePeriod, "waitedTime", waitedTime)
+		return false, nil
+	}
+
 	round := x.currentRound
 	isEpochSwitch, _, err := x.IsEpochSwitchAtRound(round, parent)
 	if err != nil {

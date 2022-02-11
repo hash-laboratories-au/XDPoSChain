@@ -17,6 +17,7 @@ import (
 func TestYourTurnInitialV2(t *testing.T) {
 	config := params.TestXDPoSMockChainConfigWithV2EngineEpochSwitch
 	blockchain, _, parentBlock, _ := PrepareXDCTestBlockChain(t, int(config.XDPoS.Epoch)-1, config)
+	minePeriod := config.XDPoS.V2.MinePeriod
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 
 	// Insert block 900
@@ -36,6 +37,7 @@ func TestYourTurnInitialV2(t *testing.T) {
 		t.Fatal(err)
 	}
 	blockchain.InsertBlock(block900)
+	time.Sleep(time.Duration(minePeriod) * time.Second)
 
 	// YourTurn is called before mine first v2 block
 	b, err := adaptor.YourTurn(blockchain, block900.Header(), common.HexToAddress("xdc0278C350152e15fa6FFC712a5A73D704Ce73E2E1"))

@@ -301,21 +301,21 @@ func (self *worker) update() {
 				self.commitNewWork()
 			}
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
-			// Handle ChainHeadEvent
 
+		// Handle ChainHeadEvent
 		case <-self.chainHeadCh:
 			self.commitNewWork()
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
-			// Handle ChainSideEvent
 
+		// Handle ChainSideEvent
 		case ev := <-self.chainSideCh:
 			if self.config.XDPoS == nil {
 				self.uncleMu.Lock()
 				self.possibleUncles[ev.Block.Hash()] = ev.Block
 				self.uncleMu.Unlock()
 			}
-			// Handle TxPreEvent
 
+		// Handle TxPreEvent
 		case ev := <-self.txCh:
 			// Apply transaction to the pending state if we're not mining
 			if atomic.LoadInt32(&self.mining) == 0 {

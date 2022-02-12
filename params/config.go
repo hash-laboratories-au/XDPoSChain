@@ -48,7 +48,7 @@ var (
 		SkipV2Validation:      true,
 	}
 	DevnetXDPoSV2Config = &V2{
-		SwitchBlock:           big.NewInt(7218000),
+		SwitchBlock:           big.NewInt(7219800),
 		TimeoutWorkerDuration: 50,
 		CertThreshold:         6,
 		WaitPeriod:            2,

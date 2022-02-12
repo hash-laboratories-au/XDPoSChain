@@ -15,7 +15,7 @@ import (
 )
 
 func TestYourTurnInitialV2(t *testing.T) {
-	config := params.TestXDPoSMockChainConfigWithV2EngineEpochSwitch
+	config := params.TestXDPoSMockChainConfig
 	blockchain, _, parentBlock, _ := PrepareXDCTestBlockChain(t, int(config.XDPoS.Epoch)-1, config)
 	minePeriod := config.XDPoS.V2.MinePeriod
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
@@ -59,7 +59,7 @@ func TestYourTurnInitialV2(t *testing.T) {
 }
 
 func TestUpdateMasterNodes(t *testing.T) {
-	config := params.TestXDPoSMockChainConfigWithV2EngineEpochSwitch
+	config := params.TestXDPoSMockChainConfig
 	blockchain, backend, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch+config.XDPoS.Gap)-1, config, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 	x := adaptor.EngineV2
@@ -123,7 +123,7 @@ func TestUpdateMasterNodes(t *testing.T) {
 }
 
 func TestPrepare(t *testing.T) {
-	config := params.TestXDPoSMockChainConfigWithV2EngineEpochSwitch
+	config := params.TestXDPoSMockChainConfig
 	blockchain, _, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch), config, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 

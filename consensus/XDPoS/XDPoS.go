@@ -88,8 +88,8 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		WaitPeriodCh: waitPeriodCh,
 
 		signingTxsCache: signingTxsCache,
-		EngineV1:        engine_v1.New(&config, db),
-		EngineV2:        engine_v2.New(&config, db, waitPeriodCh),
+		EngineV1:        engine_v1.New(config, db),
+		EngineV2:        engine_v2.New(config, db, waitPeriodCh),
 	}
 }
 
@@ -316,8 +316,10 @@ func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber 
 func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
 	if x.config.V2.SwitchBlock != nil && parent.Number.Cmp(x.config.V2.SwitchBlock) == 0 {
 		err := x.initialV2(chain, parent)
-		log.Error("[YourTurn] Error when initialise v2", "Error", err, "ParentBlock", parent)
-		return false, err
+		if err != nil {
+			log.Error("[YourTurn] Error when initialise v2", "Error", err, "ParentBlock", parent)
+			return false, err
+		}
 	}
 	switch x.config.BlockConsensusVersion(big.NewInt(parent.Number.Int64() + 1)) {
 	case params.ConsensusEngineVersion2:

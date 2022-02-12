@@ -74,11 +74,11 @@ func TestIsAuthorisedMNForConsensusV1(t *testing.T) {
 
 func TestIsAuthorisedMNForConsensusV2(t *testing.T) {
 	// we skip test for v1 since it's hard to make a real genesis block
-	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 10, params.TestXDPoSMockChainConfigWithV2Engine, 0)
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
-	blockNum := 11
+	blockNum := 901
 	blockCoinBase := "0x111000000000000000000000000000000123"
-	currentBlock = CreateBlock(blockchain, params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
+	currentBlock = CreateBlock(blockchain, params.TestXDPoSMockChainConfig, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
 	blockchain.InsertBlock(currentBlock)
 
 	// As long as the address is in the master node list, they are all valid
@@ -94,12 +94,12 @@ func TestIsAuthorisedMNForConsensusV2(t *testing.T) {
 
 func TestIsYourTurnConsensusV2(t *testing.T) {
 	// we skip test for v1 since it's hard to make a real genesis block
-	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 10, params.TestXDPoSMockChainConfigWithV2Engine, 0)
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
 	minePeriod := params.TestXDPoSV2Config.MinePeriod
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
-	blockNum := 11
+	blockNum := 901
 	blockCoinBase := "0x111000000000000000000000000000000123"
-	currentBlock = CreateBlock(blockchain, params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
+	currentBlock = CreateBlock(blockchain, params.TestXDPoSMockChainConfig, currentBlock, blockNum, 1, blockCoinBase, signer, signFn)
 	blockchain.InsertBlock(currentBlock)
 
 	// Less then Mine Period
@@ -122,8 +122,8 @@ func TestIsYourTurnConsensusV2(t *testing.T) {
 	assert.False(t, isYourTurn)
 
 	// We continue to grow the chain which will increase the round number
-	blockNum = 12
-	currentBlock = CreateBlock(blockchain, params.TestXDPoSMockChainConfigWithV2Engine, currentBlock, blockNum, int64(blockNum-10), blockCoinBase, signer, signFn)
+	blockNum = 902
+	currentBlock = CreateBlock(blockchain, params.TestXDPoSMockChainConfig, currentBlock, blockNum, int64(blockNum-900), blockCoinBase, signer, signFn)
 	blockchain.InsertBlock(currentBlock)
 	time.Sleep(time.Duration(minePeriod) * time.Second)
 

@@ -71,9 +71,8 @@ func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
 		config.Epoch = utils.EpochLength
 	}
 
-	if config.V2 == nil {
-		config.V2 = params.DevnetXDPoSV2Config
-	}
+	// TODO: This shall be configurable or replaced
+	config.V2 = params.DevnetXDPoSV2Config
 
 	// Allocate the snapshot caches and create the engine
 	signingTxsCache, _ := lru.New(utils.BlockSignersCacheLimit)
@@ -304,8 +303,10 @@ func (x *XDPoS) GetMasternodesByNumber(chain consensus.ChainReader, blockNumber 
 }
 
 func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
-	if parent.Number.Cmp(x.config.V2.SwitchBlock) == 0 {
-		x.initialV2(chain, parent)
+	if x.config.V2.SwitchBlock != nil && parent.Number.Cmp(x.config.V2.SwitchBlock) == 0 {
+		err := x.initialV2(chain, parent)
+		log.Error("[YourTurn] Error when initialise v2", "Error", err, "ParentBlock", parent)
+		return false, err
 	}
 	switch x.config.BlockConsensusVersion(big.NewInt(parent.Number.Int64() + 1)) {
 	case params.ConsensusEngineVersion2:

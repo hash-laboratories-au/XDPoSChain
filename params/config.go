@@ -38,7 +38,6 @@ var (
 	XDPoSV2Config = &V2{
 		TimeoutWorkerDuration: 50,
 		CertThreshold:         common.MaxMasternodesV2*2/3 + 1,
-		SwitchBlock:           big.NewInt(10),
 	}
 	TestXDPoSV2Config = &V2{
 		TimeoutWorkerDuration: 10,
@@ -46,7 +45,7 @@ var (
 		SwitchBlock:           big.NewInt(10),
 	}
 	DevnetXDPoSV2Config = &V2{
-		SwitchBlock:           big.NewInt(10),
+		SwitchBlock:           big.NewInt(9999999), // Temporary set it to very high
 		TimeoutWorkerDuration: 10,
 		CertThreshold:         3,
 	}

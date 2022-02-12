@@ -46,8 +46,8 @@ var (
 	}
 	DevnetXDPoSV2Config = &V2{
 		SwitchBlock:           big.NewInt(9999999), // Temporary set it to very high
-		TimeoutWorkerDuration: 10,
-		CertThreshold:         3,
+		TimeoutWorkerDuration: 50,
+		CertThreshold:         6,
 	}
 
 	// XDPoSChain mainnet config

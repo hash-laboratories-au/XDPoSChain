@@ -267,7 +267,7 @@ func (self *worker) update() {
 	defer self.chainSideSub.Unsubscribe()
 
 	// timeout waiting for v1 inital value
-	// TODO: minePeriod := self.engine.(*XDPoS.XDPoS).Config.waitPeriod
+	// TODO: Read value from config after we decide where is the config
 	waitPeriod := 10
 	WaitPeriodCh := self.engine.(*XDPoS.XDPoS).WaitPeriodCh
 	defer close(WaitPeriodCh)

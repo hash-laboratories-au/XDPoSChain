@@ -201,7 +201,13 @@ type autodisc struct {
 
 func startautodisc(what string, doit func() Interface) Interface {
 	// TODO: monitor network configuration and rerun doit when it changes.
-	return &autodisc{what: what, doit: doit}
+	// return &autodisc{what: what, doit: doit}
+	// XDC: CHANGED TO BELOW https://github.com/ethereum/go-ethereum/pull/960/files
+	ad := &autodisc{what: what, doit: doit}
+	// Start the auto discovery as early as possible so it is already
+	// in progress when the rest of the stack calls the methods.
+	go ad.wait()
+	return ad
 }
 
 func (n *autodisc) AddMapping(protocol string, extport, intport int, name string, lifetime time.Duration) error {

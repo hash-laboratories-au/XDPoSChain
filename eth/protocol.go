@@ -32,7 +32,7 @@ import (
 const (
 	eth62  = 62
 	eth63  = 63
-	xdpos2 = 100
+	xdpos2 = 64
 )
 
 // Official short name of the protocol used during capability negotiation.

@@ -19,8 +19,9 @@ package miner
 
 import (
 	"fmt"
-	"github.com/XinFinOrg/XDPoSChain/XDCxlending"
 	"sync/atomic"
+
+	"github.com/XinFinOrg/XDPoSChain/XDCxlending"
 
 	"github.com/XinFinOrg/XDPoSChain/XDCx"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
@@ -94,7 +95,7 @@ func (self *Miner) update() {
 			}
 		case downloader.DoneEvent, downloader.FailedEvent:
 			shouldStart := atomic.LoadInt32(&self.shouldStart) == 1
-
+			log.Info("downloader event", "shouldStart", shouldStart)
 			atomic.StoreInt32(&self.canStart, 1)
 			atomic.StoreInt32(&self.shouldStart, 0)
 			if shouldStart {

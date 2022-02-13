@@ -63,6 +63,8 @@ type XDPoS struct {
 	// The exact consensus engine with different versions
 	EngineV1 *engine_v1.XDPoS_v1
 	EngineV2 *engine_v2.XDPoS_v2
+
+	isV2Initilised bool
 }
 
 // New creates a XDPoS delegated-proof-of-stake consensus engine with the initial

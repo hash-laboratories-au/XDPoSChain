@@ -158,8 +158,10 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	// Initiate a sub-protocol for every implemented version we can handle
 	manager.SubProtocols = make([]p2p.Protocol, 0, len(ProtocolVersions))
 	for i, version := range ProtocolVersions {
+		log.Info("[NewProtocolManager] Adding new protocoal manager subprotocols", "version", version)
 		// Skip protocol version if incompatible with the mode of operation
 		if mode == downloader.FastSync && version < eth63 {
+			log.Info("[NewProtocolManager] Skipping protocol version if incompatible with the mode of operation", "version", version)
 			continue
 		}
 		// Compatible; initialise the sub-protocol
@@ -191,6 +193,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		})
 	}
 	if len(manager.SubProtocols) == 0 {
+		log.Error("@@@wtf, no subprotocols")
 		return nil, errIncompatibleConfig
 	}
 	// Construct the different synchronisation mechanisms
@@ -333,7 +336,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
 	}
-	p.Log().Debug("Ethereum peer connected", "name", p.Name())
+	p.Log().Info("Ethereum peer connected", "name", p.Name())
 
 	// Execute the Ethereum handshake
 	var (

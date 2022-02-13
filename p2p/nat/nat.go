@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/log"
-	"github.com/jackpal/go-nat-pmp"
+	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
 // An implementation of nat.Interface can map local ports to ports
@@ -119,7 +119,7 @@ func Map(m Interface, c chan struct{}, protocol string, extport, intport int, na
 		case <-refresh.C:
 			log.Trace("Refreshing port mapping")
 			if err := m.AddMapping(protocol, extport, intport, name, mapTimeout); err != nil {
-				log.Debug("Couldn't add port mapping", "err", err)
+				log.Debug("[refresh] Couldn't add port mapping", "err", err)
 			}
 			refresh.Reset(mapUpdateInterval)
 		}

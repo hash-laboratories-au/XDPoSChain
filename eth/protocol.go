@@ -32,14 +32,15 @@ import (
 const (
 	eth62  = 62
 	eth63  = 63
-	xdpos2 = 64
+	xdpos2 = 100
 )
 
 // Official short name of the protocol used during capability negotiation.
 var ProtocolName = "eth"
 
 // Supported versions of the eth protocol (first is primary).
-var ProtocolVersions = []uint{xdpos2, eth63, eth62}
+// var ProtocolVersions = []uint{xdpos2, eth63, eth62}
+var ProtocolVersions = []uint{xdpos2}
 
 // Number of implemented message corresponding to different protocol versions.
 var ProtocolLengths = []uint64{227, 17, 8}

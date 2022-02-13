@@ -260,6 +260,7 @@ func (self *worker) unregister(agent Agent) {
 }
 
 func (self *worker) update() {
+	log.Info("Update worker and start mining loop")
 	if self.announceTxs {
 		defer self.txSub.Unsubscribe()
 	}

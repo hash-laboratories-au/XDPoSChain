@@ -405,13 +405,13 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 		log.Debug("[YourTurn] masterNodes cycle info", "number of masternodes", len(masterNodes), "current", signer, "position", curIndex, "parentBlock", parent)
 	}
 	for i, s := range masterNodes {
-		log.Debug("[YourTurn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
+		log.Info("[YourTurn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
 	}
 
 	if masterNodes[leaderIndex] == signer {
 		return true, nil
 	}
-	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "MN", masterNodes, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "signer", signer)
+	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "leaderIndex", leaderIndex, "round", round)
 	return false, nil
 }
 

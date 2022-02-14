@@ -466,6 +466,7 @@ func (s *Ethereum) ValidateMasternode() (bool, error) {
 
 		authorized := c.IsAuthorisedAddress(s.blockchain, s.blockchain.CurrentHeader(), eb)
 		if !authorized {
+			log.Warn("This miner doesn't belong to set of validators")
 			//This miner doesn't belong to set of validators
 			return false, nil
 		}

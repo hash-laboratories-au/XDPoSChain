@@ -419,6 +419,7 @@ func (self *worker) wait() {
 				}
 
 				authorized := c.IsAuthorisedAddress(self.chain, block.Header(), self.coinbase)
+				log.Warn("not authorized address")
 				if !authorized {
 					valid := false
 					masternodes := c.GetMasternodes(self.chain, block.Header())

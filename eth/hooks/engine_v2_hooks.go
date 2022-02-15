@@ -148,6 +148,10 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 			return nil, errors.New("foundation wallet address is empty")
 		}
 		rewards := make(map[string]interface{})
+		// skip hook reward if this is the first v2
+		if number == chain.Config().XDPoS.V2.SwitchBlock.Uint64()+1 {
+			return rewards, nil
+		}
 		start := time.Now()
 		// Get reward inflation.
 		chainReward := new(big.Int).Mul(new(big.Int).SetUint64(chain.Config().XDPoS.Reward), new(big.Int).SetUint64(params.Ether))
@@ -210,7 +214,7 @@ func GetSigningTxCount(c *XDPoS.XDPoS, chain consensus.ChainReader, header *type
 		if err != nil {
 			return nil, err
 		}
-		if isEpochSwitch {
+		if isEpochSwitch && i != chain.Config().XDPoS.V2.SwitchBlock.Uint64()+1 {
 			epochCount += 1
 			if epochCount == signEpochCount {
 				endBlockNumber = header.Number.Uint64() - 1

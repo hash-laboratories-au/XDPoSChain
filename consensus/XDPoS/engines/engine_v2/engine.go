@@ -236,9 +236,6 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 func (x *XDPoS_v2) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, parentState *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// set block reward
 
-	// TODO what's this comment?
-	// _ = c.CacheData(header, txs, receipts)
-
 	isEpochSwitch, _, err := x.IsEpochSwitch(header)
 	if err != nil {
 		log.Error("[Finalize] IsEpochSwitch bug!", "err", err)

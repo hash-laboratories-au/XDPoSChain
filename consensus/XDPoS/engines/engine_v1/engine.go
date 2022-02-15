@@ -488,7 +488,11 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 				log.Info("Loaded voting snapshot form disk", "number", number, "hash", hash)
 				snap = s
 				log.Info("load Snapshot snap", "snap", snap)
-				break
+				if len(snap.Signers) > 0 {
+					break
+				} else {
+					log.Warn("skip this snapshot, len of snap signer is 0")
+				}
 			}
 		}
 		// If we're at block zero, make a snapshot

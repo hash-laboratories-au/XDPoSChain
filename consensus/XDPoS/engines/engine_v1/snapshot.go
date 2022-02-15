@@ -9,6 +9,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus/clique"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -65,10 +66,12 @@ func newSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, number uint
 func loadSnapshot(config *params.XDPoSConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*SnapshotV1, error) {
 	blob, err := db.Get(append([]byte("XDPoS-"), hash[:]...))
 	if err != nil {
+		log.Error("[loadSnapshot] db Get", "err", err)
 		return nil, err
 	}
 	snap := new(SnapshotV1)
 	if err := json.Unmarshal(blob, snap); err != nil {
+		log.Error("[loadSnapshot] json Unmarshal", "err", err)
 		return nil, err
 	}
 	snap.config = config

@@ -335,7 +335,7 @@ func (x *XDPoS_v1) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 
 func (x *XDPoS_v1) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV1, error) {
 	number := header.Number.Uint64()
-	log.Trace("get snapshot", "number", number, "hash", header.Hash())
+	log.Info("get snapshot", "number", number, "hash", header.Hash())
 	snap, err := x.snapshot(chain, number, header.Hash(), nil, header)
 	if err != nil {
 		return nil, err
@@ -485,7 +485,7 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 		// checkpoint snapshot = checkpoint - gap
 		if (number+x.config.Gap)%x.config.Epoch == 0 {
 			if s, err := loadSnapshot(x.config, x.signatures, x.db, hash); err == nil {
-				log.Trace("Loaded voting snapshot form disk", "number", number, "hash", hash)
+				log.Info("Loaded voting snapshot form disk", "number", number, "hash", hash)
 				snap = s
 				break
 			}
@@ -504,7 +504,7 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 			if err := snap.store(x.db); err != nil {
 				return nil, err
 			}
-			log.Trace("Stored genesis voting snapshot to disk")
+			log.Info("Stored genesis voting snapshot to disk")
 			break
 		}
 		// No snapshot for this header, gather the header and move backward
@@ -544,7 +544,7 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 		if err = snap.store(x.db); err != nil {
 			return nil, err
 		}
-		log.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+		log.Info("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
 	}
 	return snap, err
 }

@@ -419,6 +419,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 	x.lock.RLock()
 	defer x.lock.RUnlock()
 
+	log.Info("[IsAuthorisedAddress] v2")
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &extraField)
 	if err != nil {

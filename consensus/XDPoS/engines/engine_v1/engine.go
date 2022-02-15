@@ -492,6 +492,7 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 					break
 				} else {
 					log.Warn("skip this snapshot, len of snap signer is 0")
+					snap = nil
 				}
 			}
 		}

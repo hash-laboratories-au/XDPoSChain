@@ -487,6 +487,7 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 			if s, err := loadSnapshot(x.config, x.signatures, x.db, hash); err == nil {
 				log.Info("Loaded voting snapshot form disk", "number", number, "hash", hash)
 				snap = s
+				log.Info("load Snapshot snap", "snap", snap)
 				break
 			}
 		}

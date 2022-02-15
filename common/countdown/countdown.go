@@ -37,6 +37,7 @@ func (t *CountdownTimer) StopTimer() {
 // Reset will start the countdown timer if it's already stopped, or simply reset the countdown time back to the defual `duration`
 func (t *CountdownTimer) Reset() {
 	if !t.isInitilised() {
+		log.Info("initilise timeout worker")
 		t.setInitilised(true)
 		go t.startTimer()
 	} else {

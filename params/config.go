@@ -50,7 +50,7 @@ var (
 	DevnetXDPoSV2Config = &V2{
 		SwitchBlock:           big.NewInt(7218000),
 		TimeoutWorkerDuration: 50,
-		CertThreshold:         6,
+		CertThreshold:         2,
 		WaitPeriod:            2,
 		MinePeriod:            10,
 	}

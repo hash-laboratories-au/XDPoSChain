@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"math/big"
 	"testing"
 
@@ -14,12 +15,20 @@ import (
 )
 
 func TestHookRewardV2(t *testing.T) {
-	config := params.TestXDPoSMockChainConfig
+	b, err := json.Marshal(params.TestXDPoSMockChainConfig)
+	assert.Nil(t, err)
+	configString := string(b)
+
+	var config params.ChainConfig
+	err = json.Unmarshal([]byte(configString), &config)
+	assert.Nil(t, err)
 	// set switch to 1800, so that it covers 901-1799, 1800-2700 two epochs
 	config.XDPoS.V2.SwitchBlock.SetUint64(1800)
-	blockchain, _, _, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch)*5, config, 0)
+
+	blockchain, _, _, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch)*5, &config, 0)
+
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
-	hooks.AttachConsensusV2Hooks(adaptor, blockchain, config)
+	hooks.AttachConsensusV2Hooks(adaptor, blockchain, &config)
 	assert.NotNil(t, adaptor.EngineV2.HookReward)
 	// forcely insert signing tx into cache, to give rewards.
 	header915 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 15)

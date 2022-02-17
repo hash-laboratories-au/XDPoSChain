@@ -35,7 +35,7 @@ func TestHookRewardV2(t *testing.T) {
 	header916 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 16)
 	header1799 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 - 1)
 	header1801 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 + 1)
-	tx, err := signingTx(header915, 0, signer, signFn)
+	tx, err := signingTxWithSignerFn(header915, 0, signer, signFn)
 	assert.Nil(t, err)
 	adaptor.CacheSigningTxs(header916.Hash(), []*types.Transaction{tx})
 	statedb, err := blockchain.StateAt(header1799.Root)
@@ -65,7 +65,7 @@ func TestHookRewardV2(t *testing.T) {
 	header2716 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*3 + 16)
 	header3599 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*4 - 1)
 	header3600 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch * 4)
-	tx, err = signingTx(header2685, 0, signer, signFn)
+	tx, err = signingTxWithSignerFn(header2685, 0, signer, signFn)
 	assert.Nil(t, err)
 	// signed block hash and block contains tx are in different epoch, we should get same rewards
 	adaptor.CacheSigningTxs(header2716.Hash(), []*types.Transaction{tx})
@@ -114,15 +114,18 @@ func TestHookRewardV2SplitReward(t *testing.T) {
 	// forcely insert signing tx into cache, to give rewards.
 	header915 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 15)
 	header916 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 16)
-	header917 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 17)
+	// header917 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 17)
+	header1785 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 - 15)
 	header1799 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 - 1)
 	header1801 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 + 1)
-	tx, err := signingTx(header915, 0, signer, signFn)
+	tx, err := signingTxWithSignerFn(header915, 0, signer, signFn)
 	assert.Nil(t, err)
 	adaptor.CacheSigningTxs(header916.Hash(), []*types.Transaction{tx})
 	tx2, err := signingTxWithKey(header915, 0, acc1Key)
 	assert.Nil(t, err)
-	adaptor.CacheSigningTxs(header917.Hash(), []*types.Transaction{tx2})
+	tx3, err := signingTxWithKey(header1785, 0, acc1Key)
+	assert.Nil(t, err)
+	adaptor.CacheSigningTxs(header1799.Hash(), []*types.Transaction{tx2, tx3})
 
 	statedb, err := blockchain.StateAt(header1799.Root)
 	assert.Nil(t, err)
@@ -139,21 +142,21 @@ func TestHookRewardV2SplitReward(t *testing.T) {
 	assert.Nil(t, err)
 	result := reward["rewards"].(map[common.Address]interface{})
 	assert.Equal(t, 2, len(result))
-	// two signing tx, reward is split
+	// two signing account, 3 txs, reward is split by 1:2 (total reward is 250...000)
 	for addr, x := range result {
 		if addr == acc1Addr {
 			r := x.(map[common.Address]*big.Int)
 			owner := state.GetCandidateOwner(parentState, acc1Addr)
-			a, _ := big.NewInt(0).SetString("112500000000000000000", 10)
+			a, _ := big.NewInt(0).SetString("149999999999999999999", 10)
 			assert.Zero(t, a.Cmp(r[owner]))
-			b, _ := big.NewInt(0).SetString("12500000000000000000", 10)
+			b, _ := big.NewInt(0).SetString("16666666666666666666", 10)
 			assert.Zero(t, b.Cmp(r[common.HexToAddress("0x0000000000000000000000000000000000000068")]))
 		} else if addr == signer {
 			r := x.(map[common.Address]*big.Int)
 			owner := state.GetCandidateOwner(parentState, signer)
-			a, _ := big.NewInt(0).SetString("112500000000000000000", 10)
+			a, _ := big.NewInt(0).SetString("74999999999999999999", 10)
 			assert.Zero(t, a.Cmp(r[owner]))
-			b, _ := big.NewInt(0).SetString("12500000000000000000", 10)
+			b, _ := big.NewInt(0).SetString("8333333333333333333", 10)
 			assert.Zero(t, b.Cmp(r[common.HexToAddress("0x0000000000000000000000000000000000000068")]))
 		}
 	}

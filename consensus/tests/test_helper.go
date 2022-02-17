@@ -230,7 +230,7 @@ func voteTX(gasLimit uint64, nonce uint64, addr string) (*types.Transaction, err
 	return signedTX, nil
 }
 
-func signingTx(header *types.Header, nonce uint64, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) (*types.Transaction, error) {
+func signingTxWithSignerFn(header *types.Header, nonce uint64, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) (*types.Transaction, error) {
 	tx := contracts.CreateTxSign(header.Number, header.Hash(), nonce, common.HexToAddress(common.BlockSigners))
 	s := types.NewEIP155Signer(big.NewInt(chainID))
 	h := s.Hash(tx)

@@ -245,6 +245,21 @@ func signingTx(header *types.Header, nonce uint64, signer common.Address, signFn
 	return signedTx, nil
 }
 
+func signingTxWithKey(header *types.Header, nonce uint64, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
+	tx := contracts.CreateTxSign(header.Number, header.Hash(), nonce, common.HexToAddress(common.BlockSigners))
+	s := types.NewEIP155Signer(big.NewInt(chainID))
+	h := s.Hash(tx)
+	sig, err := crypto.Sign(h[:], privateKey)
+	if err != nil {
+		return nil, err
+	}
+	signedTx, err := tx.WithSignature(s, sig)
+	if err != nil {
+		return nil, err
+	}
+	return signedTx, nil
+}
+
 func UpdateSigner(bc *BlockChain) error {
 	err := bc.UpdateM1()
 	return err

@@ -94,3 +94,67 @@ func TestHookRewardV2(t *testing.T) {
 	result = reward["rewards"].(map[common.Address]interface{})
 	assert.Equal(t, 0, len(result))
 }
+
+func TestHookRewardV2SplitReward(t *testing.T) {
+	b, err := json.Marshal(params.TestXDPoSMockChainConfig)
+	assert.Nil(t, err)
+	configString := string(b)
+
+	var config params.ChainConfig
+	err = json.Unmarshal([]byte(configString), &config)
+	assert.Nil(t, err)
+	// set switch to 1800, so that it covers 901-1799, 1800-2700 two epochs
+	config.XDPoS.V2.SwitchBlock.SetUint64(1800)
+
+	blockchain, _, _, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch)*3, &config, 0)
+
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
+	hooks.AttachConsensusV2Hooks(adaptor, blockchain, &config)
+	assert.NotNil(t, adaptor.EngineV2.HookReward)
+	// forcely insert signing tx into cache, to give rewards.
+	header915 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 15)
+	header916 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 16)
+	header917 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch + 17)
+	header1799 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 - 1)
+	header1801 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*2 + 1)
+	tx, err := signingTx(header915, 0, signer, signFn)
+	assert.Nil(t, err)
+	adaptor.CacheSigningTxs(header916.Hash(), []*types.Transaction{tx})
+	tx2, err := signingTxWithKey(header915, 0, acc1Key)
+	assert.Nil(t, err)
+	adaptor.CacheSigningTxs(header917.Hash(), []*types.Transaction{tx2})
+
+	statedb, err := blockchain.StateAt(header1799.Root)
+	assert.Nil(t, err)
+	parentState := statedb.Copy()
+	reward, err := adaptor.EngineV2.HookReward(blockchain, statedb, parentState, header1801)
+	assert.Nil(t, err)
+	assert.Zero(t, len(reward))
+	header2699 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*3 - 1)
+	header2700 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch * 3)
+	statedb, err = blockchain.StateAt(header2699.Root)
+	assert.Nil(t, err)
+	parentState = statedb.Copy()
+	reward, err = adaptor.EngineV2.HookReward(blockchain, statedb, parentState, header2700)
+	assert.Nil(t, err)
+	result := reward["rewards"].(map[common.Address]interface{})
+	assert.Equal(t, 2, len(result))
+	// two signing tx, reward is split
+	for addr, x := range result {
+		if addr == acc1Addr {
+			r := x.(map[common.Address]*big.Int)
+			owner := state.GetCandidateOwner(parentState, acc1Addr)
+			a, _ := big.NewInt(0).SetString("112500000000000000000", 10)
+			assert.Zero(t, a.Cmp(r[owner]))
+			b, _ := big.NewInt(0).SetString("12500000000000000000", 10)
+			assert.Zero(t, b.Cmp(r[common.HexToAddress("0x0000000000000000000000000000000000000068")]))
+		} else if addr == signer {
+			r := x.(map[common.Address]*big.Int)
+			owner := state.GetCandidateOwner(parentState, signer)
+			a, _ := big.NewInt(0).SetString("112500000000000000000", 10)
+			assert.Zero(t, a.Cmp(r[owner]))
+			b, _ := big.NewInt(0).SetString("12500000000000000000", 10)
+			assert.Zero(t, b.Cmp(r[common.HexToAddress("0x0000000000000000000000000000000000000068")]))
+		}
+	}
+}

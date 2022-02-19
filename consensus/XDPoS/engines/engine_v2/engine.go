@@ -673,6 +673,7 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 		1. processQC
 		2. processTC
 	*/
+	log.Info("[SyncInfoHandler] received SyncInfo msg", "syncInfo", syncInfo)
 	err := x.processQC(chain, syncInfo.HighestQuorumCert)
 	if err != nil {
 		return err
@@ -877,7 +878,7 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(pooledTimeouts map[common.Hash]
 	}
 	// Generate and broadcast syncInfo
 	syncInfo := x.getSyncInfo()
-	x.broadcastToBftChannel(syncInfo)
+	x.broadcastToBftChannel(*syncInfo)
 
 	log.Info("⏰ Successfully processed the timeout message and produced TC & SyncInfo!")
 	return nil
@@ -1007,7 +1008,7 @@ func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
 func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
-	log.Trace("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
+	log.Info("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
 	// 1. Update HighestQC
 	if quorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
 		x.highestQuorumCert = quorumCert

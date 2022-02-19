@@ -679,12 +679,14 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 		1. processQC
 		2. processTC
 	*/
-	out, err := json.Marshal(syncInfo)
-	if err != nil {
-		panic(err)
-	}
+	/*
+		out, err := json.Marshal(syncInfo)
+		if err != nil {
+			panic(err)
+		}
+	*/
 	log.Info("[SyncInfoHandler] received SyncInfo msg", "HighQC Round", syncInfo.HighestQuorumCert.ProposedBlockInfo.Round, "HighTC Round", syncInfo.HighestTimeoutCert.Round)
-	err = x.processQC(chain, syncInfo.HighestQuorumCert)
+	err := x.processQC(chain, syncInfo.HighestQuorumCert)
 	if err != nil {
 		return err
 	}

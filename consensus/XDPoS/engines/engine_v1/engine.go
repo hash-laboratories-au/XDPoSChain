@@ -335,7 +335,7 @@ func (x *XDPoS_v1) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 
 func (x *XDPoS_v1) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*SnapshotV1, error) {
 	number := header.Number.Uint64()
-	log.Info("get snapshot", "number", number, "hash", header.Hash())
+	// log.Info("get snapshot", "number", number, "hash", header.Hash())
 	snap, err := x.snapshot(chain, number, header.Hash(), nil, header)
 	if err != nil {
 		return nil, err

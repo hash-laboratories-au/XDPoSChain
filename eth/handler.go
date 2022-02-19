@@ -929,10 +929,12 @@ func (pm *ProtocolManager) BroadcastTimeout(timeout *utils.Timeout) {
 		for _, peer := range peers {
 			err := peer.SendTimeout(timeout)
 			if err != nil {
-				log.Error("[BroadcastTimeout] Fail to broadcast timeout message", "NumberOfPeers", len(peers), "peerId", peer.id, "timeout", timeout, "Error", err)
+				log.Error("[BroadcastTimeout] Fail to broadcast timeout message", "NumberOfPeers", len(peers), "peerId", peer.id, "round", timeout.Round, "hash", hash, "Error", err)
+				log.Error("[BroadcastTimeout] Remove Peer", "id", peer.id, "version", peer.version)
+				pm.removePeer(peer.id)
 			}
 		}
-		log.Trace("Propagated Timeout", "hash", hash, "recipients", len(peers))
+		log.Info("Propagated Timeout", "hash", hash, "recipients", len(peers))
 	}
 }
 
@@ -948,7 +950,7 @@ func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo *utils.SyncInfo) {
 				log.Error("[BroadcastSyncInfo] Fail to broadcast syncInfo message", "NumberOfPeers", len(peers), "peerId", peer.id, "syncInfo", syncInfo, "Error", err)
 			}
 		}
-		log.Trace("Propagated SyncInfo", "hash", hash, "recipients", len(peers))
+		log.Info("Propagated SyncInfo", "hash", hash, "recipients", len(peers))
 	}
 
 }

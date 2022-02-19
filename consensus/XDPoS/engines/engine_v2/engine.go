@@ -406,13 +406,14 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 		log.Debug("[YourTurn] masterNodes cycle info", "number of masternodes", len(masterNodes), "current", signer, "position", curIndex, "parentBlock", parent)
 	}
 	for i, s := range masterNodes {
-		log.Info("[YourTurn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
+		log.Debug("[YourTurn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
 	}
 
 	if masterNodes[leaderIndex] == signer {
 		log.Info("[YourTurn] Successfully passed yourTurn!", "index", leaderIndex, "myAddress", signer)
 		return true, nil
 	}
+
 	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "leaderIndex", leaderIndex, "round", round)
 	return false, nil
 }
@@ -682,7 +683,7 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 	if err != nil {
 		panic(err)
 	}
-	log.Info("[SyncInfoHandler] received SyncInfo msg", "syncInfo", out)
+	log.Info("[SyncInfoHandler] received SyncInfo msg", "HighQC Round", syncInfo.HighestQuorumCert.ProposedBlockInfo.Round, "HighTC Round", syncInfo.HighestTimeoutCert.Round)
 	err = x.processQC(chain, syncInfo.HighestQuorumCert)
 	if err != nil {
 		return err

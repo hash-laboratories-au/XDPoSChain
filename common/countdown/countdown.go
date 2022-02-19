@@ -63,6 +63,7 @@ func (t *CountdownTimer) startTimer() {
 			if err != nil {
 				log.Error("OnTimeoutFn error", err)
 			}
+			timer.Reset(t.timeoutDuration)
 		case <-t.resetc:
 			log.Debug("Reset countdown timer")
 			timer.Reset(t.timeoutDuration)

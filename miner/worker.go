@@ -358,8 +358,8 @@ func (self *worker) wait() {
 			block := result.Block
 
 			log.Info("recieve block")
-			// if self.config.XDPoS != nil && block.NumberU64() >= self.config.XDPoS.Epoch && len(block.Validator()) == 0 {
-			if self.config.XDPoS != nil && block.NumberU64() >= self.config.XDPoS.Epoch {
+			if self.config.XDPoS != nil && block.NumberU64() >= self.config.XDPoS.Epoch && len(block.Validator()) == 0 {
+				//if self.config.XDPoS != nil && block.NumberU64() >= self.config.XDPoS.Epoch {
 				log.Info("post new mined block event")
 				self.mux.Post(core.NewMinedBlockEvent{Block: block})
 				continue

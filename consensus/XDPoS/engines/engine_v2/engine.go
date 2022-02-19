@@ -571,7 +571,11 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 	}
 	quorumCert := decodedExtraField.QuorumCert
 	if quorumCert == nil || quorumCert.Signatures == nil || len(quorumCert.Signatures) == 0 {
-		log.Error("Invalid QC", "QC", quorumCert)
+		out, err := json.Marshal(quorumCert)
+		if err != nil {
+			panic(err)
+		}
+		log.Error("Invalid QC", "QC", out)
 		return utils.ErrInvalidQC
 	}
 

@@ -125,7 +125,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, ma
 	log.Info("[Initial] initial v2 related parameters")
 
 	if !isEmptyHash(x.highestQuorumCert.ProposedBlockInfo.Hash) { // already initialized
-		log.Error("[Initial] Already initialized", "blockNum", header.Number, "Hash", header.Hash())
+		log.Debug("[Initial] Already initialized", "blockNum", header.Number, "Hash", header.Hash())
 		return nil
 	}
 

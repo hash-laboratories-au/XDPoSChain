@@ -253,9 +253,10 @@ func (pm *ProtocolManager) removePeer(id string) {
 	// Short circuit if the peer was already removed
 	peer := pm.peers.Peer(id)
 	if peer == nil {
+		log.Info("Already Removed Ethereum peer", "peer", id)
 		return
 	}
-	log.Debug("Removing Ethereum peer", "peer", id)
+	log.Info("Removing Ethereum peer", "peer", id)
 
 	// Unregister the peer from the downloader and Ethereum peer set
 	pm.downloader.UnregisterPeer(id)
@@ -914,6 +915,8 @@ func (pm *ProtocolManager) BroadcastVote(vote *utils.Vote) {
 			err := peer.SendVote(vote)
 			if err != nil {
 				log.Error("[BroadcastVote] Fail to broadcast vote message", "NumberOfPeers", len(peers), "peerId", peer.id, "vote", vote, "Error", err)
+				log.Error("[BroadcastVote] Remove Peer", "id", peer.id, "version", peer.version)
+				pm.removePeer(peer.id)
 			}
 		}
 		log.Info("Propagated Vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "recipients", len(peers))
@@ -948,6 +951,8 @@ func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo *utils.SyncInfo) {
 			err := peer.SendSyncInfo(syncInfo)
 			if err != nil {
 				log.Error("[BroadcastSyncInfo] Fail to broadcast syncInfo message", "NumberOfPeers", len(peers), "peerId", peer.id, "syncInfo", syncInfo, "Error", err)
+				log.Error("[BroadcastSyncInfo] Remove Peer", "id", peer.id, "version", peer.version)
+				pm.removePeer(peer.id)
 			}
 		}
 		log.Info("Propagated SyncInfo", "hash", hash, "recipients", len(peers))

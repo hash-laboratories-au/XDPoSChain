@@ -410,6 +410,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	}
 
 	if masterNodes[leaderIndex] == signer {
+		log.Info("[YourTurn] Successfully passed yourTurn!", "index", leaderIndex, "myAddress", signer)
 		return true, nil
 	}
 	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "leaderIndex", leaderIndex, "round", round)

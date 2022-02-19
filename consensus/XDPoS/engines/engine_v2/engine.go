@@ -879,7 +879,7 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(pooledTimeouts map[common.Hash]
 	}
 	// Generate and broadcast syncInfo
 	syncInfo := x.getSyncInfo()
-	x.broadcastToBftChannel(*syncInfo)
+	x.broadcastToBftChannel(syncInfo)
 
 	log.Info("⏰ Successfully processed the timeout message and produced TC & SyncInfo!")
 	return nil

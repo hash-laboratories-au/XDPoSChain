@@ -298,6 +298,7 @@ func (self *worker) update() {
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
 
 		case <-c:
+			log.Info("[worker] timeout reached", "self mine", atomic.LoadInt32(&self.mining) == 1)
 			if atomic.LoadInt32(&self.mining) == 1 {
 				self.commitNewWork()
 			}
@@ -305,6 +306,7 @@ func (self *worker) update() {
 
 		// Handle ChainHeadEvent
 		case <-self.chainHeadCh:
+			log.Info("[worker] chain head channel event")
 			self.commitNewWork()
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
 

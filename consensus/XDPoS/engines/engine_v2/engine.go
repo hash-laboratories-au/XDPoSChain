@@ -160,7 +160,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header, ma
 	}
 
 	// Initial timeout
-	log.Info("[Initial] miner wait period", "period", x.config.WaitPeriod)
+	log.Info("[Initial] miner wait period", "period", x.config.V2.WaitPeriod)
 	// avoid deadlock
 	go func() {
 		x.waitPeriodCh <- x.config.V2.WaitPeriod
@@ -247,7 +247,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 // rewards given, and returns the final block.
 func (x *XDPoS_v2) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, parentState *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// set block reward
-
+	log.Info("Finalize block")
 	isEpochSwitch, _, err := x.IsEpochSwitch(header)
 	if err != nil {
 		log.Error("[Finalize] IsEpochSwitch bug!", "err", err)

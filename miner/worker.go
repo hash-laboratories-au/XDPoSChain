@@ -347,14 +347,18 @@ func (self *worker) wait() {
 	for {
 		mustCommitNewWork := true
 		for result := range self.recv {
+			log.Info("recieve block")
 			atomic.AddInt32(&self.atWork, -1)
 
 			if result == nil {
 				continue
 			}
 			block := result.Block
+
+			log.Info("recieve block")
 			// if self.config.XDPoS != nil && block.NumberU64() >= self.config.XDPoS.Epoch && len(block.Validator()) == 0 {
 			if self.config.XDPoS != nil && block.NumberU64() >= self.config.XDPoS.Epoch {
+				log.Info("post new mined block event")
 				self.mux.Post(core.NewMinedBlockEvent{Block: block})
 				continue
 			}
@@ -371,6 +375,7 @@ func (self *worker) wait() {
 				log.BlockHash = block.Hash()
 			}
 			self.currentMu.Lock()
+			log.Info("write block with state")
 			stat, err := self.chain.WriteBlockWithState(block, work.receipts, work.state, work.tradingState, work.lendingState)
 			self.currentMu.Unlock()
 			if err != nil {

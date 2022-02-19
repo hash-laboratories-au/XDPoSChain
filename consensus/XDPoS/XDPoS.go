@@ -323,9 +323,15 @@ func (x *XDPoS) YourTurn(chain consensus.ChainReader, parent *types.Header, sign
 				log.Error("[YourTurn] Error while initilising first v2 block from the last v1 block", "ParentBlockHash", parent.Hash(), "Error", err)
 				return false, err
 			}
-		} else if parent.Number.Cmp(x.config.V2.SwitchBlock) == 1 { // TODO: XIN-147
-			log.Info("[YourTurn] Initilising v2 after sync or restarted", "currentBlockNum", chain.CurrentHeader().Number, "currentBlockHash", chain.CurrentHeader().Hash())
+		} else if parent.Number.Cmp(x.config.V2.SwitchBlock) == 1 && !x.isV2Initilised { // TODO: XIN-147
+			err := x.initialV2FromLastV1(chain, parent)
+			if err != nil {
+				log.Error("[YourTurn] Error while initilising first v2 block after SwitchBlock", "ParentBlockHash", parent.Hash(), "Error", err)
+				return false, err
+			}
+			log.Debug("[YourTurn] Initilising v2 after sync or restarted", "currentBlockNum", chain.CurrentHeader().Number, "currentBlockHash", chain.CurrentHeader().Hash())
 		}
+		x.isV2Initilised = true
 	}
 	switch x.config.BlockConsensusVersion(big.NewInt(parent.Number.Int64() + 1)) {
 	case params.ConsensusEngineVersion2:

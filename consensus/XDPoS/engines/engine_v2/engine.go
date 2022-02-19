@@ -418,8 +418,6 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
 	x.lock.RLock()
 	defer x.lock.RUnlock()
-
-	log.Info("[IsAuthorisedAddress] v2")
 	var extraField utils.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(header.Extra, &extraField)
 	if err != nil {

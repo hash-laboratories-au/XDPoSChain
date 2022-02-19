@@ -317,15 +317,11 @@ func (x *XDPoS_v1) checkSignersOnCheckpoint(chain consensus.ChainReader, header 
 }
 
 func (x *XDPoS_v1) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
-	log.Info("[IsAuthorisedAddress] v1")
 	snap, err := x.GetSnapshot(chain, header)
 
 	if err != nil {
 		log.Error("[IsAuthorisedAddress] Can't get snapshot with at ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
 		return false
-	}
-	for a := range snap.Signers {
-		log.Info("signer list", "signer", a.Hex(), "target", address.Hex())
 	}
 	if _, ok := snap.Signers[address]; ok {
 		return true
@@ -485,9 +481,8 @@ func (x *XDPoS_v1) snapshot(chain consensus.ChainReader, number uint64, hash com
 		// checkpoint snapshot = checkpoint - gap
 		if (number+x.config.Gap)%x.config.Epoch == 0 {
 			if s, err := loadSnapshot(x.config, x.signatures, x.db, hash); err == nil {
-				log.Info("Loaded voting snapshot form disk", "number", number, "hash", hash)
+				log.Debug("Loaded voting snapshot form disk", "number", number, "hash", hash)
 				snap = s
-				log.Info("load Snapshot snap", "snap", snap)
 				if len(snap.Signers) > 0 {
 					break
 				} else {

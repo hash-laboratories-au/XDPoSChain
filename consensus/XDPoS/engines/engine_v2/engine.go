@@ -674,8 +674,12 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 		1. processQC
 		2. processTC
 	*/
-	log.Info("[SyncInfoHandler] received SyncInfo msg", "syncInfo", syncInfo)
-	err := x.processQC(chain, syncInfo.HighestQuorumCert)
+	out, err := json.Marshal(syncInfo)
+	if err != nil {
+		panic(err)
+	}
+	log.Info("[SyncInfoHandler] received SyncInfo msg", "syncInfo", out)
+	err = x.processQC(chain, syncInfo.HighestQuorumCert)
 	if err != nil {
 		return err
 	}
@@ -1016,6 +1020,9 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 	}
 	// 2. Get QC from header and update lockQuorumCert(lockQuorumCert is the parent of highestQC)
 	proposedBlockHeader := blockChainReader.GetHeaderByHash(quorumCert.ProposedBlockInfo.Hash)
+	if proposedBlockHeader == nil {
+		return fmt.Errorf("Block not found, number: %v, hash: %v", quorumCert.ProposedBlockInfo.Number, quorumCert.ProposedBlockInfo.Hash)
+	}
 	if proposedBlockHeader.Number.Cmp(x.config.V2.SwitchBlock) > 0 {
 		// Extra field contain parent information
 		var decodedExtraField utils.ExtraFields_v2
@@ -1043,7 +1050,7 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 			return err
 		}
 	}
-	log.Trace("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
+	log.Info("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
 	return nil
 }
 

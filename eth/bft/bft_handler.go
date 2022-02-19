@@ -79,7 +79,7 @@ func (b *Bfter) SetConsensusFuns(engine consensus.Engine) {
 
 // TODO: rename
 func (b *Bfter) Vote(vote *utils.Vote) error {
-	log.Trace("Receive Vote", "hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "signature", vote.Signature)
+	log.Info("Receive Vote", "hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round, "signature", vote.Signature)
 	if exist, _ := b.knownVotes.ContainsOrAdd(vote.Hash(), true); exist {
 		log.Info("Discarded vote, known vote", "vote hash", vote.Hash(), "voted block hash", vote.ProposedBlockInfo.Hash.Hex(), "number", vote.ProposedBlockInfo.Number, "round", vote.ProposedBlockInfo.Round)
 		return nil
@@ -104,7 +104,7 @@ func (b *Bfter) Vote(vote *utils.Vote) error {
 	return nil
 }
 func (b *Bfter) Timeout(timeout *utils.Timeout) error {
-	log.Trace("Receive Timeout", "timeout", timeout)
+	log.Info("Receive Timeout", "timeout", timeout)
 	if exist, _ := b.knownTimeouts.ContainsOrAdd(timeout.Hash(), true); exist {
 		log.Trace("Discarded Timeout, known Timeout", "Signature", timeout.Signature, "hash", timeout.Hash(), "round", timeout.Round)
 		return nil
@@ -128,7 +128,7 @@ func (b *Bfter) Timeout(timeout *utils.Timeout) error {
 	return nil
 }
 func (b *Bfter) SyncInfo(syncInfo *utils.SyncInfo) error {
-	log.Trace("Receive SyncInfo", "syncInfo", syncInfo)
+	log.Info("Receive SyncInfo", "syncInfo", syncInfo)
 	if exist, _ := b.knownSyncInfos.ContainsOrAdd(syncInfo.Hash(), true); exist {
 		log.Trace("Discarded SyncInfo, known SyncInfo", "hash", syncInfo.Hash())
 		return nil

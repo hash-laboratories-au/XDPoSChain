@@ -1162,7 +1162,7 @@ func (x *XDPoS_v2) sendVote(chainReader consensus.ChainReader, blockInfo *utils.
 	3. send to broadcast channel
 */
 func (x *XDPoS_v2) sendTimeout() error {
-	log.Info("[sendTimeout] Send timeout message")
+	log.Info("[sendTimeout] Send timeout message", "round", x.currentRound)
 	signedHash, err := x.signSignature(utils.TimeoutSigHash(&x.currentRound))
 	if err != nil {
 		log.Error("signSignature when sending out TC", "Error", err)

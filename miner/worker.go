@@ -540,6 +540,7 @@ func (self *worker) commitNewWork() {
 	parent := self.chain.CurrentBlock()
 	var signers map[common.Address]struct{}
 	if parent.Hash().Hex() == self.lastParentBlockCommit {
+		log.Info("[commitNewWork] return as current block is mine from self")
 		return
 	}
 	if !self.announceTxs && atomic.LoadInt32(&self.mining) == 0 {

@@ -376,13 +376,13 @@ func TestVoteMessageShallNotThrowErrorIfBlockNotYetExist(t *testing.T) {
 }
 
 func TestVerifyVoteMsg(t *testing.T) {
-	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 15, params.TestXDPoSMockChainConfig, 0)
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 915, params.TestXDPoSMockChainConfig, 0)
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 
 	blockInfo := &utils.BlockInfo{
 		Hash:   currentBlock.Hash(),
-		Round:  utils.Round(5),
-		Number: big.NewInt(15),
+		Round:  utils.Round(15),
+		Number: big.NewInt(915),
 	}
 
 	// Invalid vote msg

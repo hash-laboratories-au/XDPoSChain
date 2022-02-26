@@ -92,8 +92,7 @@ func (b *Bfter) Vote(vote *utils.Vote) error {
 	if err != nil || !verified {
 		log.Error("Verify BFT Vote", "error", err, "verified", verified)
 		if !verified {
-			// TODO: Drop peer
-			return fmt.Errorf("Fail to verify vote, dropping peer")
+			return fmt.Errorf("Fail to verify vote")
 		}
 		return err
 	}

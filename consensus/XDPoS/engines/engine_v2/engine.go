@@ -1055,7 +1055,8 @@ func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
 func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
-	log.Trace("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
+	log.Info("[ProcessQC][Before]", "HighQCRound", x.highestQuorumCert.ProposedBlockInfo.Round, "HQNum", x.highestQuorumCert.ProposedBlockInfo.Number, "IncomingQCRound", quorumCert.ProposedBlockInfo.Round, "IncomingQCNum", quorumCert.ProposedBlockInfo.Number)
+
 	// 1. Update HighestQC
 	if quorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
 		x.highestQuorumCert = quorumCert
@@ -1093,7 +1094,8 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 			return err
 		}
 	}
-	log.Trace("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
+
+	log.Info("[ProcessQC][After]", "HighQCRound", x.highestQuorumCert.ProposedBlockInfo.Round, "HQNum", x.highestQuorumCert.ProposedBlockInfo.Number, "IncomingQCRound", quorumCert.ProposedBlockInfo.Round, "IncomingQCNum", quorumCert.ProposedBlockInfo.Number)
 	return nil
 }
 
@@ -1102,6 +1104,8 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 	2. Check TC round >= node's currentRound. If yes, call setNewRound
 */
 func (x *XDPoS_v2) processTC(timeoutCert *utils.TimeoutCert) error {
+	log.Info("[processTC]", "TC-round", timeoutCert.Round, "HTC-round", x.highestTimeoutCert.Round, "currentRound", x.currentRound)
+
 	if timeoutCert.Round > x.highestTimeoutCert.Round {
 		x.highestTimeoutCert = timeoutCert
 	}
@@ -1120,6 +1124,7 @@ func (x *XDPoS_v2) processTC(timeoutCert *utils.TimeoutCert) error {
 	3. Reset vote and timeout Pools
 */
 func (x *XDPoS_v2) setNewRound(round utils.Round) error {
+	log.Info("[setNewRound]", "round", round)
 	x.currentRound = round
 	//TODO: tell miner now it's a new round and start mine if it's leader
 	x.timeoutWorker.Reset()
@@ -1165,6 +1170,8 @@ func (x *XDPoS_v2) verifyVotingRule(blockChainReader consensus.ChainReader, bloc
 
 // Once Hot stuff voting rule has verified, this node can then send vote
 func (x *XDPoS_v2) sendVote(chainReader consensus.ChainReader, blockInfo *utils.BlockInfo) error {
+	log.Info("[sendVote] Sending out vote", "round", blockInfo.Round, "Number", blockInfo.Number)
+
 	// First step: Update the highest Voted round
 	// Second step: Generate the signature by using node's private key(The signature is the blockInfo signature)
 	// Third step: Construct the vote struct with the above signature & blockinfo struct
@@ -1198,6 +1205,8 @@ func (x *XDPoS_v2) sendVote(chainReader consensus.ChainReader, blockInfo *utils.
 	3. send to broadcast channel
 */
 func (x *XDPoS_v2) sendTimeout() error {
+	log.Info("[sendTimeout] Send timeout message", "round", x.currentRound)
+
 	signedHash, err := x.signSignature(utils.TimeoutSigHash(&x.currentRound))
 	if err != nil {
 		log.Error("signSignature when sending out TC", "Error", err)

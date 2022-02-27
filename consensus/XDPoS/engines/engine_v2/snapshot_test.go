@@ -40,7 +40,7 @@ func TestStoreLoadSnapshot(t *testing.T) {
 		t.Error("store snapshot failed", err)
 	}
 
-	restoredSnapshot, err := loadSnapshot(nil, lddb, snap.Hash)
+	restoredSnapshot, err := loadSnapshot(lddb, snap.Hash)
 	if err != nil || restoredSnapshot.Hash != snap.Hash {
 		t.Error("load snapshot failed", err)
 	}

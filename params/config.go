@@ -202,7 +202,6 @@ type XDPoSConfig struct {
 	RewardCheckpoint    uint64         `json:"rewardCheckpoint"`    // Checkpoint block for calculate rewards.
 	Gap                 uint64         `json:"gap"`                 // Gap time preparing for the next epoch
 	FoudationWalletAddr common.Address `json:"foudationWalletAddr"` // Foundation Address Wallet
-	WaitPeriod          int            `json:"waitPeriod"`          // Miner wait period
 	SkipV1Validation    bool           //Skip Block Validation for testing purpose, V1 consensus only
 	V2                  *V2            `json:"v2"`
 }

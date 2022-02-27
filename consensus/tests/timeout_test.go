@@ -15,14 +15,14 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 
 	// Set round to 1
-	engineV2.SetNewRoundFaker(utils.Round(1), false)
+	engineV2.SetNewRoundFaker(blockchain, utils.Round(1), false)
 	// Create two timeout message which will not reach timeout pool threshold
 	timeoutMsg := &utils.Timeout{
 		Round:     utils.Round(1),
 		Signature: []byte{1},
 	}
 
-	err := engineV2.TimeoutHandler(timeoutMsg)
+	err := engineV2.TimeoutHandler(blockchain, timeoutMsg)
 	assert.Nil(t, err)
 	currentRound, _, _, _, _ := engineV2.GetProperties()
 	assert.Equal(t, utils.Round(1), currentRound)
@@ -30,7 +30,7 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 		Round:     utils.Round(1),
 		Signature: []byte{2},
 	}
-	err = engineV2.TimeoutHandler(timeoutMsg)
+	err = engineV2.TimeoutHandler(blockchain, timeoutMsg)
 	assert.Nil(t, err)
 	currentRound, _, _, _, _ = engineV2.GetProperties()
 	assert.Equal(t, utils.Round(1), currentRound)
@@ -40,7 +40,7 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 		Signature: []byte{3},
 	}
 
-	err = engineV2.TimeoutHandler(timeoutMsg)
+	err = engineV2.TimeoutHandler(blockchain, timeoutMsg)
 	assert.Nil(t, err)
 
 	syncInfoMsg := <-engineV2.BroadcastCh
@@ -66,20 +66,20 @@ func TestThrowErrorIfTimeoutMsgRoundNotEqualToCurrentRound(t *testing.T) {
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 
 	// Set round to 3
-	engineV2.SetNewRoundFaker(utils.Round(3), false)
+	engineV2.SetNewRoundFaker(blockchain, utils.Round(3), false)
 	timeoutMsg := &utils.Timeout{
 		Round:     utils.Round(2),
 		Signature: []byte{1},
 	}
 
-	err := engineV2.TimeoutHandler(timeoutMsg)
+	err := engineV2.TimeoutHandler(blockchain, timeoutMsg)
 	assert.NotNil(t, err)
 	// Timeout msg round > currentRound
 	assert.Equal(t, "timeout message round number: 2 does not match currentRound: 3", err.Error())
 
 	// Set round to 1
-	engineV2.SetNewRoundFaker(utils.Round(1), false)
-	err = engineV2.TimeoutHandler(timeoutMsg)
+	engineV2.SetNewRoundFaker(blockchain, utils.Round(1), false)
+	err = engineV2.TimeoutHandler(blockchain, timeoutMsg)
 	assert.NotNil(t, err)
 	// Timeout msg round < currentRound
 	assert.Equal(t, "timeout message round number: 2 does not match currentRound: 1", err.Error())

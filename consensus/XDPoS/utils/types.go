@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -81,6 +82,7 @@ type Vote struct {
 type Timeout struct {
 	Round     Round
 	Signature Signature
+	GapNumber uint64
 }
 
 // BFT Sync Info message in XDPoS 2.0
@@ -99,6 +101,7 @@ type QuorumCert struct {
 type TimeoutCert struct {
 	Round      Round
 	Signatures []Signature
+	GapNumber  uint64
 }
 
 // The parsed extra fields in block header in XDPoS 2.0 (excluding the version byte)
@@ -157,6 +160,6 @@ func (m *Vote) PoolKey() string {
 }
 
 func (m *Timeout) PoolKey() string {
-	// return a default pool key string
-	return "0"
+	// timeout pool key is round:gapNumber
+	return fmt.Sprint(m.Round, ":", m.GapNumber)
 }

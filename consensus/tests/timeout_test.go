@@ -20,6 +20,7 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	timeoutMsg := &utils.Timeout{
 		Round:     utils.Round(1),
 		Signature: []byte{1},
+		GapNumber: 450,
 	}
 
 	err := engineV2.TimeoutHandler(blockchain, timeoutMsg)
@@ -29,15 +30,29 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	timeoutMsg = &utils.Timeout{
 		Round:     utils.Round(1),
 		Signature: []byte{2},
+		GapNumber: 450,
 	}
 	err = engineV2.TimeoutHandler(blockchain, timeoutMsg)
 	assert.Nil(t, err)
 	currentRound, _, _, _, _ = engineV2.GetProperties()
 	assert.Equal(t, utils.Round(1), currentRound)
-	// Create a timeout message that should trigger timeout pool hook
+
+	// Send a timeout with different gap number, it shall not trigger timeout pool hook
 	timeoutMsg = &utils.Timeout{
 		Round:     utils.Round(1),
 		Signature: []byte{3},
+		GapNumber: 1350,
+	}
+	err = engineV2.TimeoutHandler(blockchain, timeoutMsg)
+	assert.Nil(t, err)
+	currentRound, _, _, _, _ = engineV2.GetProperties()
+	assert.Equal(t, utils.Round(1), currentRound)
+
+	// Create a timeout message that should trigger timeout pool hook
+	timeoutMsg = &utils.Timeout{
+		Round:     utils.Round(1),
+		Signature: []byte{4},
+		GapNumber: 450,
 	}
 
 	err = engineV2.TimeoutHandler(blockchain, timeoutMsg)
@@ -56,7 +71,9 @@ func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	tc := syncInfoMsg.(*utils.SyncInfo).HighestTimeoutCert
 	assert.NotNil(t, tc)
 	assert.Equal(t, tc.Round, utils.Round(1))
-	sigatures := []utils.Signature{[]byte{1}, []byte{2}, []byte{3}}
+	assert.Equal(t, uint64(450), tc.GapNumber)
+	// The signatures shall not include the byte{3} from a different gap number
+	sigatures := []utils.Signature{[]byte{1}, []byte{2}, []byte{4}}
 	assert.ElementsMatch(t, tc.Signatures, sigatures)
 	assert.Equal(t, utils.Round(2), currentRound)
 }

@@ -19,6 +19,8 @@ func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
 	poolSize := engineV2.GetTimeoutPoolSize(timeoutMsg.(*utils.Timeout))
 	assert.Equal(t, poolSize, 1)
 	assert.NotNil(t, timeoutMsg)
+	assert.Equal(t, uint64(0), timeoutMsg.(*utils.Timeout).GapNumber)
+	assert.Equal(t, utils.Round(1), timeoutMsg.(*utils.Timeout).Round)
 
 	valid, err := engineV2.VerifyTimeoutMessage(blockchain, timeoutMsg.(*utils.Timeout))
 	// We can only test valid = false for now as the implementation for getCurrentRoundMasterNodes is not complete

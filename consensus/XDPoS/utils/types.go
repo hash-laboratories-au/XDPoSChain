@@ -150,7 +150,12 @@ func VoteSigHash(m *BlockInfo) common.Hash {
 	return rlpHash(m)
 }
 
-func TimeoutSigHash(m *Round) common.Hash {
+type TimeoutForSign struct {
+	Round     Round
+	GapNumber uint64
+}
+
+func TimeoutSigHash(m *TimeoutForSign) common.Hash {
 	return rlpHash(m)
 }
 

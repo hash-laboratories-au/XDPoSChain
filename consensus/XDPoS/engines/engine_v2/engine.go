@@ -822,7 +822,10 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg *utils.Timeout) (bool, error) {
 
 	masternodes := x.GetMasternodesAtRound(chain, timeoutMsg.Round, chain.CurrentHeader())
-	return x.verifyMsgSignature(utils.TimeoutSigHash(&timeoutMsg.Round), timeoutMsg.Signature, masternodes)
+	return x.verifyMsgSignature(utils.TimeoutSigHash(&utils.TimeoutForSign{
+		Round:     timeoutMsg.Round,
+		GapNumber: timeoutMsg.GapNumber,
+	}), timeoutMsg.Signature, masternodes)
 }
 
 /*
@@ -1221,7 +1224,10 @@ func (x *XDPoS_v2) sendTimeout(chain consensus.ChainReader) error {
 		log.Debug("[sendTimeout] non-epoch-switch block found its epoch block and calculated the gapNumber", "epochSwitchInfo.EpochSwitchBlockInfo.Number", epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64(), "gapNumber", gapNumber)
 	}
 
-	signedHash, err := x.signSignature(utils.TimeoutSigHash(&x.currentRound))
+	signedHash, err := x.signSignature(utils.TimeoutSigHash(&utils.TimeoutForSign{
+		Round:     x.currentRound,
+		GapNumber: gapNumber,
+	}))
 	if err != nil {
 		log.Error("[sendTimeout] signSignature when sending out TC", "Error", err)
 		return err

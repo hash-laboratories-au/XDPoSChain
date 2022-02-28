@@ -10,6 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
+	blockchain, _, _, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 2251, params.TestXDPoSMockChainConfig, 0)
+	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
+
+	timeoutMsg := <-engineV2.BroadcastCh
+	poolSize := engineV2.GetTimeoutPoolSize(timeoutMsg.(*utils.Timeout))
+	assert.Equal(t, poolSize, 1)
+	assert.NotNil(t, timeoutMsg)
+	assert.Equal(t, uint64(1350), timeoutMsg.(*utils.Timeout).GapNumber)
+	assert.Equal(t, utils.Round(1), timeoutMsg.(*utils.Timeout).Round)
+}
+
 // Timeout handler
 func TestTimeoutMessageHandlerSuccessfullyGenerateTCandSyncInfo(t *testing.T) {
 	blockchain, _, _, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 11, params.TestXDPoSMockChainConfig, 0)
@@ -109,12 +121,12 @@ func TestShouldVerifyTimeoutMessageForFirstV2Block(t *testing.T) {
 
 	signedHash, err := signFn(accounts.Account{Address: signer}, utils.TimeoutSigHash(&utils.TimeoutForSign{
 		Round:     utils.Round(1),
-		GapNumber: 1350,
+		GapNumber: 450,
 	}).Bytes())
 	assert.Nil(t, err)
 	timeoutMsg := &utils.Timeout{
 		Round:     utils.Round(1),
-		GapNumber: 1350,
+		GapNumber: 450,
 		Signature: signedHash,
 	}
 
@@ -124,12 +136,12 @@ func TestShouldVerifyTimeoutMessageForFirstV2Block(t *testing.T) {
 
 	signedHash, err = signFn(accounts.Account{Address: signer}, utils.TimeoutSigHash(&utils.TimeoutForSign{
 		Round:     utils.Round(2),
-		GapNumber: 1350,
+		GapNumber: 450,
 	}).Bytes())
 	assert.Nil(t, err)
 	timeoutMsg = &utils.Timeout{
 		Round:     utils.Round(2),
-		GapNumber: 1350,
+		GapNumber: 450,
 		Signature: signedHash,
 	}
 

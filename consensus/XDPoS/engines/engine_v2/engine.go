@@ -465,7 +465,7 @@ func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header
 
 // snapshot retrieves the authorization snapshot at a given point in time.
 func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64) (*SnapshotV2, error) {
-	// checkpoint snapshot = checkpoint - gap
+	// checkpoint snapshot = checkpoint - gap. NOTE: Below won't work for blockNum less than 1350
 	gapBlockNum := number - number%x.config.Epoch - x.config.Gap
 	gapBlockHash := chain.GetHeaderByNumber(gapBlockNum).Hash()
 	log.Debug("get snapshot from gap block", "number", gapBlockNum, "hash", gapBlockHash.Hex())
@@ -663,7 +663,7 @@ func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *
 		log.Warn("SyncInfo message verification failed due to QC", err)
 		return err
 	}
-	err = x.verifyTC(syncInfo.HighestTimeoutCert)
+	err = x.verifyTC(chain, syncInfo.HighestTimeoutCert)
 	if err != nil {
 		log.Warn("SyncInfo message verification failed due to TC", err)
 		return err
@@ -820,12 +820,19 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 		3. Broadcast(Not part of consensus)
 */
 func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg *utils.Timeout) (bool, error) {
+	snap, err := x.getSnapshot(chain, timeoutMsg.GapNumber)
+	if err != nil {
+		log.Error("[VerifyTimeoutMessage] Fail to get snapshot when verifying timeout message!", "messageGapNumber", timeoutMsg.GapNumber)
+	}
+	if snap == nil || len(snap.NextEpochMasterNodes) == 0 {
+		log.Error("[VerifyTimeoutMessage] Something wrong with the snapshot from gapNumber", "messageGapNumber", timeoutMsg.GapNumber, "snapshot", snap)
+		return false, fmt.Errorf("Empty master node lists from snapshot")
+	}
 
-	masternodes := x.GetMasternodesAtRound(chain, timeoutMsg.Round, chain.CurrentHeader())
 	return x.verifyMsgSignature(utils.TimeoutSigHash(&utils.TimeoutForSign{
 		Round:     timeoutMsg.Round,
 		GapNumber: timeoutMsg.GapNumber,
-	}), timeoutMsg.Signature, masternodes)
+	}), timeoutMsg.Signature, snap.NextEpochMasterNodes)
 }
 
 /*
@@ -1045,7 +1052,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	return x.VerifyBlockInfo(blockChainReader, quorumCert.ProposedBlockInfo)
 }
 
-func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
+func (x *XDPoS_v2) verifyTC(chain consensus.ChainReader, timeoutCert *utils.TimeoutCert) error {
 	/*
 		1. Get epoch master node list by gapNumber
 		2. Check number of signatures > threshold, as well as it's format. (Same as verifyQC)
@@ -1054,6 +1061,52 @@ func (x *XDPoS_v2) verifyTC(timeoutCert *utils.TimeoutCert) error {
 					- Use the above public key to find out the xdc address
 					- Use the above xdc address to check against the master node list from step 1(For the received TC epoch)
 	*/
+	snap, err := x.getSnapshot(chain, timeoutCert.GapNumber)
+	if err != nil {
+		log.Error("[verifyTC] Fail to get snapshot when verifying TC!", "TCGapNumber", timeoutCert.GapNumber)
+	}
+	if snap == nil || len(snap.NextEpochMasterNodes) == 0 {
+		log.Error("[verifyTC] Something wrong with the snapshot from gapNumber", "messageGapNumber", timeoutCert.GapNumber, "snapshot", snap)
+		return fmt.Errorf("Empty master node lists from snapshot")
+	}
+
+	if timeoutCert == nil {
+		log.Warn("[verifyTC] TC is Nil")
+		return utils.ErrInvalidTC
+	} else if timeoutCert.Signatures == nil || (len(timeoutCert.Signatures) < x.config.V2.CertThreshold) {
+		log.Warn("[verifyHeader] Invalid TC Signature is nil or empty", "timeoutCert.Round", timeoutCert.Round, "timeoutCert.GapNumber", timeoutCert.GapNumber, "Signatures len", len(timeoutCert.Signatures))
+		return utils.ErrInvalidQC
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(timeoutCert.Signatures))
+	var haveError error
+
+	signedTimeoutObj := utils.TimeoutSigHash(&utils.TimeoutForSign{
+		Round:     timeoutCert.Round,
+		GapNumber: timeoutCert.GapNumber,
+	})
+
+	for _, signature := range timeoutCert.Signatures {
+		go func(sig utils.Signature) {
+			defer wg.Done()
+			verified, err := x.verifyMsgSignature(signedTimeoutObj, sig, snap.NextEpochMasterNodes)
+			if err != nil {
+				log.Error("[verifyTC] Error while verfying TC message signatures", "timeoutCert.Round", timeoutCert.Round, "timeoutCert.GapNumber", timeoutCert.GapNumber, "Signatures len", len(timeoutCert.Signatures), "Error", err)
+				haveError = fmt.Errorf("Error while verfying TC message signatures")
+				return
+			}
+			if !verified {
+				log.Warn("[verifyTC] Signature not verified doing TC verification", "timeoutCert.Round", timeoutCert.Round, "timeoutCert.GapNumber", timeoutCert.GapNumber, "Signatures len", len(timeoutCert.Signatures))
+				haveError = fmt.Errorf("Fail to verify TC due to signature mis-match")
+				return
+			}
+		}(signature)
+	}
+	wg.Wait()
+	if haveError != nil {
+		return haveError
+	}
 	return nil
 }
 
@@ -1213,14 +1266,14 @@ func (x *XDPoS_v2) sendTimeout(chain consensus.ChainReader) error {
 	if isEpochSwitch {
 		// Notice this +1 is because we expect a block whos is the child of currentHeader
 		currentNumber := currentBlockHeader.Number.Uint64() + 1
-		gapNumber := currentNumber - currentNumber%x.config.Epoch - x.config.Gap
+		gapNumber = currentNumber - currentNumber%x.config.Epoch - x.config.Gap
 		log.Debug("[sendTimeout] is epoch switch when sending out timeout message", "currentNumber", currentNumber, "gapNumber", gapNumber)
 	} else {
 		epochSwitchInfo, err := x.getEpochSwitchInfo(chain, currentBlockHeader, currentBlockHeader.Hash())
 		if err != nil {
 			log.Error("[sendTimeout] Error when trying to get current epoch switch info for a non-epoch block", "currentRound", x.currentRound, "currentBlockNum", currentBlockHeader.Number, "currentBlockHash", currentBlockHeader.Hash(), "epochNum", epochNum)
 		}
-		gapNumber := epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64() - epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64()%x.config.Epoch - x.config.Gap
+		gapNumber = epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64() - epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64()%x.config.Epoch - x.config.Gap
 		log.Debug("[sendTimeout] non-epoch-switch block found its epoch block and calculated the gapNumber", "epochSwitchInfo.EpochSwitchBlockInfo.Number", epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64(), "gapNumber", gapNumber)
 	}
 
@@ -1302,9 +1355,40 @@ func (x *XDPoS_v2) broadcastToBftChannel(msg interface{}) {
 	}()
 }
 
-func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
-	return []common.Address{}
-}
+//  Given current round, get master node
+//  If under attack and forking, network may have different results of this function
+//  Should be used only for verifying timeout, TC
+// func (x *XDPoS_v2) GetMasternodesAtRound(chain consensus.ChainReader, round utils.Round, currentHeader *types.Header) []common.Address {
+// 	var extraField utils.ExtraFields_v2
+// 	err := utils.DecodeBytesExtraFields(currentHeader.Extra, &extraField)
+// 	if err != nil {
+// 		log.Error("[getMasternodesAtRound] Fail to decode v2 extra data", "Hash", currentHeader.Hash(), "Extra", currentHeader.Extra, "Error", err)
+// 		return []common.Address{}
+// 	}
+// 	currentHeaderRound := extraField.Round
+// 	// if currentHeaderRound and this round is in the same epoch
+// 	if currentHeaderRound/utils.Round(x.config.Epoch) == round/utils.Round(x.config.Epoch) {
+// 		return x.GetMasternodes(chain, currentHeader)
+// 	} else if currentHeaderRound/utils.Round(x.config.Epoch) > round/utils.Round(x.config.Epoch) { // if currentHeaderRound epoch is above this round epoch
+// 		epochSwitchInfo, err := x.getEpochSwitchInfo(chain, currentHeader, currentHeader.Hash())
+// 		if err != nil {
+// 			log.Error("[getMasternodesAtRound] Adaptor v2 getEpochSwitchInfo has error, potentially bug", "currentHeaderHash", currentHeader.Hash(), "err", err)
+// 			return []common.Address{}
+// 		}
+// 		if epochSwitchInfo.EpochSwitchParentBlockInfo.Round/utils.Round(x.config.Epoch) == round/utils.Round(x.config.Epoch) {
+// 			return x.GetMasternodesByHash(chain, epochSwitchInfo.EpochSwitchParentBlockInfo.Hash)
+// 		} else {
+// 			log.Error("[getMasternodesAtRound] should not get masternodes at two epoch ago!", "currentHeaderRound", currentHeaderRound, "round", round, "epochSwitchInfo.EpochSwitchParentBlockInfo.Round", epochSwitchInfo.EpochSwitchParentBlockInfo.Round, "epochSwitchInfo.EpochSwitchParentBlockInfo.Hash", epochSwitchInfo.EpochSwitchParentBlockInfo.Hash)
+// 			return []common.Address{}
+// 		}
+// 	}
+// 	// if this round enters a brand new epoch (no epoch switch block to use)
+// 	mn, _, err := x.calcMasternodes(chain, currentHeader.Number, currentHeader.Hash())
+// 	if err != nil {
+// 		log.Error("[GetMasternodesAtRound] Fail to calcMasternodes", "currentHeader.Hash", currentHeader.Hash(), "currentHeader.Number", currentHeader.Number)
+// 	}
+// 	return mn
+// }
 
 func (x *XDPoS_v2) getSyncInfo() *utils.SyncInfo {
 	return &utils.SyncInfo{

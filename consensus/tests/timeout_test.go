@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/XinFinOrg/XDPoSChain/accounts"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/params"
@@ -100,4 +101,58 @@ func TestThrowErrorIfTimeoutMsgRoundNotEqualToCurrentRound(t *testing.T) {
 	assert.NotNil(t, err)
 	// Timeout msg round < currentRound
 	assert.Equal(t, "timeout message round number: 2 does not match currentRound: 1", err.Error())
+}
+
+func TestShouldVerifyTimeoutMessageForFirstV2Block(t *testing.T) {
+	blockchain, _, _, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 901, params.TestXDPoSMockChainConfig, 0)
+	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
+
+	signedHash, err := signFn(accounts.Account{Address: signer}, utils.TimeoutSigHash(&utils.TimeoutForSign{
+		Round:     utils.Round(1),
+		GapNumber: 1350,
+	}).Bytes())
+	assert.Nil(t, err)
+	timeoutMsg := &utils.Timeout{
+		Round:     utils.Round(1),
+		GapNumber: 1350,
+		Signature: signedHash,
+	}
+
+	verified, err := engineV2.VerifyTimeoutMessage(blockchain, timeoutMsg)
+	assert.Nil(t, err)
+	assert.True(t, verified)
+
+	signedHash, err = signFn(accounts.Account{Address: signer}, utils.TimeoutSigHash(&utils.TimeoutForSign{
+		Round:     utils.Round(2),
+		GapNumber: 1350,
+	}).Bytes())
+	assert.Nil(t, err)
+	timeoutMsg = &utils.Timeout{
+		Round:     utils.Round(2),
+		GapNumber: 1350,
+		Signature: signedHash,
+	}
+
+	verified, err = engineV2.VerifyTimeoutMessage(blockchain, timeoutMsg)
+	assert.Nil(t, err)
+	assert.True(t, verified)
+}
+
+func TestShouldVerifyTimeoutMessage(t *testing.T) {
+	blockchain, _, _, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 2251, params.TestXDPoSMockChainConfig, 0)
+	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
+
+	signedHash := SignHashByPK(acc1Key, utils.TimeoutSigHash(&utils.TimeoutForSign{
+		Round:     utils.Round(5000),
+		GapNumber: 2250,
+	}).Bytes())
+	timeoutMsg := &utils.Timeout{
+		Round:     utils.Round(5000),
+		GapNumber: 2250,
+		Signature: signedHash,
+	}
+
+	verified, err := engineV2.VerifyTimeoutMessage(blockchain, timeoutMsg)
+	assert.Nil(t, err)
+	assert.True(t, verified)
 }

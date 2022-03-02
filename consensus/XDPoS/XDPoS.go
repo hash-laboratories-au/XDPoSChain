@@ -486,15 +486,3 @@ func (x *XDPoS) CacheSigningTxs(hash common.Hash, txs []*types.Transaction) []*t
 func (x *XDPoS) GetCachedSigningTxs(hash common.Hash) (interface{}, bool) {
 	return x.signingTxsCache.Get(hash)
 }
-
-func (x *XDPoS) VerifyVote(*utils.Vote) error {
-	return nil
-}
-
-func (x *XDPoS) VerifyTimeout(*utils.Timeout) error {
-	return nil
-}
-
-func (x *XDPoS) VerifySyncInfo(*utils.SyncInfo) error {
-	return nil
-}

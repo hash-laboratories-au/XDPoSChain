@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/XinFinOrg/XDPoSChain/accounts"
@@ -20,6 +21,7 @@ func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
 	assert.Equal(t, poolSize, 1)
 	assert.NotNil(t, timeoutMsg)
 	assert.Equal(t, uint64(1350), timeoutMsg.(*utils.Timeout).GapNumber)
+	fmt.Println(timeoutMsg.(*utils.Timeout).GapNumber)
 	assert.Equal(t, utils.Round(1), timeoutMsg.(*utils.Timeout).Round)
 }
 
@@ -42,6 +44,22 @@ func TestSyncInfoAfterReachTimeoutSnycThreadhold(t *testing.T) {
 	}
 	assert.Equal(t, 2, timeoutCounter)
 	assert.Equal(t, 1, syncInfoCounter)
+
+	t.Log("waiting for another consecutive period")
+	// another consecutive period
+	for i := 0; i < 3; i++ {
+		obj := <-engineV2.BroadcastCh
+		switch v := obj.(type) {
+		case *utils.Timeout:
+			timeoutCounter++
+		case *utils.SyncInfo:
+			syncInfoCounter++
+		default:
+			log.Error("Unknown message type received", "value", v)
+		}
+	}
+	assert.Equal(t, 4, timeoutCounter)
+	assert.Equal(t, 2, syncInfoCounter)
 }
 
 // Timeout handler

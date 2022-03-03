@@ -43,7 +43,7 @@ var (
 		SwitchBlock:          big.NewInt(900),
 		CertThreshold:        3,
 		TimeoutSyncThreshold: 2,
-		TimeoutPeriod:        10,
+		TimeoutPeriod:        5,
 		WaitPeriod:           1,
 		MinePeriod:           2,
 		SkipV2Validation:     true,

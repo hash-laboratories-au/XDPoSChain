@@ -53,7 +53,7 @@ var (
 		CertThreshold:        6,
 		TimeoutSyncThreshold: 5,
 		TimeoutPeriod:        50,
-		WaitPeriod:           2,
+		WaitPeriod:           10,
 		MinePeriod:           10,
 	}
 

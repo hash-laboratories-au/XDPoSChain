@@ -126,7 +126,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, masternodes []common.Add
 	log.Info("[Initial] initial v2 related parameters")
 
 	if x.highestQuorumCert.ProposedBlockInfo.Hash != (common.Hash{}) { // already initialized
-		log.Error("[Initial] Already initialized", "x.highestQuorumCert.ProposedBlockInfo.Hash", x.highestQuorumCert.ProposedBlockInfo.Hash)
+		log.Warn("[Initial] Already initialized", "x.highestQuorumCert.ProposedBlockInfo.Hash", x.highestQuorumCert.ProposedBlockInfo.Hash)
 		return nil
 	}
 
@@ -415,7 +415,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	if masterNodes[leaderIndex] == signer {
 		return true, nil
 	}
-	log.Warn("[YourTurn] Not authorised signer", "signer", signer, "MN", masterNodes, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "signer", signer)
+	log.Debug("[YourTurn] Not authorised signer", "signer", signer, "MN", masterNodes, "Hash", parent.Hash(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "signer", signer)
 	return false, nil
 }
 

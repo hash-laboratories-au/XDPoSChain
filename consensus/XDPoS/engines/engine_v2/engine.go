@@ -1723,6 +1723,7 @@ func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types
 		if signer == mn {
 			log.Debug("[allowedToSend] Yes, I'm allowed to send", "sendType", sendType, "MyAddress", signer.Hex(), "Index in master node list", i)
 			allowedToSend = true
+			break
 		}
 	}
 	if !allowedToSend {

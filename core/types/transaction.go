@@ -28,6 +28,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/common/hexutil"
 	"github.com/XinFinOrg/XDPoSChain/crypto"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/rlp"
 )
 
@@ -308,6 +309,7 @@ func (tx *Transaction) IsSpecialTransaction() bool {
 	toBytes := tx.To().Bytes()
 	randomizeSMCBytes := common.HexToAddress(common.RandomizeSMC).Bytes()
 	blockSignersBytes := common.HexToAddress(common.BlockSigners).Bytes()
+	// TradingStateAddrByte := common.HexToAddress(common.TradingStateAddr).Bytes()
 	return bytes.Equal(toBytes, randomizeSMCBytes) || bytes.Equal(toBytes, blockSignersBytes)
 }
 
@@ -357,6 +359,7 @@ func (tx *Transaction) IsSkipNonceTransaction() bool {
 
 func (tx *Transaction) IsSigningTransaction() bool {
 	if tx.To() == nil {
+		log.Error("1")
 		return false
 	}
 
@@ -371,6 +374,7 @@ func (tx *Transaction) IsSigningTransaction() bool {
 	}
 
 	if len(tx.Data()) != (32*2 + 4) {
+		log.Error("IsSigningTransaction", "len(tx.Data())", len(tx.Data()), "tx", tx)
 		return false
 	}
 

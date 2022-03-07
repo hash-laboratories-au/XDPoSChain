@@ -459,6 +459,7 @@ func ApplySignTransaction(config *params.ChainConfig, statedb *state.StateDB, he
 	} else if nonce > tx.Nonce() {
 		return nil, 0, ErrNonceTooLow, false
 	}
+	log.Warn("[ApplySignTransaction] setting nonce", "nonce", nonce, "from", from)
 	statedb.SetNonce(from, nonce+1)
 	// Create a new receipt for the transaction, storing the intermediate root and gas used by the tx
 	// based on the eip phase, we're passing wether the root touch-delete accounts.

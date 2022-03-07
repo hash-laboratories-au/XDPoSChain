@@ -560,7 +560,7 @@ func (x *XDPoS_v1) verifySeal(chain consensus.ChainReader, header *types.Header,
 		parent = chain.GetHeader(header.ParentHash, number-1)
 	}
 	difficulty := x.calcDifficulty(chain, parent, creator)
-	log.Debug("verify seal block", "number", header.Number, "hash", header.Hash(), "block difficulty", header.Difficulty, "calc difficulty", difficulty, "creator", creator)
+	log.Debug("verify seal block", "number", header.Number, "hash", header.Hash().Hex(), "block difficulty", header.Difficulty, "calc difficulty", difficulty, "creator", creator)
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
 	if number > 0 {
 		if header.Difficulty.Int64() != difficulty.Int64() {

@@ -643,6 +643,7 @@ func (pool *LendingPool) validateTx(tx *types.LendingTransaction, local bool) er
 	}
 	// Ensure the transaction adheres to nonce lending
 	if pool.currentLendingState.GetNonce(from.Hash()) > tx.Nonce() {
+		log.Error("[validateTx- lending_pool] ERROR CHECK NONCE", "pool.currentLendingState.GetNonce(from.Hash())", pool.currentLendingState.GetNonce(from.Hash()), "tx.Nonce()", tx.Nonce())
 		return ErrNonceTooLow
 	}
 	if pool.pendingState.GetNonce(from.Hash())+common.LimitThresholdNonceInQueue < tx.Nonce() {

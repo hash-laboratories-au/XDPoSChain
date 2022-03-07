@@ -341,6 +341,7 @@ func GetRewardForCheckpoint(c *XDPoS.XDPoS, chain consensus.ChainReader, header 
 				receipts := core.GetBlockReceipts(c.GetDb(), header.Hash(), i)
 				signData = c.CacheNoneTIPSigningTxs(header, txs, receipts)
 			} else {
+				log.Info("GetRewardForCheckpoint", "header.Hash()", header.Hash(), "txs", txs)
 				signData = c.CacheSigningTxs(header.Hash(), txs)
 			}
 		}

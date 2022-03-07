@@ -1400,6 +1400,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	if bc.chainConfig.XDPoS != nil && bc.chainConfig.IsTIPSigning(block.Number()) {
 		engine, ok := bc.Engine().(*XDPoS.XDPoS)
 		if ok {
+			log.Info("save cache BlockSigners", "block.Header().Hash()", block.Header().Hash(), "block.Transactions()", block.Transactions())
 			engine.CacheSigningTxs(block.Header().Hash(), block.Transactions())
 		}
 	}

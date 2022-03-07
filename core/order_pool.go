@@ -551,6 +551,7 @@ func (pool *OrderPool) validateTx(tx *types.OrderTransaction, local bool) error 
 	}
 	// Ensure the transaction adheres to nonce ordering
 	if pool.currentOrderState.GetNonce(from.Hash()) > tx.Nonce() {
+		log.Error("[validateTx- order_pool] ERROR CHECK NONCE", "pool.currentOrderState.GetNonce(from.Hash())", pool.currentOrderState.GetNonce(from.Hash()), "tx.Nonce()", tx.Nonce())
 		return ErrNonceTooLow
 	}
 	if pool.pendingState.GetNonce(from.Hash())+common.LimitThresholdNonceInQueue < tx.Nonce() {

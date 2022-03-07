@@ -342,7 +342,7 @@ func (x *XDPoS) CacheSigningTxs(hash common.Hash, txs []*types.Transaction) []*t
 			signTxs = append(signTxs, tx)
 		}
 	}
-	log.Debug("Save tx signers to cache", "hash", hash.String(), "len(txs)", len(signTxs))
+	log.Info("Save tx signers to cache", "hash", hash.String(), "len(txs)", len(signTxs))
 	x.signingTxsCache.Add(hash, signTxs)
 	return signTxs
 }

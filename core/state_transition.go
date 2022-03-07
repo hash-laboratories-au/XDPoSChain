@@ -251,6 +251,7 @@ func (st *StateTransition) TransitionDb(owner common.Address) (ret []byte, usedG
 	} else {
 		// Increment the nonce for the next transaction
 		nonce = st.state.GetNonce(sender.Address()) + 1
+		log.Warn("[TransitionDb] Setting nonce", "nonce", nonce, "sender.Address()", sender.Address())
 		st.state.SetNonce(sender.Address(), nonce)
 		ret, st.gas, vmerr = evm.Call(sender, st.to().Address(), st.data, st.gas, st.value)
 		contractAction = "contract call"

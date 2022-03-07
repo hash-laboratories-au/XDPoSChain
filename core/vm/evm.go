@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/XDCx/tradingstate"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
@@ -392,6 +393,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
+	log.Warn("[create] setting nonce", "nonce", nonce, "caller.Address()", caller.Address())
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
 
 	// Ensure there's no existing contract already at the designated address

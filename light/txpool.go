@@ -376,6 +376,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	// Last but not least check for nonce errors
 	currentState := pool.currentState(ctx)
 	if n := currentState.GetNonce(from); n > tx.Nonce() {
+		log.Error("[validateTx- light] ERROR CHECK NONCE", "currentState.GetNonce(from)", currentState.GetNonce(from), "tx.Nonce()", tx.Nonce())
 		return core.ErrNonceTooLow
 	}
 

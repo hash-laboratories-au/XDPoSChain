@@ -418,6 +418,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
 					return
 				}
+				log.Warn("[reset] discarded and included", "discarded", discarded, "rem.hash", rem.Hash().Hex(), "add.hash", add.Hash().Hex(), "included", included)
 			}
 			reinject = types.TxDifference(discarded, included)
 		}
@@ -437,7 +438,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.currentMaxGas = newHead.GasLimit
 
 	// Inject any transactions discarded due to reorgs
-	log.Debug("Reinjecting stale transactions", "count", len(reinject))
+	log.Warn("Reinjecting stale transactions", "count", len(reinject), "reinject", reinject)
 	pool.addTxsLocked(reinject, false)
 
 	// validate the pool of pending transactions, this will remove
@@ -449,6 +450,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// Update all accounts to the latest known pending nonce
 	for addr, list := range pool.pending {
 		txs := list.Flatten() // Heavy but will be cached and is needed by the miner anyway
+		log.Info("[reset] pending state nonce", "addr", addr, "txs[len(txs)-1].Nonce()", txs[len(txs)-1].Nonce(), "tx", txs)
 		pool.pendingState.SetNonce(addr, txs[len(txs)-1].Nonce()+1)
 	}
 	// Check the queue and move transactions over to the pending if possible
@@ -622,7 +624,9 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		}
 	}
 	// Ensure the transaction adheres to nonce ordering
+	// log.Info("[validateTx] CHECK NONCE", "from", from, "pool.currentState.GetNonce(from)", pool.currentState.GetNonce(from), "tx.Nonce()", tx.Nonce(), "tx.From()", tx.From(), "tx.IsSkipNonceTransaction()", tx.IsSkipNonceTransaction(), "to", tx.To())
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
+		log.Error("[validateTx] ERROR CHECK NONCE", "from", from, "pool.currentState.GetNonce(from)", pool.currentState.GetNonce(from), "tx.Nonce()", tx.Nonce(), "tx.From()", tx.From(), "tx.IsSkipNonceTransaction()", tx.IsSkipNonceTransaction(), "tx-hash", tx.Hash(), "to", tx.To(), "Tx", tx)
 		return ErrNonceTooLow
 	}
 	if pool.pendingState.GetNonce(from)+common.LimitThresholdNonceInQueue < tx.Nonce() {
@@ -714,7 +718,11 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		return false, err
 	}
 	from, _ := types.Sender(pool.signer, tx) // already validated
+	// if tx.IsSpecialTransaction() && pool.IsSigner != nil && pool.IsSigner(from) {
+	// 	log.Warn("[add] special transasction", "tx-hash", tx.Hash(), "tx-to", tx.To(), "tx.Nonce()", tx.Nonce(), "pool.pendingState.GetNonce(from)", pool.pendingState.GetNonce(from), "pool.currentState.GetNonce(from)", pool.currentState.GetNonce(from))
+	// }
 	if tx.IsSpecialTransaction() && pool.IsSigner != nil && pool.IsSigner(from) && pool.pendingState.GetNonce(from) == tx.Nonce() {
+		// log.Warn("[add] special transasction", "tx-hash", tx.Hash(), "tx-to", tx.To(), "tx.Nonce()", tx.Nonce(), "pool.currentState.GetNonce(from)", pool.currentState.GetNonce(from))
 		return pool.promoteSpecialTx(from, tx)
 	}
 	// If the transaction pool is full, discard underpriced transactions
@@ -845,6 +853,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	}
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.beats[addr] = time.Now()
+	log.Info("[promoteTx]", "address", addr, "tx.Nonce()", tx.Nonce(), "tx", tx)
 	pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 
 	go pool.txFeed.Send(TxPreEvent{tx})
@@ -879,6 +888,7 @@ func (pool *TxPool) promoteSpecialTx(addr common.Address, tx *types.Transaction)
 	}
 	// Set the potentially new pending nonce and notify any subsystems of the new tx
 	pool.beats[addr] = time.Now()
+	log.Info("[promoteSpecialTx] set nonce", "address", addr, "tx.Nonce", tx.Nonce())
 	pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 	go pool.txFeed.Send(TxPreEvent{tx})
 	return true, nil
@@ -1024,6 +1034,7 @@ func (pool *TxPool) removeTx(hash common.Hash) {
 			}
 			// Update the account nonce if needed
 			if nonce := tx.Nonce(); pool.pendingState.GetNonce(addr) > nonce {
+				log.Info("[removeTx] set nonce", "address", addr, "tx.Nonce", tx.Nonce(), "pool.pendingState.GetNonce(addr)", pool.pendingState.GetNonce(addr))
 				pool.pendingState.SetNonce(addr, nonce)
 			}
 			return
@@ -1134,6 +1145,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 
 							// Update the account nonce to the dropped transaction
 							if nonce := tx.Nonce(); pool.pendingState.GetNonce(offenders[i]) > nonce {
+								log.Info("[promoteExecutables] set nonce", "offenders[i]", offenders[i], "tx.Nonce", tx.Nonce(), "pool.pendingState.GetNonce(offenders[i])", pool.pendingState.GetNonce(offenders[i]))
 								pool.pendingState.SetNonce(offenders[i], nonce)
 							}
 							log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
@@ -1156,6 +1168,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 
 						// Update the account nonce to the dropped transaction
 						if nonce := tx.Nonce(); pool.pendingState.GetNonce(addr) > nonce {
+							log.Info("[promoteExecutables] set nonce", "address", addr, "tx.Nonce", tx.Nonce(), "pool.pendingState.GetNonce(addr)", pool.pendingState.GetNonce(addr))
 							pool.pendingState.SetNonce(addr, nonce)
 						}
 						log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)

@@ -146,6 +146,7 @@ func AttachConsensusV1Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 					if !ok {
 						block := chain.GetBlock(bhash, blockNumber)
 						txs := block.Transactions()
+						log.Info("HookPenaltyTIPSigning!!!", "bhash", bhash, "txs", txs)
 						signData = adaptor.CacheSigningTxs(bhash, txs)
 					}
 					txs := signData.([]*types.Transaction)

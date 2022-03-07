@@ -1030,20 +1030,26 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")
 	}
 
+	signatures, duplicates := UniqueSignatures(quorumCert.Signatures)
+	if len(duplicates) != 0 {
+		for _, d := range duplicates {
+			log.Warn("[verifyQC] duplicated signature in QC", "duplicate", common.Bytes2Hex(d))
+		}
+	}
 	if quorumCert == nil {
 		log.Warn("[verifyQC] QC is Nil")
 		return utils.ErrInvalidQC
-	} else if (quorumCert.ProposedBlockInfo.Number.Uint64() > x.config.V2.SwitchBlock.Uint64()) && (quorumCert.Signatures == nil || (len(quorumCert.Signatures) < x.config.V2.CertThreshold)) {
+	} else if (quorumCert.ProposedBlockInfo.Number.Uint64() > x.config.V2.SwitchBlock.Uint64()) && (signatures == nil || (len(signatures) < x.config.V2.CertThreshold)) {
 		//First V2 Block QC, QC Signatures is initial nil
-		log.Warn("[verifyHeader] Invalid QC Signature is nil or empty", "QC", quorumCert, "QCNumber", quorumCert.ProposedBlockInfo.Number, "Signatures len", len(quorumCert.Signatures))
+		log.Warn("[verifyHeader] Invalid QC Signature is nil or empty", "QC", quorumCert, "QCNumber", quorumCert.ProposedBlockInfo.Number, "Signatures len", len(signatures))
 		return utils.ErrInvalidQC
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(quorumCert.Signatures))
+	wg.Add(len(signatures))
 	var haveError error
 
-	for _, signature := range quorumCert.Signatures {
+	for _, signature := range signatures {
 		go func(sig utils.Signature) {
 			defer wg.Done()
 			verified, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), sig, epochInfo.Masternodes)

@@ -60,7 +60,7 @@ func (t *CountdownTimer) startTimer(i interface{}) {
 			log.Debug("Countdown time reached!")
 			err := t.OnTimeoutFn(time.Now(), i)
 			if err != nil {
-				log.Error("OnTimeoutFn error", err)
+				log.Error("OnTimeoutFn error", "error", err)
 			}
 			log.Debug("Reset timer after timeout reached and OnTimeoutFn processed")
 			timer.Reset(t.timeoutDuration)

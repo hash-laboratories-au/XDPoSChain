@@ -110,7 +110,7 @@ func (b *Bfter) Vote(vote *utils.Vote) error {
 	return nil
 }
 func (b *Bfter) Timeout(timeout *utils.Timeout) error {
-	log.Info("Receive Timeout", "timeout", timeout)
+	log.Debug("Receive Timeout", "timeout", timeout)
 	if exist, _ := b.knownTimeouts.ContainsOrAdd(timeout.Hash(), true); exist {
 		log.Trace("Discarded Timeout, known Timeout", "Signature", timeout.Signature, "hash", timeout.Hash(), "round", timeout.Round)
 		return nil
@@ -138,7 +138,7 @@ func (b *Bfter) Timeout(timeout *utils.Timeout) error {
 	return nil
 }
 func (b *Bfter) SyncInfo(syncInfo *utils.SyncInfo) error {
-	log.Info("Receive SyncInfo", "syncInfo", syncInfo)
+	log.Debug("Receive SyncInfo", "syncInfo", syncInfo)
 	if exist, _ := b.knownSyncInfos.ContainsOrAdd(syncInfo.Hash(), true); exist {
 		log.Trace("Discarded SyncInfo, known SyncInfo", "hash", syncInfo.Hash())
 		return nil

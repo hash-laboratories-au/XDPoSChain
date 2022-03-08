@@ -696,6 +696,7 @@ func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *
 }
 
 func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.SyncInfo) error {
+	log.Info("[SyncInfoHandler]", "QC Round", syncInfo.HighestQuorumCert.ProposedBlockInfo.Round, "TC Round", syncInfo.HighestTimeoutCert.Round)
 	x.lock.Lock()
 	defer x.lock.Unlock()
 	/*
@@ -1566,7 +1567,7 @@ func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 		log.Info("[IsEpochSwitch] true, parent equals V2.SwitchBlock", "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
 		return true, epochNum, nil
 	}
-	log.Info("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
+	log.Debug("[IsEpochSwitch]", "parent round", parentRound, "round", round, "number", header.Number.Uint64(), "hash", header.Hash())
 	return parentRound < epochStartRound, epochNum, nil
 }
 

@@ -831,6 +831,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		// Mark the peer as owning the vote and process it
+		p = pm.peers.Peer(p.id) // because sender and receive peer are different
 		p.MarkVote(vote.Hash())
 		pm.bft.Vote(&vote)
 	case msg.Code == TimeoutMsg:
@@ -840,6 +841,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 		// Mark the peer as owning the timeout and process it
+		p = pm.peers.Peer(p.id) // because sender and receive peer are different
 		p.MarkTimeout(timeout.Hash())
 		pm.bft.Timeout(&timeout)
 	case msg.Code == SyncInfoMsg:
@@ -848,6 +850,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		// Mark the peer as owning the syncInfo and process it
+		p = pm.peers.Peer(p.id) // because sender and receive peer are different
 		p.MarkSyncInfo(syncInfo.Hash())
 		pm.bft.SyncInfo(&syncInfo)
 

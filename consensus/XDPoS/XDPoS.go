@@ -335,13 +335,6 @@ func (x *XDPoS) UpdateMasternodes(chain consensus.ChainReader, header *types.Hea
 	case params.ConsensusEngineVersion2:
 		return x.EngineV2.UpdateMasternodes(chain, header, ms)
 	default: // Default "v1"
-		if header.Number.Uint64()+x.config.Gap == x.config.V2.SwitchBlock.Uint64() {
-			// sfmt.Println("UpdateMasternodes v2")
-			err := x.EngineV2.UpdateMasternodes(chain, header, ms)
-			if err != nil {
-				log.Error("[UpdateMasternodes] on last v1 gap block", "err", err)
-			}
-		}
 		return x.EngineV1.UpdateMasternodes(chain, header, ms)
 	}
 }

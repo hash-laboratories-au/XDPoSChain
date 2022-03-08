@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
-	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/ethdb"
 )
 
@@ -12,7 +11,6 @@ import (
 // The validator list is used on next epoch master nodes
 // If we don't have the snapshot, then we have to trace back the gap block smart contract state which is very costly
 type SnapshotV2 struct {
-	Round  utils.Round `json:"round"`  // Round number
 	Number uint64      `json:"number"` // Block number where the snapshot was created
 	Hash   common.Hash `json:"hash"`   // Block hash where the snapshot was created
 
@@ -21,9 +19,8 @@ type SnapshotV2 struct {
 }
 
 // create new snapshot for next epoch to use
-func newSnapshot(number uint64, hash common.Hash, round utils.Round, masternodes []common.Address) *SnapshotV2 {
+func newSnapshot(number uint64, hash common.Hash, masternodes []common.Address) *SnapshotV2 {
 	snap := &SnapshotV2{
-		Round:                round,
 		Number:               number,
 		Hash:                 hash,
 		NextEpochMasterNodes: masternodes,

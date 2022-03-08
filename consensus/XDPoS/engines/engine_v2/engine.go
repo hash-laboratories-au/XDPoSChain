@@ -150,6 +150,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 		// can not call processQC because round is equal to default
 		x.currentRound = 1
 		x.highestQuorumCert = quorumCert
+
 	} else {
 		log.Info("[Initial] highest QC from current header")
 		quorumCert, _, _, err = x.getExtraFields(header)
@@ -158,6 +159,30 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 		}
 		err = x.processQC(chain, quorumCert)
 		if err != nil {
+			return err
+		}
+	}
+
+	// Initial first v2 snapshot
+	if header.Number.Uint64() < x.config.V2.SwitchBlock.Uint64()+x.config.Gap {
+
+		checkpointBlockNumber := header.Number.Uint64() - header.Number.Uint64()%x.config.Epoch
+		checkpointHeader := chain.GetHeaderByNumber(checkpointBlockNumber)
+
+		lastGapNum := checkpointBlockNumber - x.config.Gap
+		lastGapHeader := chain.GetHeaderByNumber(lastGapNum)
+
+		log.Info("[Initial] init first snapshot")
+		_, _, masternodes, err := x.getExtraFields(checkpointHeader)
+		if err != nil {
+			log.Error("[Initial] Error while get masternodes", "error", err)
+			return err
+		}
+		snap := newSnapshot(lastGapNum, lastGapHeader.Hash(), masternodes)
+		x.snapshots.Add(snap.Hash, snap)
+		err = storeSnapshot(snap, x.db)
+		if err != nil {
+			log.Error("[Initial] Error while store snapshot", "error", err)
 			return err
 		}
 	}
@@ -484,8 +509,6 @@ func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64, isGap
 	x.snapshots.Add(snap.Hash, snap)
 	return snap, nil
 }
-450 UpdateMasternodes()
-v2 900 initial()
 
 func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []utils.Masternode) error {
 	number := header.Number.Uint64()

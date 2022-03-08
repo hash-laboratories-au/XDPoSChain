@@ -36,7 +36,6 @@ func TestInitialFirstV2Blcok(t *testing.T) {
 	// Test snapshot
 	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, currentBlock.Header())
 	assert.Nil(t, err)
-	assert.Equal(t, utils.Round(1), snap.Round)
 	assert.Equal(t, uint64(450), snap.Number)
 
 	// Test Running channels
@@ -106,6 +105,5 @@ func TestInitialOtherV2Block(t *testing.T) {
 	// Test snapshot
 	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, block.Header())
 	assert.Nil(t, err)
-	assert.Equal(t, utils.Round(11), snap.Round)
 	assert.Equal(t, uint64(450), snap.Number)
 }

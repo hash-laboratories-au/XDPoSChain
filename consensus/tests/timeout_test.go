@@ -1,11 +1,15 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/XinFinOrg/XDPoSChain/accounts"
+	"github.com/XinFinOrg/XDPoSChain/accounts/abi/bind/backends"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/params"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +23,64 @@ func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
 	assert.Equal(t, poolSize, 1)
 	assert.NotNil(t, timeoutMsg)
 	assert.Equal(t, uint64(1350), timeoutMsg.(*utils.Timeout).GapNumber)
+	fmt.Println(timeoutMsg.(*utils.Timeout).GapNumber)
 	assert.Equal(t, utils.Round(1), timeoutMsg.(*utils.Timeout).Round)
+}
+
+func TestCountdownTimeoutNotToSendTimeoutMessageIfNotInMasternodeList(t *testing.T) {
+	blockchain, _, _, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 901, params.TestXDPoSMockChainConfig, 0)
+
+	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
+	differentSigner, differentSignFn, err := backends.SimulateWalletAddressAndSignFn()
+	assert.Nil(t, err)
+	// Let's change the address
+	engineV2.Authorize(differentSigner, differentSignFn)
+
+	engineV2.SetNewRoundFaker(blockchain, 1, true)
+
+	select {
+	case <-engineV2.BroadcastCh:
+		t.Fatalf("Not suppose to receive timeout msg")
+	case <-time.After(15 * time.Second): //Countdown is only 1s wait, let's wait for 3s here
+	}
+}
+
+func TestSyncInfoAfterReachTimeoutSnycThreadhold(t *testing.T) {
+	blockchain, _, _, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 901, params.TestXDPoSMockChainConfig, 0)
+	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
+	engineV2.SetNewRoundFaker(blockchain, 1, true)
+
+	// Because messages are sending async and on random order, so use this way to test
+	var timeoutCounter, syncInfoCounter int
+	for i := 0; i < 3; i++ {
+		obj := <-engineV2.BroadcastCh
+		switch v := obj.(type) {
+		case *utils.Timeout:
+			timeoutCounter++
+		case *utils.SyncInfo:
+			syncInfoCounter++
+		default:
+			log.Error("Unknown message type received", "value", v)
+		}
+	}
+	assert.Equal(t, 2, timeoutCounter)
+	assert.Equal(t, 1, syncInfoCounter)
+
+	t.Log("waiting for another consecutive period")
+	// another consecutive period
+	for i := 0; i < 3; i++ {
+		obj := <-engineV2.BroadcastCh
+		switch v := obj.(type) {
+		case *utils.Timeout:
+			timeoutCounter++
+		case *utils.SyncInfo:
+			syncInfoCounter++
+		default:
+			log.Error("Unknown message type received", "value", v)
+		}
+	}
+	assert.Equal(t, 4, timeoutCounter)
+	assert.Equal(t, 2, syncInfoCounter)
 }
 
 // Timeout handler

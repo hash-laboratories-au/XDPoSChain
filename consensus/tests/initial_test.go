@@ -16,7 +16,11 @@ func TestInitialFirstV2Blcok(t *testing.T) {
 	blockchain, _, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 	header := currentBlock.Header()
-	// Initialise
+
+	// snapshot should not be created before initial
+	snap, _ := adaptor.EngineV2.GetSnapshot(blockchain, currentBlock.Header())
+	assert.Nil(t, snap)
+
 	err := adaptor.EngineV2.Initial(blockchain, header)
 	assert.Nil(t, err)
 
@@ -34,7 +38,7 @@ func TestInitialFirstV2Blcok(t *testing.T) {
 	assert.Equal(t, expectedQuorumCert, highQC)
 
 	// Test snapshot
-	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, currentBlock.Header())
+	snap, err = adaptor.EngineV2.GetSnapshot(blockchain, currentBlock.Header())
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(450), snap.Number)
 
@@ -42,7 +46,7 @@ func TestInitialFirstV2Blcok(t *testing.T) {
 	WaitPeriod := <-adaptor.WaitPeriodCh
 	assert.Equal(t, params.TestXDPoSMockChainConfig.XDPoS.V2.WaitPeriod, WaitPeriod)
 
-	t.Logf("Waiting %d secs for timeout to happen", params.TestXDPoSMockChainConfig.XDPoS.V2.TimeoutWorkerDuration)
+	t.Logf("Waiting %d secs for timeout to happen", params.TestXDPoSMockChainConfig.XDPoS.V2.TimeoutPeriod)
 	timeoutMsg := <-adaptor.EngineV2.BroadcastCh
 	assert.NotNil(t, timeoutMsg)
 	assert.Equal(t, utils.Round(1), timeoutMsg.(*utils.Timeout).Round)
@@ -106,4 +110,14 @@ func TestInitialOtherV2Block(t *testing.T) {
 	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, block.Header())
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(450), snap.Number)
+}
+
+func TestSnapshotShouldAlreadyCreatedByUpdateM1(t *testing.T) {
+	// insert new block with new extra fields
+	blockchain, _, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 1800, params.TestXDPoSMockChainConfig, 0)
+	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
+
+	snap, err := adaptor.EngineV2.GetSnapshot(blockchain, currentBlock.Header())
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(1350), snap.Number)
 }

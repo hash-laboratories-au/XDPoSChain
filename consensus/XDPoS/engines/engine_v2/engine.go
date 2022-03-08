@@ -46,6 +46,7 @@ type XDPoS_v2 struct {
 	waitPeriodCh chan int
 
 	timeoutWorker *countdown.CountdownTimer // Timer to generate broadcast timeout msg if threashold reached
+	timeoutCount  int                       // number of timeout being sent
 
 	timeoutPool       *utils.Pool
 	votePool          *utils.Pool
@@ -63,7 +64,7 @@ type XDPoS_v2 struct {
 
 func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *XDPoS_v2 {
 	// Setup Timer
-	duration := time.Duration(config.V2.TimeoutWorkerDuration) * time.Second
+	duration := time.Duration(config.V2.TimeoutPeriod) * time.Second
 	timer := countdown.NewCountDown(duration)
 	timeoutPool := utils.NewPool(config.V2.CertThreshold)
 
@@ -442,7 +443,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 
 	_, round, _, err := x.getExtraFields(header)
 	if err != nil {
-		log.Error("[IsAuthorisedAddress] Fail to decode v2 extra data", "Hash", header.Hash(), "Extra", header.Extra, "Error", err)
+		log.Error("[IsAuthorisedAddress] Fail to decode v2 extra data", "Hash", header.Hash().Hex(), "Extra", header.Extra, "Error", err)
 		return false
 	}
 	blockRound := round
@@ -450,10 +451,10 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 	masterNodes := x.GetMasternodes(chain, header)
 
 	if len(masterNodes) == 0 {
-		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash(), "Round", blockRound, "Number", header.Number)
+		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash().Hex(), "Round", blockRound, "Number", header.Number)
 		return false
 	}
-	// leaderIndex := uint64(blockRound) % x.config.Epoch % uint64(len(masterNodes))
+
 	for index, masterNodeAddress := range masterNodes {
 		if masterNodeAddress == address {
 			log.Debug("[IsAuthorisedAddress] Found matching master node address", "index", index, "Address", address, "MasterNodes", masterNodes)
@@ -461,7 +462,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 		}
 	}
 
-	log.Warn("Not authorised address", "Address", address.Hex(), "Hash", header.Hash())
+	log.Warn("Not authorised address", "Address", address.Hex(), "Hash", header.Hash().Hex())
 	for index, mn := range masterNodes {
 		log.Warn("Master node list item", "mn", mn.Hex(), "index", index)
 	}
@@ -628,7 +629,8 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 			return utils.ErrInvalidCheckpointSigners
 		}
 	} else {
-		if header.Validators != nil {
+		if len(header.Validators) != 0 {
+			log.Warn("[verifyHeader] Validators shall not have values in non-epochSwitch block", "Hash", header.Hash(), "Number", header.Number, "Validators", header.Validators)
 			return utils.ErrInvalidFieldInNonEpochSwitch
 		}
 	}
@@ -729,7 +731,10 @@ func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vo
 	}
 	verified, err := x.verifyMsgSignature(utils.VoteSigHash(vote.ProposedBlockInfo), vote.Signature, snapshot.NextEpochMasterNodes)
 	if err != nil {
-		log.Error("[VerifyVoteMessage] Error while verifying vote message", "Error", err.Error())
+		for i, mn := range snapshot.NextEpochMasterNodes {
+			log.Warn("[VerifyVoteMessage] Master node list item", "index", i, "Master node", mn.Hex())
+		}
+		log.Warn("[VerifyVoteMessage] Error while verifying vote message", "votedBlockNum", vote.ProposedBlockInfo.Number.Uint64(), "votedBlockHash", vote.ProposedBlockInfo.Hash.Hex(), "Error", err.Error())
 	}
 	return verified, err
 }
@@ -931,7 +936,7 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(blockChainReader consensus.Chai
 /*
 	Proposed Block workflow
 */
-func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, blockHeader *types.Header) error {
+func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader *types.Header) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 
@@ -948,7 +953,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, 
 		return err
 	}
 
-	err = x.verifyQC(blockChainReader, quorumCert)
+	err = x.verifyQC(chain, quorumCert)
 	if err != nil {
 		log.Error("[ProposedBlockHandler] Fail to verify QC", "Extra round", round, "QC proposed BlockInfo Hash", quorumCert.ProposedBlockInfo.Hash)
 		return err
@@ -960,17 +965,23 @@ func (x *XDPoS_v2) ProposedBlockHandler(blockChainReader consensus.ChainReader, 
 		Round:  round,
 		Number: blockHeader.Number,
 	}
-	err = x.processQC(blockChainReader, quorumCert)
+	err = x.processQC(chain, quorumCert)
 	if err != nil {
 		log.Error("[ProposedBlockHandler] Fail to processQC", "QC proposed blockInfo round number", quorumCert.ProposedBlockInfo.Round, "QC proposed blockInfo hash", quorumCert.ProposedBlockInfo.Hash)
 		return err
 	}
-	verified, err := x.verifyVotingRule(blockChainReader, blockInfo, quorumCert)
+
+	err = x.allowedToSend(chain, blockHeader, "vote")
+	if err != nil {
+		return err
+	}
+
+	verified, err := x.verifyVotingRule(chain, blockInfo, quorumCert)
 	if err != nil {
 		return err
 	}
 	if verified {
-		return x.sendVote(blockChainReader, blockInfo)
+		return x.sendVote(chain, blockInfo)
 	} else {
 		log.Info("Failed to pass the voting rule verification", "ProposeBlockHash", blockInfo.Hash)
 	}
@@ -1031,26 +1042,38 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 					- Use the above xdc address to check against the master node list from step 1(For the received QC epoch)
 		4. Verify blockInfo
 	*/
-	if quorumCert == nil {
-		log.Warn("[verifyQC] QC is Nil")
-		return utils.ErrInvalidQC
-	} else if (quorumCert.ProposedBlockInfo.Number.Uint64() > x.config.V2.SwitchBlock.Uint64()) && (quorumCert.Signatures == nil || (len(quorumCert.Signatures) < x.config.V2.CertThreshold)) {
-		// Skip First V2 Block QC, QC Signatures is nil
-		log.Warn("[verifyHeader] Invalid QC Signature is nil or empty", "QC", quorumCert, "QCNumber", quorumCert.ProposedBlockInfo.Number, "Signatures len", len(quorumCert.Signatures))
-		return utils.ErrInvalidQC
-	}
-
 	epochInfo, err := x.getEpochSwitchInfo(blockChainReader, nil, quorumCert.ProposedBlockInfo.Hash)
 	if err != nil {
 		log.Error("[verifyQC] Error when getting epoch switch Info to verify QC", "Error", err)
 		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")
 	}
 
+	signatures, duplicates := UniqueSignatures(quorumCert.Signatures)
+	if len(duplicates) != 0 {
+		for _, d := range duplicates {
+			log.Warn("[verifyQC] duplicated signature in QC", "duplicate", common.Bytes2Hex(d))
+		}
+	}
+	if quorumCert == nil {
+		log.Warn("[verifyQC] QC is Nil")
+		return utils.ErrInvalidQC
+	} else if (quorumCert.ProposedBlockInfo.Number.Uint64() > x.config.V2.SwitchBlock.Uint64()) && (signatures == nil || (len(signatures) < x.config.V2.CertThreshold)) {
+		//First V2 Block QC, QC Signatures is initial nil
+		log.Warn("[verifyHeader] Invalid QC Signature is nil or empty", "QC", quorumCert, "QCNumber", quorumCert.ProposedBlockInfo.Number, "Signatures len", len(signatures))
+		return utils.ErrInvalidQC
+	}
+
+	epochInfo, err = x.getEpochSwitchInfo(blockChainReader, nil, quorumCert.ProposedBlockInfo.Hash)
+	if err != nil {
+		log.Error("[verifyQC] Error when getting epoch switch Info to verify QC", "Error", err)
+		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")
+	}
+
 	var wg sync.WaitGroup
-	wg.Add(len(quorumCert.Signatures))
+	wg.Add(len(signatures))
 	var haveError error
 
-	for _, signature := range quorumCert.Signatures {
+	for _, signature := range signatures {
 		go func(sig utils.Signature) {
 			defer wg.Done()
 			verified, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), sig, epochInfo.Masternodes)
@@ -1200,6 +1223,7 @@ func (x *XDPoS_v2) processTC(blockChainReader consensus.ChainReader, timeoutCert
 */
 func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round utils.Round) error {
 	x.currentRound = round
+	x.timeoutCount = 0
 	//TODO: tell miner now it's a new round and start mine if it's leader
 	x.timeoutWorker.Reset(blockChainReader)
 	//TODO: vote pools
@@ -1285,6 +1309,7 @@ func (x *XDPoS_v2) sendTimeout(chain consensus.ChainReader) error {
 		log.Error("[sendTimeout] Error while checking if the currentBlock is epoch switch", "currentRound", x.currentRound, "currentBlockNum", currentBlockHeader.Number, "currentBlockHash", currentBlockHeader.Hash(), "epochNum", epochNum)
 		return err
 	}
+
 	if isEpochSwitch {
 		// Notice this +1 is because we expect a block whos is the child of currentHeader
 		currentNumber := currentBlockHeader.Number.Uint64() + 1
@@ -1352,7 +1377,7 @@ func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signat
 		}
 	}
 
-	return false, fmt.Errorf("Masternodes does not contain signer address. Master node list %v, Signer address: %v", masternodes, signerAddress)
+	return false, fmt.Errorf("Masternodes list does not contain signer address, Signer address: %v", signerAddress.Hex())
 }
 
 /*
@@ -1363,11 +1388,25 @@ func (x *XDPoS_v2) OnCountdownTimeout(time time.Time, chain interface{}) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 
-	err := x.sendTimeout(chain.(consensus.ChainReader))
+	// Check if we are within the master node list
+	err := x.allowedToSend(chain.(consensus.ChainReader), chain.(consensus.ChainReader).CurrentHeader(), "timeout")
+	if err != nil {
+		return err
+	}
+
+	err = x.sendTimeout(chain.(consensus.ChainReader))
 	if err != nil {
 		log.Error("Error while sending out timeout message at time: ", time)
 		return err
 	}
+
+	x.timeoutCount++
+	if x.timeoutCount%x.config.V2.TimeoutSyncThreshold == 0 {
+		log.Info("[OnCountdownTimeout] timeout sync threadhold reached, send syncInfo message")
+		syncInfo := x.getSyncInfo()
+		x.broadcastToBftChannel(syncInfo)
+	}
+
 	return nil
 }
 
@@ -1698,4 +1737,29 @@ func (x *XDPoS_v2) getExtraFields(header *types.Header) (*utils.QuorumCert, util
 		return nil, utils.Round(0), masternodes, err
 	}
 	return decodedExtraField.QuorumCert, decodedExtraField.Round, masternodes, nil
+}
+
+func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types.Header, sendType string) error {
+	allowedToSend := false
+	// Don't hold the signFn for the whole signing operation
+	x.signLock.RLock()
+	signer := x.signer
+	x.signLock.RUnlock()
+	// Check if the node can send this sendType
+	masterNodes := x.GetMasternodes(chain, blockHeader)
+	for i, mn := range masterNodes {
+		if signer == mn {
+			log.Debug("[allowedToSend] Yes, I'm allowed to send", "sendType", sendType, "MyAddress", signer.Hex(), "Index in master node list", i)
+			allowedToSend = true
+			break
+		}
+	}
+	if !allowedToSend {
+		for _, mn := range masterNodes {
+			log.Debug("[allowedToSend] Master node list", "masterNodeAddress", mn.Hash())
+		}
+		log.Warn("[allowedToSend] Not in the Masternode list, not suppose to send", "sendType", sendType, "MyAddress", signer.Hex())
+		return fmt.Errorf("Not in the master node list, not suppose to %v", sendType)
+	}
+	return nil
 }

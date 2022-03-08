@@ -162,38 +162,6 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 		}
 	}
 
-	//TODO: to be discussed
-
-	checkpointBlockNumber := header.Number.Uint64() - header.Number.Uint64()%x.config.Epoch
-	checkpointHeader := chain.GetHeaderByNumber(checkpointBlockNumber)
-
-	// Initial snapshot
-	lastGapNum := checkpointBlockNumber - x.config.Gap
-	lastGapHeader := chain.GetHeaderByNumber(lastGapNum)
-
-	_, err = loadSnapshot(x.db, lastGapHeader.Hash())
-	if err != nil {
-		if err.Error() != "not found" {
-			log.Error("[Initial] something wrong from db", "err", err, "number", lastGapNum, "hash", lastGapHeader.Hash())
-			return err
-		}
-		log.Info("[Initial] init first snapshot")
-		_, _, masternodes, err := x.getExtraFields(checkpointHeader)
-		if err != nil {
-			log.Error("[Initial] Error while get masternodes", "error", err)
-			return err
-		}
-		snap := newSnapshot(lastGapNum, lastGapHeader.Hash(), x.currentRound, x.highestQuorumCert, masternodes)
-		x.snapshots.Add(snap.Hash, snap)
-		err = storeSnapshot(snap, x.db)
-		if err != nil {
-			log.Error("[Initial] Error while store snapshot", "error", err)
-			return err
-		}
-	} else {
-		log.Info("[Initial] found exist snapshot")
-	}
-
 	// Initial timeout
 	log.Info("[Initial] miner wait period", "period", x.config.V2.WaitPeriod)
 	// avoid deadlock
@@ -516,6 +484,8 @@ func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64, isGap
 	x.snapshots.Add(snap.Hash, snap)
 	return snap, nil
 }
+450 UpdateMasternodes()
+v2 900 initial()
 
 func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []utils.Masternode) error {
 	number := header.Number.Uint64()
@@ -527,7 +497,7 @@ func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.
 	}
 
 	x.lock.RLock()
-	snap := newSnapshot(number, header.Hash(), x.currentRound, x.highestQuorumCert, masterNodes)
+	snap := newSnapshot(number, header.Hash(), masterNodes)
 	x.lock.RUnlock()
 
 	err := storeSnapshot(snap, x.db)

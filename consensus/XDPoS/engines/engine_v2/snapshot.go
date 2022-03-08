@@ -21,7 +21,7 @@ type SnapshotV2 struct {
 }
 
 // create new snapshot for next epoch to use
-func newSnapshot(number uint64, hash common.Hash, round utils.Round, qc *utils.QuorumCert, masternodes []common.Address) *SnapshotV2 {
+func newSnapshot(number uint64, hash common.Hash, round utils.Round, masternodes []common.Address) *SnapshotV2 {
 	snap := &SnapshotV2{
 		Round:                round,
 		Number:               number,

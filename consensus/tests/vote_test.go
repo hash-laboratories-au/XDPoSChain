@@ -430,7 +430,7 @@ func TestVerifyVoteMsg(t *testing.T) {
 
 	blockInfo := &utils.BlockInfo{
 		Hash:   currentBlock.Hash(),
-		Round:  utils.Round(15),
+		Round:  utils.Round(14),
 		Number: big.NewInt(915),
 	}
 
@@ -439,13 +439,13 @@ func TestVerifyVoteMsg(t *testing.T) {
 		ProposedBlockInfo: blockInfo,
 		Signature:         []byte{1},
 	}
-
+	engineV2.SetNewRoundFaker(blockchain, utils.Round(15), false)
 	verified, err := engineV2.VerifyVoteMessage(blockchain, voteMsg)
 	assert.False(t, verified)
 	assert.Nil(t, err)
 
 	// Invalid vote message with wrong signature
-	engineV2.SetNewRoundFaker(blockchain, utils.Round(15), false)
+	engineV2.SetNewRoundFaker(blockchain, utils.Round(14), false)
 	verified, err = engineV2.VerifyVoteMessage(blockchain, voteMsg)
 	assert.False(t, verified)
 	assert.Equal(t, "Error while verifying message: invalid signature length", err.Error())

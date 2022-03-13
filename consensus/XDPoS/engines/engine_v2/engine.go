@@ -590,9 +590,12 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 
 	// Verify this is truely a v2 block first
 
-	quorumCert, _, _, err := x.getExtraFields(header)
+	quorumCert, round, _, err := x.getExtraFields(header)
 	if err != nil {
 		return utils.ErrInvalidV2Extra
+	}
+	if round <= quorumCert.ProposedBlockInfo.Round {
+		return utils.ErrRoundInvalid
 	}
 
 	err = x.verifyQC(chain, quorumCert)
@@ -613,6 +616,10 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		return utils.ErrInvalidUncleHash
 	}
 
+	if header.Difficulty.Cmp(big.NewInt(1)) != 0 {
+		return utils.ErrInvalidDifficulty
+	}
+
 	isEpochSwitch, _, err := x.IsEpochSwitch(header) // Verify v2 block that is on the epoch switch
 	if err != nil {
 		log.Error("[verifyHeader] error when checking if header is epoch switch header", "Hash", header.Hash(), "Number", header.Number, "Error", err)
@@ -628,6 +635,7 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		if len(header.Validators)%common.AddressLength != 0 {
 			return utils.ErrInvalidCheckpointSigners
 		}
+		// TODO: Add checkMasternodesOnEpochSwitch
 	} else {
 		if len(header.Validators) != 0 {
 			log.Warn("[verifyHeader] Validators shall not have values in non-epochSwitch block", "Hash", header.Hash(), "Number", header.Number, "Validators", header.Validators)
@@ -652,10 +660,20 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
-	if parent.Time.Uint64()+uint64(x.config.V2.MinePeriod) > header.Time.Uint64() {
+	if parent.Number.Uint64() > x.config.V2.SwitchBlock.Uint64() && parent.Time.Uint64()+uint64(x.config.V2.MinePeriod) > header.Time.Uint64() {
 		return utils.ErrInvalidTimestamp
 	}
-	// TODO: verifySeal XIN-135
+	// TODO: item 9. check validator
+
+	_, penalties, err := x.calcMasternodes(chain, header.Number, header.ParentHash)
+	if err != nil {
+		log.Error("[verifyHeader] Fail to calculate master nodes list with penalty", "Number", header.Number, "Hash", header.Hash())
+		return err
+	}
+
+	if !utils.CompareSignersLists(common.ExtractAddressFromBytes(header.Penalties), penalties) {
+		return utils.ErrPenaltyListDoesNotMatch
+	}
 
 	x.verifiedHeaders.Add(header.Hash(), true)
 	return nil
@@ -719,7 +737,7 @@ func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vo
 					- Use the above xdc address to check against the master node list from step 1(For the running epoch)
 			4. Broadcast(Not part of consensus)
 	*/
-	if vote.ProposedBlockInfo.Round != x.currentRound {
+	if vote.ProposedBlockInfo.Round < x.currentRound {
 		log.Warn("[VerifyVoteMessage] Disqualified vote message as the proposed round does not match currentRound", "vote.ProposedBlockInfo.Round", vote.ProposedBlockInfo.Round, "currentRound", x.currentRound)
 		return false, nil
 	}
@@ -769,9 +787,9 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 			return nil
 		}
 
-		// Verofy blockInfo
 		err := x.VerifyBlockInfo(chain, voteMsg.ProposedBlockInfo)
 		if err != nil {
+			x.votePool.ClearPoolKeyByObj(voteMsg)
 			return err
 		}
 

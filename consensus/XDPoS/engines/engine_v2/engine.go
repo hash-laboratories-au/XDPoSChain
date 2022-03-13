@@ -661,38 +661,35 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 	return nil
 }
 
-// Utils for test to get current Pool size
-func (x *XDPoS_v2) GetVotePoolSize(vote *utils.Vote) int {
-	return x.votePool.Size(vote)
-}
-
-// Utils for test to get Timeout Pool Size
-func (x *XDPoS_v2) GetTimeoutPoolSize(timeout *utils.Timeout) int {
-	return x.timeoutPool.Size(timeout)
-}
-
 /*
 	SyncInfo workflow
 */
 // Verify syncInfo and trigger process QC or TC if successful
-func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *utils.SyncInfo) error {
+func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *utils.SyncInfo) (bool, error) {
 	/*
-		1. Verify items including:
+		1. Check QC and TC against highest QC TC. Skip if none of them need to be updated
+		2. Verify items including:
 				- verifyQC
 				- verifyTC
-		2. Broadcast(Not part of consensus)
+		3. Broadcast(Not part of consensus)
 	*/
+
+	if (x.highestQuorumCert.ProposedBlockInfo.Round >= syncInfo.HighestQuorumCert.ProposedBlockInfo.Round) && (x.highestTimeoutCert.Round >= syncInfo.HighestTimeoutCert.Round) {
+		log.Warn("[VerifySyncInfoMessage] Round from incoming syncInfo message is no longer qualified", "Highest QC Round", x.highestQuorumCert.ProposedBlockInfo.Round, "Incoming SyncInfo QC Round", syncInfo.HighestQuorumCert.ProposedBlockInfo.Round, "highestTimeoutCert Round", x.highestTimeoutCert.Round, "Incoming syncInfo TC Round", syncInfo.HighestTimeoutCert.Round)
+		return false, nil
+	}
+
 	err := x.verifyQC(chain, syncInfo.HighestQuorumCert)
 	if err != nil {
 		log.Warn("SyncInfo message verification failed due to QC", err)
-		return err
+		return false, err
 	}
 	err = x.verifyTC(chain, syncInfo.HighestTimeoutCert)
 	if err != nil {
 		log.Warn("SyncInfo message verification failed due to TC", err)
-		return err
+		return false, err
 	}
-	return nil
+	return true, nil
 }
 
 func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.SyncInfo) error {
@@ -714,17 +711,19 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 */
 func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vote) (bool, error) {
 	/*
-		  1. Get masterNode list from snapshot
-		  2. Check signature:
+		  1. Check vote round with current round for fast fail(disqualifed)
+		  2. Get masterNode list from snapshot
+		  3. Check signature:
 					- Use ecRecover to get the public key
 					- Use the above public key to find out the xdc address
 					- Use the above xdc address to check against the master node list from step 1(For the running epoch)
 			4. Broadcast(Not part of consensus)
 	*/
-	err := x.VerifyBlockInfo(chain, vote.ProposedBlockInfo)
-	if err != nil {
-		return false, err
+	if vote.ProposedBlockInfo.Round != x.currentRound {
+		log.Warn("[VerifyVoteMessage] Disqualified vote message as the proposed round does not match currentRound", "vote.ProposedBlockInfo.Round", vote.ProposedBlockInfo.Round, "currentRound", x.currentRound)
+		return false, nil
 	}
+
 	snapshot, err := x.getSnapshot(chain, vote.ProposedBlockInfo.Number.Uint64(), false)
 	if err != nil {
 		log.Error("[VerifyVoteMessage] fail to get snapshot for a vote message", "BlockNum", vote.ProposedBlockInfo.Number, "Hash", vote.ProposedBlockInfo.Hash, "Error", err.Error())
@@ -770,7 +769,13 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 			return nil
 		}
 
-		err := x.onVotePoolThresholdReached(chain, pooledVotes, voteMsg, proposedBlockHeader)
+		// Verofy blockInfo
+		err := x.VerifyBlockInfo(chain, voteMsg.ProposedBlockInfo)
+		if err != nil {
+			return err
+		}
+
+		err = x.onVotePoolThresholdReached(chain, pooledVotes, voteMsg, proposedBlockHeader)
 		if err != nil {
 			return err
 		}
@@ -1487,41 +1492,6 @@ func (x *XDPoS_v2) isExtendingFromAncestor(blockChainReader consensus.ChainReade
 	return false, nil
 }
 
-/*
-	Testing tools
-*/
-
-func (x *XDPoS_v2) SetNewRoundFaker(blockChainReader consensus.ChainReader, newRound utils.Round, resetTimer bool) {
-	x.lock.Lock()
-	defer x.lock.Unlock()
-	// Reset a bunch of things
-	if resetTimer {
-		x.timeoutWorker.Reset(blockChainReader)
-	}
-	x.currentRound = newRound
-}
-
-// for test only
-func (x *XDPoS_v2) ProcessQC(chain consensus.ChainReader, qc *utils.QuorumCert) error {
-	x.lock.Lock()
-	defer x.lock.Unlock()
-	return x.processQC(chain, qc)
-}
-
-// Utils for test to check currentRound value
-func (x *XDPoS_v2) GetCurrentRound() utils.Round {
-	x.lock.RLock()
-	defer x.lock.RUnlock()
-	return x.currentRound
-}
-
-// Utils for test to check currentRound value
-func (x *XDPoS_v2) GetProperties() (utils.Round, *utils.QuorumCert, *utils.QuorumCert, utils.Round, *utils.BlockInfo) {
-	x.lock.RLock()
-	defer x.lock.RUnlock()
-	return x.currentRound, x.lockQuorumCert, x.highestQuorumCert, x.highestVotedRound, x.highestCommitBlock
-}
-
 // Get master nodes over extra data of epoch switch block.
 func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.Header) []common.Address {
 	if epochSwitchHeader == nil {
@@ -1539,7 +1509,7 @@ func (x *XDPoS_v2) GetMasternodesFromEpochSwitchHeader(epochSwitchHeader *types.
 func (x *XDPoS_v2) IsEpochSwitch(header *types.Header) (bool, uint64, error) {
 	// Return true directly if we are examing the last v1 block. This could happen if the calling function is examing parent block
 	if header.Number.Cmp(x.config.V2.SwitchBlock) == 0 {
-		log.Info("[IsEpochSwitch] examing last v1 block 👯‍♂️")
+		log.Info("[IsEpochSwitch] examing last v1 block")
 		return true, header.Number.Uint64() / x.config.Epoch, nil
 	}
 

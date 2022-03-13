@@ -40,7 +40,7 @@ type ConsensusFns struct {
 	verifyTimeout  func(consensus.ChainReader, *utils.Timeout) (bool, error)
 	timeoutHandler func(consensus.ChainReader, *utils.Timeout) error
 
-	verifySyncInfo  func(consensus.ChainReader, *utils.SyncInfo) error
+	verifySyncInfo  func(consensus.ChainReader, *utils.SyncInfo) (bool, error)
 	syncInfoHandler func(consensus.ChainReader, *utils.SyncInfo) error
 }
 
@@ -143,18 +143,20 @@ func (b *Bfter) SyncInfo(syncInfo *utils.SyncInfo) error {
 		log.Trace("Discarded SyncInfo, known SyncInfo", "hash", syncInfo.Hash())
 		return nil
 	}
-	err := b.consensus.verifySyncInfo(b.blockChainReader, syncInfo)
+	verified, err := b.consensus.verifySyncInfo(b.blockChainReader, syncInfo)
 	if err != nil {
 		log.Error("Verify BFT SyncInfo", "error", err)
 		return err
 	}
 
 	b.broadcastCh <- syncInfo
-
-	err = b.consensus.syncInfoHandler(b.blockChainReader, syncInfo)
-	if err != nil {
-		log.Error("handle BFT SyncInfo", "error", err)
-		return err
+	// Process only if verified and qualified
+	if verified {
+		err = b.consensus.syncInfoHandler(b.blockChainReader, syncInfo)
+		if err != nil {
+			log.Error("handle BFT SyncInfo", "error", err)
+			return err
+		}
 	}
 	return nil
 }

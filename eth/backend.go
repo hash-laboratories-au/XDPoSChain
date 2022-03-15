@@ -296,7 +296,6 @@ func New(ctx *node.ServiceContext, config *Config, XDCXServ *XDCx.XDCX, lendingS
 				// not genesis block
 				header = parentHeader
 			}
-			log.Info("isAuthorisedAddress", "Address", address)
 			return c.IsAuthorisedAddress(eth.blockchain, header, address)
 		}
 
@@ -467,7 +466,6 @@ func (s *Ethereum) ValidateMasternode() (bool, error) {
 
 		authorized := c.IsAuthorisedAddress(s.blockchain, s.blockchain.CurrentHeader(), eb)
 		if !authorized {
-			log.Warn("IsAuthorisedAddress not IsAuthorisedAddress", "address", eb)
 			//This miner doesn't belong to set of validators
 			return false, nil
 		}

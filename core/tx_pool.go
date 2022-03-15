@@ -619,6 +619,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if !local && pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
 		log.Info("[Not IsSpecialTransaction] ", "from", from)
 		if !tx.IsSpecialTransaction() || (pool.IsSigner != nil && !pool.IsSigner(from)) {
+			log.Info("ErrUnderpriced", "Err", ErrUnderpriced)
 			return ErrUnderpriced
 		}
 	}

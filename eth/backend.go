@@ -296,6 +296,7 @@ func New(ctx *node.ServiceContext, config *Config, XDCXServ *XDCx.XDCX, lendingS
 				// not genesis block
 				header = parentHeader
 			}
+			log.Info("IsAuthorisedAddress", "Address", address)
 			return c.IsAuthorisedAddress(eth.blockchain, header, address)
 		}
 

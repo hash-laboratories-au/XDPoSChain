@@ -714,6 +714,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		return false, err
 	}
 	from, _ := types.Sender(pool.signer, tx) // already validated
+	log.Info("[tx add] pool is signer")
 	if tx.IsSpecialTransaction() && pool.IsSigner != nil && pool.IsSigner(from) && pool.pendingState.GetNonce(from) == tx.Nonce() {
 		return pool.promoteSpecialTx(from, tx)
 	}

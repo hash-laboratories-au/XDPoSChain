@@ -234,6 +234,7 @@ func New(ctx *node.ServiceContext, config *Config, XDCXServ *XDCx.XDCX, lendingS
 				log.Error("Cannot get etherbase for append m2 header", "err", err)
 				return fmt.Errorf("etherbase missing: %v", err)
 			}
+			log.Info("[signHook]")
 			ok := eth.txPool.IsSigner != nil && eth.txPool.IsSigner(eb)
 			if !ok {
 				return nil

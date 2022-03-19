@@ -12,7 +12,7 @@ import (
 // Snapshot try to read before blockchain is written
 func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 
-	blockchain, backend, parentBlock, _ := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
+	blockchain, backend, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
 
 	state, err := blockchain.State()
 	if err != nil {
@@ -48,7 +48,7 @@ func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
 
-	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction})
+	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 		Difficulty: big.NewInt(2),
 	}
 
-	block450B, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction})
+	block450B, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 		Coinbase:   common.HexToAddress(blockCoinBase451B),
 		Difficulty: big.NewInt(3),
 	}
-	block451B, err := createBlockFromHeader(blockchain, header, nil)
+	block451B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}

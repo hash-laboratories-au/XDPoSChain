@@ -89,7 +89,7 @@ func TestInitialOtherV2Block(t *testing.T) {
 	}
 	header.Extra = extraBytes
 
-	block, err := createBlockFromHeader(blockchain, header, nil)
+	block, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}

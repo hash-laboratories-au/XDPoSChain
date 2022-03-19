@@ -13,7 +13,7 @@ import (
 
 // Should NOT update signerList if not on the gap block
 func TestNotUpdateSignerListIfNotOnGapBlock(t *testing.T) {
-	blockchain, backend, parentBlock, _ := PrepareXDCTestBlockChain(t, 400, params.TestXDPoSMockChainConfig)
+	blockchain, backend, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, 400, params.TestXDPoSMockChainConfig)
 	parentSigners, err := GetSnapshotSigner(blockchain, parentBlock.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestNotUpdateSignerListIfNotOnGapBlock(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestNotUpdateSignerListIfNotOnGapBlock(t *testing.T) {
 
 // Should call updateM1 at the gap block, and have the same snapshot values as the parent block if no SM transaction is involved
 func TestNotChangeSingerListIfNothingProposedOrVoted(t *testing.T) {
-	blockchain, _, parentBlock, _ := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
+	blockchain, _, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
 	// Insert block 450
 	blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", 450)
 	merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
@@ -68,7 +68,7 @@ func TestNotChangeSingerListIfNothingProposedOrVoted(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase),
 	}
-	block, err := createBlockFromHeader(blockchain, header, nil)
+	block, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestNotChangeSingerListIfNothingProposedOrVoted(t *testing.T) {
 //Should call updateM1 at gap block, and update the snapshot if there are SM transactions involved
 func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 
-	blockchain, backend, parentBlock, _ := PrepareXDCTestBlockChain(t, GAP-2, params.TestXDPoSMockChainConfig)
+	blockchain, backend, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-2, params.TestXDPoSMockChainConfig)
 	// Insert first Block 449
 	t.Logf("Inserting block with propose at 449...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000000449"
@@ -110,7 +110,7 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	block449, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	block449, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(block450CoinbaseAddress),
 	}
-	block450, err := createBlockFromHeader(blockchain, header, nil)
+	block450, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 //Should call updateM1 before gap block, and update the snapshot if there are SM transactions involved
 func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 
-	blockchain, backend, currentBlock, _ := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
+	blockchain, backend, currentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
 	// Insert first Block 450 A
 	t.Logf("Inserting block with propose at 450 A...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000000450"
@@ -183,7 +183,7 @@ func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 		ParentHash: currentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 // Should call updateM1 and update snapshot when a forked block(at gap block number) is inserted back into main chain (Edge case)
 func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 
-	blockchain, backend, currentBlock, _ := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
+	blockchain, backend, currentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
 	// Check initial signer, by default, acc3 is in the signerList
 	signers, err := GetSnapshotSigner(blockchain, blockchain.CurrentBlock().Header())
 	if err != nil {
@@ -232,7 +232,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 		ParentHash: currentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 		ParentHash: currentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase450B),
 	}
-	block450B, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	block450B, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +297,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 		ParentHash: block450B.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase451B),
 	}
-	block451B, err := createBlockFromHeader(blockchain, header, nil)
+	block451B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	blockchain.InsertBlock(block451B)
 
 	if err != nil {
@@ -346,7 +346,7 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 
 func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testing.T) {
 
-	blockchain, backend, parentBlock, _ := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
+	blockchain, backend, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
 
 	state, err := blockchain.State()
 	if err != nil {
@@ -380,7 +380,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction})
+	blockA, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase450B),
 	}
-	block450B, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction})
+	block450B, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx, transferTransaction}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +456,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 		ParentHash: block450B.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase451B),
 	}
-	block451B, err := createBlockFromHeader(blockchain, header, nil)
+	block451B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +500,7 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 }
 
 func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
-	blockchain, backend, parentBlock, _ := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
+	blockchain, backend, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-1, params.TestXDPoSMockChainConfig)
 	// Check initial signer, by default, acc3 is in the signerList
 	signers, err := GetSnapshotSigner(blockchain, blockchain.CurrentBlock().Header())
 	if err != nil {
@@ -524,7 +524,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase450A),
 	}
-	block450A, err := createBlockFromHeader(blockchain, header, nil)
+	block450A, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -544,7 +544,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 		ParentHash: block450A.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbase451A),
 	}
-	block451A, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	block451A, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +574,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase450B),
 	}
-	block450B, err := createBlockFromHeader(blockchain, header, nil)
+	block450B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +588,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 		ParentHash: block450B.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase451B),
 	}
-	block451B, err := createBlockFromHeader(blockchain, header, nil)
+	block451B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +602,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 		ParentHash: block451B.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinBase452B),
 	}
-	block452B, err := createBlockFromHeader(blockchain, header, nil)
+	block452B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,7 +626,7 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 // Pending for creating cross version blocks
 func TestV2UpdateSignerListIfVotedBeforeGap(t *testing.T) {
 	config := params.TestXDPoSMockChainConfig
-	blockchain, backend, parentBlock, _ := PrepareXDCTestBlockChain(t, int(config.XDPoS.Epoch)+GAP-2, config)
+	blockchain, backend, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, int(config.XDPoS.Epoch)+GAP-2, config)
 	// Insert first Block 1349
 	t.Logf("Inserting block with propose at 1349...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000001349"
@@ -643,7 +643,7 @@ func TestV2UpdateSignerListIfVotedBeforeGap(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	block1349, err := insertBlockTxs(blockchain, header, []*types.Transaction{tx})
+	block1349, err := insertBlockTxs(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -271,6 +271,15 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		header.Time = big.NewInt(time.Now().Unix())
 	}
 
+	x.signLock.RLock()
+	signer := x.signer
+	x.signLock.RUnlock()
+
+	if header.Coinbase != signer {
+		log.Error("[Prepare] The mined blocker header coinbase address mismatch with waller address", "headerCoinbase", header.Coinbase.Hex(), "WalletAddress", signer.Hex())
+		return consensus.ErrCoinbaseMismatch
+	}
+
 	return nil
 }
 
@@ -578,10 +587,11 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		return utils.ErrUnknownBlock
 	}
 
+	if len(header.Validator) == 0 {
+		return consensus.ErrNoValidatorSignature
+	}
+
 	if fullVerify {
-		if len(header.Validator) == 0 {
-			return consensus.ErrNoValidatorSignature
-		}
 		// Don't waste time checking blocks from the future
 		if header.Time.Int64() > time.Now().Unix() {
 			return consensus.ErrFutureBlock
@@ -589,7 +599,6 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 	}
 
 	// Verify this is truely a v2 block first
-
 	quorumCert, round, _, err := x.getExtraFields(header)
 	if err != nil {
 		return utils.ErrInvalidV2Extra
@@ -663,7 +672,6 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 	if parent.Number.Uint64() > x.config.V2.SwitchBlock.Uint64() && parent.Time.Uint64()+uint64(x.config.V2.MinePeriod) > header.Time.Uint64() {
 		return utils.ErrInvalidTimestamp
 	}
-	// TODO: item 9. check validator
 
 	_, penalties, err := x.calcMasternodes(chain, header.Number, header.ParentHash)
 	if err != nil {
@@ -673,6 +681,29 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 
 	if !utils.CompareSignersLists(common.ExtractAddressFromBytes(header.Penalties), penalties) {
 		return utils.ErrPenaltyListDoesNotMatch
+	}
+
+	// Check its validator
+	masterNodes := x.GetMasternodes(chain, header)
+	verified, validatorAddress, err := x.verifyMsgSignature(sigHash(header), header.Validator, masterNodes)
+	if err != nil {
+		log.Error("[verifyHeader] Error while verifying header validator signature", "BlockNumber", header.Number, "Hash", header.Hash().Hex())
+		return err
+	}
+	if !verified {
+		log.Warn("[verifyHeader] Fail to verify the block validator as the validator address not within the masternode list", header.Number, "Hash", header.Hash().Hex(), "validatorAddress", validatorAddress.Hex())
+		return utils.ErrValidatorNotWithinMasternodes
+	}
+	if validatorAddress != header.Coinbase {
+		log.Warn("[verifyHeader] Header validator and coinbase address not match", header.Number, "Hash", header.Hash().Hex(), "validatorAddress", validatorAddress.Hex(), "coinbase", header.Coinbase.Hex())
+		return utils.ErrCoinbaseAndValidatorMismatch
+	}
+	// Check the proposer is the leader
+	curIndex := utils.Position(masterNodes, validatorAddress)
+	leaderIndex := uint64(round) % x.config.Epoch % uint64(len(masterNodes))
+	if masterNodes[leaderIndex] != validatorAddress {
+		log.Warn("[verifyHeader] Invalid blocker proposer, not its turn", "curIndex", curIndex, "leaderIndex", leaderIndex, "Hash", header.Hash().Hex(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "validatorAddress", validatorAddress)
+		return utils.ErrNotItsTurn
 	}
 
 	x.verifiedHeaders.Add(header.Hash(), true)
@@ -746,7 +777,7 @@ func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vo
 	if err != nil {
 		log.Error("[VerifyVoteMessage] fail to get snapshot for a vote message", "BlockNum", vote.ProposedBlockInfo.Number, "Hash", vote.ProposedBlockInfo.Hash, "Error", err.Error())
 	}
-	verified, err := x.verifyMsgSignature(utils.VoteSigHash(vote.ProposedBlockInfo), vote.Signature, snapshot.NextEpochMasterNodes)
+	verified, _, err := x.verifyMsgSignature(utils.VoteSigHash(vote.ProposedBlockInfo), vote.Signature, snapshot.NextEpochMasterNodes)
 	if err != nil {
 		for i, mn := range snapshot.NextEpochMasterNodes {
 			log.Warn("[VerifyVoteMessage] Master node list item", "index", i, "Master node", mn.Hex())
@@ -818,7 +849,7 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 	for h, vote := range pooledVotes {
 		go func(hash common.Hash, v *utils.Vote, i int) {
 			defer wg.Done()
-			verified, err := x.verifyMsgSignature(utils.VoteSigHash(v.ProposedBlockInfo), v.Signature, masternodes)
+			verified, _, err := x.verifyMsgSignature(utils.VoteSigHash(v.ProposedBlockInfo), v.Signature, masternodes)
 			if !verified || err != nil {
 				log.Warn("[onVotePoolThresholdReached] Skip not verified vote signatures when building QC", "Error", err.Error(), "verified", verified)
 			} else {
@@ -880,10 +911,11 @@ func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg 
 		return false, fmt.Errorf("Empty master node lists from snapshot")
 	}
 
-	return x.verifyMsgSignature(utils.TimeoutSigHash(&utils.TimeoutForSign{
+	verified, _, err := x.verifyMsgSignature(utils.TimeoutSigHash(&utils.TimeoutForSign{
 		Round:     timeoutMsg.Round,
 		GapNumber: timeoutMsg.GapNumber,
 	}), timeoutMsg.Signature, snap.NextEpochMasterNodes)
+	return verified, err
 }
 
 /*
@@ -1099,7 +1131,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	for _, signature := range signatures {
 		go func(sig utils.Signature) {
 			defer wg.Done()
-			verified, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), sig, epochInfo.Masternodes)
+			verified, _, err := x.verifyMsgSignature(utils.VoteSigHash(quorumCert.ProposedBlockInfo), sig, epochInfo.Masternodes)
 			if err != nil {
 				log.Error("[verifyQC] Error while verfying QC message signatures", "Error", err)
 				haveError = fmt.Errorf("Error while verfying QC message signatures")
@@ -1159,7 +1191,7 @@ func (x *XDPoS_v2) verifyTC(chain consensus.ChainReader, timeoutCert *utils.Time
 	for _, signature := range timeoutCert.Signatures {
 		go func(sig utils.Signature) {
 			defer wg.Done()
-			verified, err := x.verifyMsgSignature(signedTimeoutObj, sig, snap.NextEpochMasterNodes)
+			verified, _, err := x.verifyMsgSignature(signedTimeoutObj, sig, snap.NextEpochMasterNodes)
 			if err != nil {
 				log.Error("[verifyTC] Error while verfying TC message signatures", "timeoutCert.Round", timeoutCert.Round, "timeoutCert.GapNumber", timeoutCert.GapNumber, "Signatures len", len(timeoutCert.Signatures), "Error", err)
 				haveError = fmt.Errorf("Error while verfying TC message signatures")
@@ -1383,24 +1415,25 @@ func (x *XDPoS_v2) signSignature(signingHash common.Hash) (utils.Signature, erro
 	return signedHash, nil
 }
 
-func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signature utils.Signature, masternodes []common.Address) (bool, error) {
+func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signature utils.Signature, masternodes []common.Address) (bool, common.Address, error) {
+	var signerAddress common.Address
 	if len(masternodes) == 0 {
-		return false, fmt.Errorf("Empty masternode list detected when verifying message signatures")
+		return false, signerAddress, fmt.Errorf("Empty masternode list detected when verifying message signatures")
 	}
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(signedHashToBeVerified.Bytes(), signature)
 	if err != nil {
-		return false, fmt.Errorf("Error while verifying message: %v", err)
+		return false, signerAddress, fmt.Errorf("Error while verifying message: %v", err)
 	}
-	var signerAddress common.Address
+
 	copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
 	for _, mn := range masternodes {
 		if mn == signerAddress {
-			return true, nil
+			return true, signerAddress, nil
 		}
 	}
 
-	return false, fmt.Errorf("Masternodes list does not contain signer address, Signer address: %v", signerAddress.Hex())
+	return false, signerAddress, fmt.Errorf("Masternodes list does not contain signer address, Signer address: %v", signerAddress.Hex())
 }
 
 /*

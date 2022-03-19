@@ -80,11 +80,14 @@ var (
 
 	ErrEmptyEpochSwitchValidators = errors.New("empty validators list on epoch switch block")
 
-	ErrInvalidV2Extra               = errors.New("Invalid v2 extra in the block")
-	ErrInvalidQC                    = errors.New("Invalid QC content")
-	ErrInvalidTC                    = errors.New("Invalid TC content")
-	ErrEmptyBlockInfoHash           = errors.New("BlockInfo hash is empty")
-	ErrInvalidFieldInNonEpochSwitch = errors.New("Invalid field exist in a non-epoch swtich block")
+	ErrInvalidV2Extra                = errors.New("Invalid v2 extra in the block")
+	ErrInvalidQC                     = errors.New("Invalid QC content")
+	ErrInvalidTC                     = errors.New("Invalid TC content")
+	ErrEmptyBlockInfoHash            = errors.New("BlockInfo hash is empty")
+	ErrInvalidFieldInNonEpochSwitch  = errors.New("Invalid field exist in a non-epoch swtich block")
+	ErrValidatorNotWithinMasternodes = errors.New("Validaotor address is not in the master node list")
+	ErrCoinbaseAndValidatorMismatch  = errors.New("Validaotor and coinbase address in header does not match")
+	ErrNotItsTurn                    = errors.New("Not validator's turn to mine this block")
 
 	ErrPenaltyListDoesNotMatch = errors.New("Incoming block penalty list does not match")
 	ErrRoundInvalid            = errors.New("Invalid Round, it shall be bigger than QC round")

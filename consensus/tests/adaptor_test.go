@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestAdaptorShouldGetAuthorForDifferentConsensusVersion(t *testing.T) {
-	blockchain, backend, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
+	blockchain, backend, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 
 	addressFromAdaptor, errorAdaptor := adaptor.Author(currentBlock.Header())
@@ -32,19 +31,21 @@ func TestAdaptorShouldGetAuthorForDifferentConsensusVersion(t *testing.T) {
 	// Insert one more block to make it above 10, which means now we are on v2 of consensus engine
 	// Insert block 901
 
-	blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", 901)
 	merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
 	header := &types.Header{
 		Root:       common.HexToHash(merkleRoot),
 		Number:     big.NewInt(int64(901)),
 		ParentHash: currentBlock.Hash(),
-		Coinbase:   common.HexToAddress(blockCoinBase),
+		Coinbase:   signer,
 	}
 	err := generateSignature(backend, adaptor, header)
 	if err != nil {
 		t.Fatal(err)
 	}
-	block901, err := createBlockFromHeader(blockchain, header, nil)
+
+	header.Extra = generateV2Extra(1, currentBlock, signer, signFn)
+
+	block901, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +184,7 @@ func TestAdaptorGetMasternodesV2(t *testing.T) {
 	// block 901 is the first v2 block, and is treated as epoch switch block
 	blockchain.InsertBlock(currentBlock)
 	masternodes1 := adaptor.GetMasternodes(blockchain, currentBlock.Header())
-	assert.Equal(t, 4, len(masternodes1))
+	assert.Equal(t, 5, len(masternodes1))
 	masternodes1ByNumber := adaptor.GetMasternodesByNumber(blockchain, currentBlock.NumberU64())
 	assert.True(t, reflect.DeepEqual(masternodes1, masternodes1ByNumber), "at block number", blockNum)
 	for blockNum = 902; blockNum < 915; blockNum++ {

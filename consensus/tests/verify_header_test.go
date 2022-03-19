@@ -34,7 +34,8 @@ func TestShouldVerifyBlock(t *testing.T) {
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 
 	// Happy path
-	err = adaptor.VerifyHeader(blockchain, blockchain.GetBlockByNumber(901).Header(), true)
+	happyPathHeader := blockchain.GetBlockByNumber(901).Header()
+	err = adaptor.VerifyHeader(blockchain, happyPathHeader, true)
 	assert.Nil(t, err)
 
 	// Unhappy path

@@ -38,6 +38,7 @@ type signersList map[string]bool
 
 const GAP = int(450)
 
+// TODO: Best to convert it into slice or map
 var (
 	acc1Key, _  = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 	acc2Key, _  = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
@@ -306,7 +307,7 @@ func GetCandidateFromCurrentSmartContract(backend bind.ContractBackend, t *testi
 }
 
 // V1 consensus engine
-func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params.ChainConfig) (*BlockChain, *backends.SimulatedBackend, *types.Block, common.Address) {
+func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params.ChainConfig) (*BlockChain, *backends.SimulatedBackend, *types.Block, common.Address, func(account accounts.Account, hash []byte) ([]byte, error)) {
 	// Preparation
 	var err error
 	// Authorise
@@ -340,7 +341,7 @@ func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params
 			ParentHash: currentBlock.Hash(),
 			Coinbase:   common.HexToAddress(blockCoinBase),
 		}
-		block, err := createBlockFromHeader(blockchain, header, nil)
+		block, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, chainConfig)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -353,7 +354,7 @@ func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params
 		t.Fatal(err)
 	}
 
-	return blockchain, backend, currentBlock, signer
+	return blockchain, backend, currentBlock, signer, signFn
 }
 
 // V2 concensus engine
@@ -493,51 +494,14 @@ func CreateBlock(blockchain *BlockChain, chainConfig *params.ChainConfig, starti
 	var header *types.Header
 
 	if big.NewInt(int64(blockNumber)).Cmp(chainConfig.XDPoS.V2.SwitchBlock) == 1 { // Build engine v2 compatible extra data field
-		var extraField utils.ExtraFields_v2
-		var round utils.Round
-		err := utils.DecodeBytesExtraFields(currentBlock.Extra(), &extraField)
-		if err != nil {
-			round = utils.Round(0)
-		} else {
-			round = extraField.Round
-		}
+		extraInBytes := generateV2Extra(roundNumber, currentBlock, signer, signFn)
 
-		proposedBlockInfo := &utils.BlockInfo{
-			Hash:   currentBlock.Hash(),
-			Round:  round,
-			Number: currentBlock.Number(),
-		}
-		// Genrate QC
-		signedHash, err := signFn(accounts.Account{Address: signer}, utils.VoteSigHash(proposedBlockInfo).Bytes())
-		if err != nil {
-			panic(fmt.Errorf("Error generate QC by creating signedHash: %v", err))
-		}
-		// Sign from acc 1, 2, 3
-		acc1SignedHash := SignHashByPK(acc1Key, utils.VoteSigHash(proposedBlockInfo).Bytes())
-		acc2SignedHash := SignHashByPK(acc2Key, utils.VoteSigHash(proposedBlockInfo).Bytes())
-		acc3SignedHash := SignHashByPK(acc3Key, utils.VoteSigHash(proposedBlockInfo).Bytes())
-		var signatures []utils.Signature
-		signatures = append(signatures, signedHash, acc1SignedHash, acc2SignedHash, acc3SignedHash)
-		quorumCert := &utils.QuorumCert{
-			ProposedBlockInfo: proposedBlockInfo,
-			Signatures:        signatures,
-		}
-
-		extra := utils.ExtraFields_v2{
-			Round:      utils.Round(roundNumber),
-			QuorumCert: quorumCert,
-		}
-		extraInBytes, err := extra.EncodeToBytes()
-		if err != nil {
-			panic(fmt.Errorf("Error encode extra into bytes: %v", err))
-		}
 		header = &types.Header{
 			Root:       common.HexToHash(merkleRoot),
 			Number:     big.NewInt(int64(blockNumber)),
 			ParentHash: currentBlock.Hash(),
 			Coinbase:   common.HexToAddress(blockCoinBase),
 			Extra:      extraInBytes,
-			Validator:  signedHash,
 		}
 		if int64(blockNumber) == (chainConfig.XDPoS.V2.SwitchBlock.Int64() + 1) { // This is the first v2 block, we need to copy the last v1 epoch master node list and inject into v2 validators
 			// Get last master node list from last v1 block
@@ -576,7 +540,8 @@ func CreateBlock(blockchain *BlockChain, chainConfig *params.ChainConfig, starti
 			}
 			header.Extra = header.Extra[:utils.ExtraVanity]
 			var masternodes []common.Address
-			masternodes = append(masternodes, acc1Addr, acc2Addr, acc3Addr, signer)
+			// Place the test's signer address to the last
+			masternodes = append(masternodes, acc1Addr, acc2Addr, acc3Addr, voterAddr, signer)
 			// masternodesFromV1LastEpoch = masternodes
 			for _, masternode := range masternodes {
 				header.Extra = append(header.Extra, masternode[:]...)
@@ -591,7 +556,7 @@ func CreateBlock(blockchain *BlockChain, chainConfig *params.ChainConfig, starti
 			copy(header.Extra[len(header.Extra)-utils.ExtraSeal:], sighash)
 		}
 	}
-	block, err := createBlockFromHeader(blockchain, header, nil)
+	block, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, chainConfig)
 	if err != nil {
 		panic(fmt.Errorf("Fail to create block in test helper, %v", err))
 	}
@@ -612,7 +577,7 @@ func generateSignature(backend *backends.SimulatedBackend, adaptor *XDPoS.XDPoS,
 	return nil
 }
 
-func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*types.Transaction) (*types.Block, error) {
+func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*types.Transaction, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error), config *params.ChainConfig) (*types.Block, error) {
 	if customHeader.Extra == nil {
 		extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101" // Grabbed from existing mainnet block, it does not have any meaning except for the length validation
 		customHeader.Extra, _ = hex.DecodeString(extraSubstring)
@@ -649,6 +614,11 @@ func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*ty
 	}
 	var block *types.Block
 	if len(txs) == 0 {
+		// Sign all the things and seal it
+		signerAddress, signerFunction := findSignerAndSignFn(bc, &header, signer, signFn, config)
+		header.Coinbase = signerAddress
+		sealHeader(bc, &header, signerAddress, signerFunction, config)
+
 		block = types.NewBlockWithHeader(&header)
 	} else {
 		// Prepare Receipt
@@ -670,6 +640,11 @@ func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*ty
 		}
 
 		header.GasUsed = *gasUsed
+
+		// Sign all the things and seal it
+		signerAddress, signerFunction := findSignerAndSignFn(bc, &header, signer, signFn, config)
+		header.Coinbase = signerAddress
+		sealHeader(bc, &header, signerAddress, signerFunction, config)
 
 		block = types.NewBlock(&header, txs, nil, receipts)
 	}
@@ -707,4 +682,100 @@ func decodeMasternodesFromHeaderExtra(checkpointHeader *types.Header) []common.A
 		copy(masternodes[i][:], checkpointHeader.Extra[utils.ExtraVanity+i*common.AddressLength:])
 	}
 	return masternodes
+}
+
+func findSignerAndSignFn(bc *BlockChain, header *types.Header, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error), config *params.ChainConfig) (common.Address, func(account accounts.Account, hash []byte) ([]byte, error)) {
+	addressToSign := signer
+	addressedSignFn := signFn
+
+	// If v2 block, we need to use extra data's round to find who is creating the block in order to verify the validator
+	if header.Number.Cmp(config.XDPoS.V2.SwitchBlock) > 0 {
+		var decodedExtraField utils.ExtraFields_v2
+		err := utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
+		if err != nil {
+			panic(fmt.Errorf("fail to seal header for v2 block"))
+		}
+		round := decodedExtraField.Round
+		masterNodes := getMasternodesList(signer)
+
+		index := uint64(round) % config.XDPoS.Epoch % uint64(len(masterNodes))
+		// index 0 to 2 are acc1Addr, acc2Addr, acc3Addr
+		addressToSign = masterNodes[index]
+		if index == 0 {
+			_, signFn, err = getSignerAndSignFn(acc1Key)
+		} else if index == 1 {
+			_, signFn, err = getSignerAndSignFn(acc2Key)
+		} else if index == 2 {
+			_, signFn, err = getSignerAndSignFn(acc3Key)
+		} else if index == 3 {
+			// Skip signing anything for voterAddress to simulate penalty
+			return signer, signFn
+		}
+		addressedSignFn = signFn
+		if err != nil {
+			panic(fmt.Errorf("Error trying to use one of the pre-defined private key to sign"))
+		}
+	}
+
+	return addressToSign, addressedSignFn
+}
+
+func sealHeader(bc *BlockChain, header *types.Header, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error), config *params.ChainConfig) {
+	// Sign all the things and seal it
+	signedBlockHeader := bc.Engine().(*XDPoS.XDPoS).SigHash(header)
+
+	signature, err := signFn(accounts.Account{Address: signer}, signedBlockHeader.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	header.Validator = signature
+}
+
+func getMasternodesList(signer common.Address) []common.Address {
+	var masternodes []common.Address
+	// Place the test's signer address to the last
+	masternodes = append(masternodes, acc1Addr, acc2Addr, acc3Addr, voterAddr, signer)
+	return masternodes
+}
+
+func generateV2Extra(roundNumber int64, currentBlock *types.Block, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) []byte {
+	var extraField utils.ExtraFields_v2
+	var round utils.Round
+	err := utils.DecodeBytesExtraFields(currentBlock.Extra(), &extraField)
+	if err != nil {
+		round = utils.Round(0)
+	} else {
+		round = extraField.Round
+	}
+
+	proposedBlockInfo := &utils.BlockInfo{
+		Hash:   currentBlock.Hash(),
+		Round:  round,
+		Number: currentBlock.Number(),
+	}
+	// Genrate QC
+	signedHash, err := signFn(accounts.Account{Address: signer}, utils.VoteSigHash(proposedBlockInfo).Bytes())
+	if err != nil {
+		panic(fmt.Errorf("Error generate QC by creating signedHash: %v", err))
+	}
+	// Sign from acc 1, 2, 3
+	acc1SignedHash := SignHashByPK(acc1Key, utils.VoteSigHash(proposedBlockInfo).Bytes())
+	acc2SignedHash := SignHashByPK(acc2Key, utils.VoteSigHash(proposedBlockInfo).Bytes())
+	acc3SignedHash := SignHashByPK(acc3Key, utils.VoteSigHash(proposedBlockInfo).Bytes())
+	var signatures []utils.Signature
+	signatures = append(signatures, acc1SignedHash, acc2SignedHash, acc3SignedHash, signedHash)
+	quorumCert := &utils.QuorumCert{
+		ProposedBlockInfo: proposedBlockInfo,
+		Signatures:        signatures,
+	}
+
+	extra := utils.ExtraFields_v2{
+		Round:      utils.Round(roundNumber),
+		QuorumCert: quorumCert,
+	}
+	extraInBytes, err := extra.EncodeToBytes()
+	if err != nil {
+		panic(fmt.Errorf("Error encode extra into bytes: %v", err))
+	}
+	return extraInBytes
 }

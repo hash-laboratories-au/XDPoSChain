@@ -16,7 +16,7 @@ func TestIsAuthorisedMNForConsensusV1(t *testing.T) {
 	/*
 		V1 consensus engine
 	*/
-	blockchain, _, parentBlock, _ := PrepareXDCTestBlockChain(t, GAP-2, params.TestXDPoSMockChainConfig)
+	blockchain, _, parentBlock, signer, signFn := PrepareXDCTestBlockChain(t, GAP-2, params.TestXDPoSMockChainConfig)
 	// Insert first Block 449
 	t.Logf("Inserting block with propose at 449...")
 	blockCoinbaseA := "0xaaa0000000000000000000000000000000000449"
@@ -33,7 +33,7 @@ func TestIsAuthorisedMNForConsensusV1(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(blockCoinbaseA),
 	}
-	block449, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx})
+	block449, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, blockchain.Config())
 	blockchain.InsertBlock(block449)
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestIsAuthorisedMNForConsensusV1(t *testing.T) {
 		ParentHash: parentBlock.Hash(),
 		Coinbase:   common.HexToAddress(block450CoinbaseAddress),
 	}
-	block450, err := createBlockFromHeader(blockchain, header, nil)
+	block450, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
 	if err != nil {
 		t.Fatal(err)
 	}

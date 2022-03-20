@@ -481,20 +481,6 @@ func CreateBlock(blockchain *BlockChain, chainConfig *params.ChainConfig, starti
 	return block
 }
 
-func generateSignature(backend *backends.SimulatedBackend, adaptor *XDPoS.XDPoS, header *types.Header) error {
-	signer, signFn, err := backends.SimulateWalletAddressAndSignFn()
-	if err != nil {
-		panic(fmt.Errorf("Error while creating simulated wallet for generating singer address and signer fn: %v", err))
-	}
-
-	signature, err := signFn(accounts.Account{Address: signer}, adaptor.SigHash(header).Bytes())
-	if err != nil {
-		return err
-	}
-	header.Validator = signature
-	return nil
-}
-
 func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*types.Transaction, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error), config *params.ChainConfig) (*types.Block, error) {
 	if customHeader.Extra == nil {
 		extraSubstring := "d7830100018358444388676f312e31342e31856c696e75780000000000000000b185dc0d0e917d18e5dbf0746be6597d3331dd27ea0554e6db433feb2e81730b20b2807d33a1527bf43cd3bc057aa7f641609c2551ebe2fd575f4db704fbf38101" // Grabbed from existing mainnet block, it does not have any meaning except for the length validation
@@ -647,7 +633,7 @@ func generateV2Extra(roundNumber int64, currentBlock *types.Block, signer common
 		Round:  round,
 		Number: currentBlock.Number(),
 	}
-	// Genrate QC
+
 	signedHash, err := signFn(accounts.Account{Address: signer}, utils.VoteSigHash(proposedBlockInfo).Bytes())
 	if err != nil {
 		panic(fmt.Errorf("Error generate QC by creating signedHash: %v", err))

@@ -14,7 +14,7 @@ import (
 )
 
 func TestAdaptorShouldGetAuthorForDifferentConsensusVersion(t *testing.T) {
-	blockchain, backend, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 900, params.TestXDPoSMockChainConfig, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 
 	addressFromAdaptor, errorAdaptor := adaptor.Author(currentBlock.Header())
@@ -37,10 +37,6 @@ func TestAdaptorShouldGetAuthorForDifferentConsensusVersion(t *testing.T) {
 		Number:     big.NewInt(int64(901)),
 		ParentHash: currentBlock.Hash(),
 		Coinbase:   signer,
-	}
-	err := generateSignature(backend, adaptor, header)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	header.Extra = generateV2Extra(1, currentBlock, signer, signFn)

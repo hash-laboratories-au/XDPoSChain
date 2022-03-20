@@ -62,7 +62,7 @@ func TestYourTurnInitialV2(t *testing.T) {
 
 func TestUpdateMasterNodes(t *testing.T) {
 	config := params.TestXDPoSMockChainConfig
-	blockchain, backend, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch+config.XDPoS.Gap)-1, config, 0)
+	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, int(config.XDPoS.Epoch+config.XDPoS.Gap)-1, config, 0)
 	adaptor := blockchain.Engine().(*XDPoS.XDPoS)
 	x := adaptor.EngineV2
 	snap, err := x.GetSnapshot(blockchain, currentBlock.Header())
@@ -88,11 +88,7 @@ func TestUpdateMasterNodes(t *testing.T) {
 	}
 
 	header.Extra = generateV2Extra(450, currentBlock, signer, signFn)
-	// insert header validator
-	err = generateSignature(backend, adaptor, header)
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	parentBlock, err := createBlockFromHeader(blockchain, header, []*types.Transaction{tx}, signer, signFn, config)
 	assert.Nil(t, err)
 	err = blockchain.InsertBlock(parentBlock)
@@ -112,10 +108,7 @@ func TestUpdateMasterNodes(t *testing.T) {
 		}
 
 		header.Extra = generateV2Extra(int64(i), currentBlock, signer, signFn)
-		err = generateSignature(backend, adaptor, header)
-		if err != nil {
-			t.Fatal(err)
-		}
+
 		block, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, config)
 		if err != nil {
 			t.Fatal(err)

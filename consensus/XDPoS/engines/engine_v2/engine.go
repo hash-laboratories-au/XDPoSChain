@@ -368,8 +368,11 @@ func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Hea
 
 // Check if it's my turm to mine a block. Note: The second return value `preIndex` is useless in V2 engine
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
+	log.Info("[YourTurn] get lock")
 	x.lock.RLock()
+	log.Info("[YourTurn] got lock")
 	defer x.lock.RUnlock()
+	defer log.Info("[YourTurn] release lock")
 
 	if !x.isInitilised {
 		err := x.Initial(chain, parent)
@@ -1419,8 +1422,11 @@ func (x *XDPoS_v2) verifyMsgSignature(signedHashToBeVerified common.Hash, signat
 	In the engine v2, we would need to broadcast timeout messages to other peers
 */
 func (x *XDPoS_v2) OnCountdownTimeout(time time.Time, chain interface{}) error {
+	log.Info("[OnCountdownTimeout] get lock")
 	x.lock.Lock()
+	log.Info("[OnCountdownTimeout] got lock")
 	defer x.lock.Unlock()
+	defer log.Info("[OnCountdownTimeout] release lock")
 
 	// Check if we are within the master node list
 	err := x.allowedToSend(chain.(consensus.ChainReader), chain.(consensus.ChainReader).CurrentHeader(), "timeout")

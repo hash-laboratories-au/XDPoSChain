@@ -519,6 +519,8 @@ func abs(x int64) int64 {
 }
 
 func (self *worker) commitNewWork() {
+	log.Info("[commit new work] dead lock log")
+	defer log.Info(("[commit new work] dead lock log finish"))
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	self.uncleMu.Lock()
@@ -545,6 +547,7 @@ func (self *worker) commitNewWork() {
 	}
 
 	// Only try to commit new work if we are mining
+	log.Info("Only try to commit new work if we are mining", "self.mining", self.mining)
 	if atomic.LoadInt32(&self.mining) == 1 {
 		// check if we are right after parent's coinbase in the list
 		if self.config.XDPoS != nil {

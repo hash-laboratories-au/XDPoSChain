@@ -1,4 +1,4 @@
-package tests
+package engine_v2_tests
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -38,7 +37,6 @@ type signersList map[string]bool
 
 const GAP = int(450)
 
-// TODO: Best to convert it into slice or map
 var (
 	acc1Key, _  = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 	acc2Key, _  = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
@@ -50,22 +48,6 @@ var (
 	voterAddr   = crypto.PubkeyToAddress(voterKey.PublicKey) //xdc5F74529C0338546f82389402a01c31fB52c6f434
 	chainID     = int64(1337)
 )
-
-func debugMessage(backend *backends.SimulatedBackend, signers signersList, t *testing.T) {
-	ms := GetCandidateFromCurrentSmartContract(backend, t)
-	fmt.Println("=== current smart contract")
-	for nodeAddr, cap := range ms {
-		if !strings.Contains(nodeAddr, "000000000000000000000000000000000000") { //remove defaults
-			fmt.Println(nodeAddr, cap)
-		}
-	}
-	fmt.Println("=== this block signer list")
-	for signer := range signers {
-		if !strings.Contains(signer, "000000000000000000000000000000000000") { //remove defaults
-			fmt.Println(signer)
-		}
-	}
-}
 
 func SignHashByPK(pk *ecdsa.PrivateKey, itemToSign []byte) []byte {
 	signer, signFn, err := getSignerAndSignFn(pk)
@@ -109,6 +91,27 @@ func getSignerAndSignFn(pk *ecdsa.PrivateKey) (common.Address, func(account acco
 		return a1.Address, nil, fmt.Errorf(err.Error())
 	}
 	return a1.Address, ks.SignHash, nil
+}
+
+func voteTX(gasLimit uint64, nonce uint64, addr string) (*types.Transaction, error) {
+	vote := "6dd7d8ea" // VoteMethod = "0x6dd7d8ea"
+	action := fmt.Sprintf("%s%s%s", vote, "000000000000000000000000", addr[3:])
+	data := common.Hex2Bytes(action)
+	gasPrice := big.NewInt(int64(0))
+	amountInt := new(big.Int)
+	amount, ok := amountInt.SetString("60000", 10)
+	if !ok {
+		return nil, fmt.Errorf("big int init failed")
+	}
+	to := common.HexToAddress(common.MasternodeVotingSMC)
+	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
+
+	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), voterKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return signedTX, nil
 }
 
 func getCommonBackend(t *testing.T, chainConfig *params.ChainConfig) *backends.SimulatedBackend {
@@ -192,50 +195,13 @@ func getCommonBackend(t *testing.T, chainConfig *params.ChainConfig) *backends.S
 	}, 10000000, chainConfig)
 
 	return contractBackend2
-
 }
 
-func transferTx(t *testing.T, to common.Address, transferAmount int64) *types.Transaction {
-	t.Logf("Transfering %v to address: %v", transferAmount, to.String())
-	data := []byte{}
-	gasPrice := big.NewInt(int64(0))
-	gasLimit := uint64(21000)
-	amount := big.NewInt(transferAmount)
-	nonce := uint64(1)
-	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
-	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), voterKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return signedTX
-}
-
-func voteTX(gasLimit uint64, nonce uint64, addr string) (*types.Transaction, error) {
-	vote := "6dd7d8ea" // VoteMethod = "0x6dd7d8ea"
-	action := fmt.Sprintf("%s%s%s", vote, "000000000000000000000000", addr[3:])
-	data := common.Hex2Bytes(action)
-	gasPrice := big.NewInt(int64(0))
-	amountInt := new(big.Int)
-	amount, ok := amountInt.SetString("60000", 10)
-	if !ok {
-		return nil, fmt.Errorf("big int init failed")
-	}
-	to := common.HexToAddress(common.MasternodeVotingSMC)
-	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
-
-	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), voterKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return signedTX, nil
-}
-
-func signingTxWithSignerFn(header *types.Header, nonce uint64, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) (*types.Transaction, error) {
+func signingTxWithKey(header *types.Header, nonce uint64, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
 	tx := contracts.CreateTxSign(header.Number, header.Hash(), nonce, common.HexToAddress(common.BlockSigners))
 	s := types.NewEIP155Signer(big.NewInt(chainID))
 	h := s.Hash(tx)
-	sig, err := signFn(accounts.Account{Address: signer}, h[:])
+	sig, err := crypto.Sign(h[:], privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -246,11 +212,11 @@ func signingTxWithSignerFn(header *types.Header, nonce uint64, signer common.Add
 	return signedTx, nil
 }
 
-func signingTxWithKey(header *types.Header, nonce uint64, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
+func signingTxWithSignerFn(header *types.Header, nonce uint64, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) (*types.Transaction, error) {
 	tx := contracts.CreateTxSign(header.Number, header.Hash(), nonce, common.HexToAddress(common.BlockSigners))
 	s := types.NewEIP155Signer(big.NewInt(chainID))
 	h := s.Hash(tx)
-	sig, err := crypto.Sign(h[:], privateKey)
+	sig, err := signFn(accounts.Account{Address: signer}, h[:])
 	if err != nil {
 		return nil, err
 	}
@@ -306,57 +272,6 @@ func GetCandidateFromCurrentSmartContract(backend bind.ContractBackend, t *testi
 	return ms
 }
 
-// V1 consensus engine
-func PrepareXDCTestBlockChain(t *testing.T, numOfBlocks int, chainConfig *params.ChainConfig) (*BlockChain, *backends.SimulatedBackend, *types.Block, common.Address, func(account accounts.Account, hash []byte) ([]byte, error)) {
-	// Preparation
-	var err error
-	// Authorise
-	signer, signFn, err := backends.SimulateWalletAddressAndSignFn()
-
-	backend := getCommonBackend(t, chainConfig)
-	blockchain := backend.GetBlockChain()
-	blockchain.Client = backend
-
-	if err != nil {
-		panic(fmt.Errorf("Error while creating simulated wallet for generating singer address and signer fn: %v", err))
-	}
-	blockchain.Engine().(*XDPoS.XDPoS).Authorize(signer, signFn)
-
-	currentBlock := blockchain.Genesis()
-
-	go func() {
-		for range core.CheckpointCh {
-			checkpointChanMsg := <-core.CheckpointCh
-			log.Info("[V1] Got a message from core CheckpointChan!", "msg", checkpointChanMsg)
-		}
-	}()
-
-	// Insert initial blocks
-	for i := 1; i <= numOfBlocks; i++ {
-		blockCoinBase := fmt.Sprintf("0x111000000000000000000000000000000%03d", i)
-		merkleRoot := "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
-		header := &types.Header{
-			Root:       common.HexToHash(merkleRoot),
-			Number:     big.NewInt(int64(i)),
-			ParentHash: currentBlock.Hash(),
-			Coinbase:   common.HexToAddress(blockCoinBase),
-		}
-		block, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, chainConfig)
-		if err != nil {
-			t.Fatal(err)
-		}
-		blockchain.InsertBlock(block)
-		currentBlock = block
-	}
-	// Update Signer as there is no previous signer assigned
-	err = UpdateSigner(blockchain)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return blockchain, backend, currentBlock, signer, signFn
-}
-
 // V2 concensus engine
 func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainConfig *params.ChainConfig, numOfForkedBlocks int) (*BlockChain, *backends.SimulatedBackend, *types.Block, common.Address, func(account accounts.Account, hash []byte) ([]byte, error), *types.Block) {
 	// Preparation
@@ -410,7 +325,10 @@ func PrepareXDCTestBlockChainForV2Engine(t *testing.T, numOfBlocks int, chainCon
 
 			forkedBlock := CreateBlock(blockchain, chainConfig, currentForkBlock, i, forkedBlockRoundNumber, forkedBlockCoinBase, signer, signFn, nil)
 
-			blockchain.InsertBlock(forkedBlock)
+			err = blockchain.InsertBlock(forkedBlock)
+			if err != nil {
+				panic(err)
+			}
 			currentForkBlock = forkedBlock
 		}
 
@@ -589,7 +507,6 @@ func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*ty
 		difficulty = customHeader.Difficulty
 	}
 
-	// TODO: check if this is needed
 	if len(txs) != 0 {
 		customHeader.ReceiptHash = common.HexToHash("0x9319777b782ba2c83a33c995481ff894ac96d9a92a1963091346a3e1e386705c")
 	} else {
@@ -651,29 +568,6 @@ func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*ty
 
 	return block, nil
 }
-
-// /*
-// func proposeTX(t *testing.T) *types.Transaction {
-// 	data := common.Hex2Bytes("012679510000000000000000000000000d3ab14bbad3d99f4203bd7a11acb94882050e7e")
-// 	//data := []byte{}
-// 	fmt.Println("data", string(data[:]))
-// 	gasPrice := big.NewInt(int64(0))
-// 	gasLimit := uint64(22680)
-// 	amountInt := new(big.Int)
-// 	amount, ok := amountInt.SetString("11000000000000000000000000", 10)
-// 	if !ok {
-// 		t.Fatal("big int init failed")
-// 	}
-// 	nonce := uint64(0)
-// 	to := common.HexToAddress("xdc35658f7b2a9e7701e65e7a654659eb1c481d1dc5")
-// 	tx := types.NewTransaction(nonce, to, amount, gasLimit, gasPrice, data)
-// 	signedTX, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(chainID)), acc4Key)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	return signedTX
-// }
-// */
 
 // Get masternodes address from checkpoint Header. Only used for v1 last block
 func decodeMasternodesFromHeaderExtra(checkpointHeader *types.Header) []common.Address {

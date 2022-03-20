@@ -1,4 +1,4 @@
-package tests
+package engine_v2_tests
 
 import (
 	"math/big"
@@ -82,7 +82,7 @@ func TestInitialOtherV2Block(t *testing.T) {
 	assert.Nil(t, err)
 
 	header := &types.Header{
-		Root:       common.HexToHash("ea465415b60d88429f181fec9fae67c0f19cbf5a4fa10971d96d4faa57d96ffa"),
+		Root:       common.HexToHash("35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"),
 		Number:     big.NewInt(int64(911)),
 		ParentHash: currentBlock.Hash(),
 		Coinbase:   common.HexToAddress("0x111000000000000000000000000000000123"),
@@ -93,7 +93,8 @@ func TestInitialOtherV2Block(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block)
+	err = blockchain.InsertBlock(block)
+	assert.Nil(t, err)
 	// Initialise
 	err = adaptor.EngineV2.Initial(blockchain, block.Header())
 	assert.Nil(t, err)

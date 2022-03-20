@@ -1,4 +1,4 @@
-package tests
+package engine_v1_tests
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/params"
+	"github.com/stretchr/testify/assert"
 )
 
 // Should NOT update signerList if not on the gap block
@@ -37,8 +38,8 @@ func TestNotUpdateSignerListIfNotOnGapBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(blockA)
-
+	err = blockchain.InsertBlock(blockA)
+	assert.Nil(t, err)
 	signers, err := GetSnapshotSigner(blockchain, blockA.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +73,8 @@ func TestNotChangeSingerListIfNothingProposedOrVoted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block)
+	err = blockchain.InsertBlock(block)
+	assert.Nil(t, err)
 	parentSigners, err := GetSnapshotSigner(blockchain, parentBlock.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -114,8 +116,8 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block449)
-
+	err = blockchain.InsertBlock(block449)
+	assert.Nil(t, err)
 	parentBlock = block449
 
 	signers, err := GetSnapshotSigner(blockchain, block449.Header())
@@ -146,8 +148,8 @@ func TestUpdateSignerListIfVotedBeforeGap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block450)
-
+	err = blockchain.InsertBlock(block450)
+	assert.Nil(t, err)
 	signers, err = GetSnapshotSigner(blockchain, block450.Header())
 	if err != nil {
 		t.Fatalf("Failed while trying to get signers")
@@ -187,8 +189,8 @@ func TestCallUpdateM1WithSmartContractTranscation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(blockA)
-
+	err = blockchain.InsertBlock(blockA)
+	assert.Nil(t, err)
 	signers, err := GetSnapshotSigner(blockchain, blockA.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -236,8 +238,8 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(blockA)
-
+	err = blockchain.InsertBlock(blockA)
+	assert.Nil(t, err)
 	signers, err = GetSnapshotSigner(blockchain, blockA.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +273,8 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block450B)
+	err = blockchain.InsertBlock(block450B)
+	assert.Nil(t, err)
 	signers, err = GetSnapshotSigner(blockchain, block450B.Header())
 	if err != nil {
 		t.Fatal(err)
@@ -298,8 +301,9 @@ func TestCallUpdateM1WhenForkedBlockBackToMainChain(t *testing.T) {
 		Coinbase:   common.HexToAddress(blockCoinBase451B),
 	}
 	block451B, err := createBlockFromHeader(blockchain, header, nil, signer, signFn, blockchain.Config())
-	blockchain.InsertBlock(block451B)
-
+	assert.Nil(t, err)
+	err = blockchain.InsertBlock(block451B)
+	assert.Nil(t, err)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +388,8 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(blockA)
+	err = blockchain.InsertBlock(blockA)
+	assert.Nil(t, err)
 	state, err = blockchain.State()
 	if err != nil {
 		t.Fatalf("Failed while trying to get blockchain state")
@@ -426,7 +431,8 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block450B)
+	err = blockchain.InsertBlock(block450B)
+	assert.Nil(t, err)
 	state, err = blockchain.State()
 	if err != nil {
 		t.Fatalf("Failed while trying to get blockchain state")
@@ -460,7 +466,8 @@ func TestStatesShouldBeUpdatedWhenForkedBlockBecameMainChainAtGapBlock(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block451B)
+	err = blockchain.InsertBlock(block451B)
+	assert.Nil(t, err)
 
 	signers, err = GetSnapshotSigner(blockchain, block450B.Header())
 	if err != nil {
@@ -528,7 +535,8 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block450A)
+	err = blockchain.InsertBlock(block450A)
+	assert.Nil(t, err)
 
 	// Insert 451 A with vote
 	blockCoinbase451A := "0xaaa0000000000000000000000000000000000451"
@@ -548,7 +556,8 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block451A)
+	err = blockchain.InsertBlock(block451A)
+	assert.Nil(t, err)
 
 	// SignerList should be unchanged as the vote happen after GAP block
 	signers, err = GetSnapshotSigner(blockchain, block451A.Header())
@@ -578,7 +587,8 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block450B)
+	err = blockchain.InsertBlock(block450B)
+	assert.Nil(t, err)
 
 	blockCoinBase451B := "0xbbb0000000000000000000000000000000000451"
 	merkleRoot = "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
@@ -592,7 +602,8 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block451B)
+	err = blockchain.InsertBlock(block451B)
+	assert.Nil(t, err)
 
 	blockCoinBase452B := "0xbbb0000000000000000000000000000000000452"
 	merkleRoot = "35999dded35e8db12de7e6c1471eb9670c162eec616ecebbaf4fddd4676fb930"
@@ -606,7 +617,8 @@ func TestVoteShouldNotBeAffectedByFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block452B)
+	err = blockchain.InsertBlock(block452B)
+	assert.Nil(t, err)
 	signers, err = GetSnapshotSigner(blockchain, block452B.Header())
 	if err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-package tests
+package engine_v2_tests
 
 import (
 	"fmt"
@@ -37,7 +37,8 @@ func TestYourTurnInitialV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block900)
+	err = blockchain.InsertBlock(block900)
+	assert.Nil(t, err)
 	time.Sleep(time.Duration(minePeriod) * time.Second)
 
 	// YourTurn is called before mine first v2 block
@@ -103,7 +104,6 @@ func TestUpdateMasterNodes(t *testing.T) {
 	for i := 1351; i <= 1800; i++ {
 		blockCoinbase := fmt.Sprintf("0xaaa000000000000000000000000000000000%4d", i)
 		//Get from block validator error message
-		merkleRoot := "46234e9cd7e85a267f7f0435b15256a794a2f6d65cc98cdbd21dcd10a01d9772"
 		header = &types.Header{
 			Root:       common.HexToHash(merkleRoot),
 			Number:     big.NewInt(int64(i)),
@@ -120,7 +120,8 @@ func TestUpdateMasterNodes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		blockchain.InsertBlock(block)
+		err = blockchain.InsertBlock(block)
+		assert.Nil(t, err)
 		parentBlock = block
 	}
 

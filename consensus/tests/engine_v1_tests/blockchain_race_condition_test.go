@@ -1,4 +1,4 @@
-package tests
+package engine_v1_tests
 
 import (
 	"math/big"
@@ -7,6 +7,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
 	"github.com/XinFinOrg/XDPoSChain/params"
+	"github.com/stretchr/testify/assert"
 )
 
 // Snapshot try to read before blockchain is written
@@ -52,7 +53,8 @@ func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(blockA)
+	err = blockchain.InsertBlock(blockA)
+	assert.Nil(t, err)
 	state, err = blockchain.State()
 	if err != nil {
 		t.Fatalf("Failed while trying to get blockchain state")
@@ -97,7 +99,8 @@ func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block450B)
+	err = blockchain.InsertBlock(block450B)
+	assert.Nil(t, err)
 	if blockchain.CurrentHeader().Hash() != block450B.Hash() {
 		t.Fatalf("the block with higher difficulty should be current header")
 	}
@@ -135,7 +138,8 @@ func TestRaceConditionOnBlockchainReadAndWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blockchain.InsertBlock(block451B)
+	err = blockchain.InsertBlock(block451B)
+	assert.Nil(t, err)
 
 	signers, err = GetSnapshotSigner(blockchain, block450B.Header())
 	if err != nil {

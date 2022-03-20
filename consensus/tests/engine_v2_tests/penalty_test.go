@@ -53,7 +53,7 @@ func TestHookPenaltyV2Mining(t *testing.T) {
 	err = adaptor.Prepare(blockchain, headerMining)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(headerMining.Penalties)/common.AddressLength)
-	// 20 candidates (set by PrepareXDCTestBlockChainForV2Engine) - 3 penalty = 17
+	// 20 candidates (set by PrepareXDCTestBlockChainForV2Engine) - 1 penalty = 19
 	assert.Equal(t, 19, len(headerMining.Validators)/common.AddressLength)
 }
 
@@ -73,7 +73,7 @@ func TestHookPenaltyV2Comeback(t *testing.T) {
 	header6300 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch * 7)
 	penalty, err := adaptor.EngineV2.HookPenalty(blockchain, big.NewInt(int64(config.XDPoS.Epoch*7)), header6300.ParentHash, masternodes)
 	assert.Nil(t, err)
-	// miner (coinbase) is in comeback. so all addresses are in penalty
+	// miner (coinbase) is in comeback, so it is added to penalty
 	assert.Equal(t, 2, len(penalty))
 	header6285 := blockchain.GetHeaderByNumber(config.XDPoS.Epoch*7 - common.MergeSignRange)
 	// forcely insert signing tx into cache, to cancel comeback. since no comeback, penalty is 3

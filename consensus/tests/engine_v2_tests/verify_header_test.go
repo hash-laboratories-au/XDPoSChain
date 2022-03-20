@@ -150,6 +150,15 @@ func TestShouldVerifyBlock(t *testing.T) {
 	sealHeader(blockchain, coinbaseValidatorMismatchBlock, notQualifiedSigner, notQualifiedSignFn)
 	err = adaptor.VerifyHeader(blockchain, coinbaseValidatorMismatchBlock, true)
 	assert.Equal(t, utils.ErrCoinbaseAndValidatorMismatch, err)
+
+	// Make the validators not legit by adding something to the penalty
+	validatorsNotLegit := blockchain.GetBlockByNumber(901).Header()
+	penalties := []common.Address{acc1Addr}
+	for _, v := range penalties {
+		validatorsNotLegit.Penalties = append(validatorsNotLegit.Penalties, v[:]...)
+	}
+	err = adaptor.VerifyHeader(blockchain, validatorsNotLegit, true)
+	assert.Equal(t, utils.ErrValidatorsNotLegit, err)
 }
 
 func TestShouldFailIfNotEnoughQCSignatures(t *testing.T) {

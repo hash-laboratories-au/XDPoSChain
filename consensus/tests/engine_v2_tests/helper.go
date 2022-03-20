@@ -520,7 +520,7 @@ func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*ty
 		// Sign all the things and seal it
 		signerAddress, signerFunction := findSignerAndSignFn(bc, &header, signer, signFn, config)
 		header.Coinbase = signerAddress
-		sealHeader(bc, &header, signerAddress, signerFunction, config)
+		sealHeader(bc, &header, signerAddress, signerFunction)
 
 		block = types.NewBlockWithHeader(&header)
 	} else {
@@ -547,7 +547,7 @@ func createBlockFromHeader(bc *BlockChain, customHeader *types.Header, txs []*ty
 		// Sign all the things and seal it
 		signerAddress, signerFunction := findSignerAndSignFn(bc, &header, signer, signFn, config)
 		header.Coinbase = signerAddress
-		sealHeader(bc, &header, signerAddress, signerFunction, config)
+		sealHeader(bc, &header, signerAddress, signerFunction)
 
 		block = types.NewBlock(&header, txs, nil, receipts)
 	}
@@ -600,7 +600,7 @@ func findSignerAndSignFn(bc *BlockChain, header *types.Header, signer common.Add
 	return addressToSign, addressedSignFn
 }
 
-func sealHeader(bc *BlockChain, header *types.Header, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error), config *params.ChainConfig) {
+func sealHeader(bc *BlockChain, header *types.Header, signer common.Address, signFn func(account accounts.Account, hash []byte) ([]byte, error)) {
 	// Sign all the things and seal it
 	signedBlockHeader := bc.Engine().(*XDPoS.XDPoS).SigHash(header)
 

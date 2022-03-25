@@ -143,7 +143,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 		quorumCert = &utils.QuorumCert{
 			ProposedBlockInfo: blockInfo,
 			Signatures:        nil,
-			GapNumber: header.Number.Uint64()-x.config.Gap,
+			GapNumber:         header.Number.Uint64() - x.config.Gap,
 		}
 
 		// can not call processQC because round is equal to default
@@ -201,7 +201,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 	return nil
 }
 
-// Check if it's my turm to mine a block. Note: The second return value `preIndex` is useless in V2 engine
+// Check if it's my turn to mine a block. Note: The second return value `preIndex` is useless in V2 engine
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
 	x.lock.RLock()
 	defer x.lock.RUnlock()
@@ -222,7 +222,7 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	}
 
 	round := x.currentRound
-	isMyTurn, err := x.checkYourturnWithinFinalisedMasternodes(chain, round, parent, signer)
+	isMyTurn, err := x.yourturn(chain, round, parent, signer)
 	if err != nil {
 		log.Error("[Yourturn] Error while checking if i am qualified to mine", "round", round, "error", err)
 	}
@@ -269,7 +269,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	signer := x.signer
 	x.signLock.RUnlock()
 
-	isMyTurn, err := x.checkYourturnWithinFinalisedMasternodes(chain, currentRound, parent, signer)
+	isMyTurn, err := x.yourturn(chain, currentRound, parent, signer)
 	if err != nil {
 		log.Error("[Prepare] Error while checking if it's still my turn to mine", "round", currentRound, "ParentHash", parent.Hash().Hex(), "ParentNumber", parent.Number.Uint64(), "error", err)
 		return err

@@ -764,12 +764,6 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 		return utils.ErrInvalidQC
 	}
 
-	epochInfo, err = x.getEpochSwitchInfo(blockChainReader, nil, quorumCert.ProposedBlockInfo.Hash)
-	if err != nil {
-		log.Error("[verifyQC] Error when getting epoch switch Info to verify QC", "Error", err)
-		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")
-	}
-
 	var wg sync.WaitGroup
 	wg.Add(len(signatures))
 	var haveError error

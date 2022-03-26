@@ -79,7 +79,6 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 
 		err := x.VerifyBlockInfo(chain, voteMsg.ProposedBlockInfo)
 		if err != nil {
-			x.votePool.ClearPoolKeyByObj(voteMsg)
 			return err
 		}
 		// verify vote.GapNumber
@@ -159,8 +158,6 @@ func (x *XDPoS_v2) onVotePoolThresholdReached(chain consensus.ChainReader, poole
 		return err
 	}
 	log.Info("Successfully processed the vote and produced QC!", "QcRound", quorumCert.ProposedBlockInfo.Round, "QcNumOfSig", len(quorumCert.Signatures), "QcHash", quorumCert.ProposedBlockInfo.Hash, "QcNumber", quorumCert.ProposedBlockInfo.Number.Uint64())
-	// clean up vote at the same poolKey. and pookKey is proposed block hash
-	x.votePool.ClearPoolKeyByObj(currentVoteMsg)
 	return nil
 }
 

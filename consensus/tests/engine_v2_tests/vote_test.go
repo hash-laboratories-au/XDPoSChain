@@ -560,7 +560,7 @@ func TestVoteMessageHandlerWrongGapNumber(t *testing.T) {
 	assert.True(t, strings.Contains(err.Error(), "gap number mismatch"))
 }
 
-func TestVotePoolKeeyGoodHygiene(t *testing.T) {
+func TestVotePoolKeepGoodHygiene(t *testing.T) {
 	blockchain, _, currentBlock, signer, signFn, _ := PrepareXDCTestBlockChainForV2Engine(t, 905, params.TestXDPoSMockChainConfig, 0)
 	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
 

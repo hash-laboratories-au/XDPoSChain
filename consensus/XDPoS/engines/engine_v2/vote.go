@@ -3,6 +3,8 @@ package engine_v2
 import (
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
@@ -215,4 +217,23 @@ func (x *XDPoS_v2) isExtendingFromAncestor(blockChainReader consensus.ChainReade
 		return true, nil
 	}
 	return false, nil
+}
+
+func (x *XDPoS_v2) hygieneVotePool() {
+	round := x.currentRound
+	votePoolKeys := x.votePool.PoolObjKeysList()
+
+	// Extract round number
+	for _, k := range votePoolKeys {
+		keyedRound, err := strconv.ParseInt(strings.Split(k, ":")[0], 10, 64)
+		if err != nil {
+			log.Error("[hygieneVotePool] Error while trying to get keyedRound inside pool", "Error", err)
+			continue
+		}
+		// Clean up any votes round that is 10 rounds older
+		if keyedRound < int64(round)-utils.PoolHygieneRound {
+			log.Debug("[hygieneVotePool] Cleaned vote poll at round", "Round", keyedRound, "currentRound", round, "Key", k)
+			x.votePool.ClearByPoolKey(k)
+		}
+	}
 }

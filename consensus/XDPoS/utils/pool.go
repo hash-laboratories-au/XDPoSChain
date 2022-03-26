@@ -45,9 +45,22 @@ func (p *Pool) Size(obj PoolObj) int {
 	return len(objListKeyed)
 }
 
+func (p *Pool) PoolObjKeysList() []string {
+	var keyList []string
+	for key := range p.objList {
+		keyList = append(keyList, key)
+	}
+	return keyList
+}
+
 // Given the pool object, clear all object under the same pool key
 func (p *Pool) ClearPoolKeyByObj(obj PoolObj) {
 	poolKey := obj.PoolKey()
+	delete(p.objList, poolKey)
+}
+
+// Given the pool key, clean its content
+func (p *Pool) ClearByPoolKey(poolKey string) {
 	delete(p.objList, poolKey)
 }
 

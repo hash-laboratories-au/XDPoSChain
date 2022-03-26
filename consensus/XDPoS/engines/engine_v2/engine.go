@@ -404,12 +404,6 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 	return x.calcDifficulty(chain, parent, x.signer)
 }
 
-// TODO: what should be new difficulty
-func (x *XDPoS_v2) calcDifficulty(chain consensus.ChainReader, parent *types.Header, signer common.Address) *big.Int {
-	// TODO: The difference of round number between parent round and current round
-	return big.NewInt(1)
-}
-
 func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
 	x.lock.RLock()
 	defer x.lock.RUnlock()

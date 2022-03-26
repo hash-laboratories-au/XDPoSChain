@@ -523,7 +523,7 @@ func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *
 		return false, nil
 	}
 
-	err := x.verifyQC(chain, syncInfo.HighestQuorumCert)
+	err := x.verifyQC(chain, syncInfo.HighestQuorumCert, nil)
 	if err != nil {
 		log.Warn("SyncInfo message verification failed due to QC", "error", err)
 		return false, err
@@ -653,7 +653,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 		return err
 	}
 
-	err = x.verifyQC(chain, quorumCert)
+	err = x.verifyQC(chain, quorumCert, nil)
 	if err != nil {
 		log.Error("[ProposedBlockHandler] Fail to verify QC", "Extra round", round, "QC proposed BlockInfo Hash", quorumCert.ProposedBlockInfo.Hash)
 		return err
@@ -732,7 +732,7 @@ func (x *XDPoS_v2) VerifyBlockInfo(blockChainReader consensus.ChainReader, block
 	return nil
 }
 
-func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert) error {
+func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert, parentHeader *types.Header) error {
 	/*
 		1. Check if num of QC signatures is >= x.config.v2.CertThreshold
 		2. Get epoch master node list by hash
@@ -743,7 +743,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 		4. Verify gapNumber = epochSwitchNumber - epochSwitchNumber%Epoch - Gap
 		5. Verify blockInfo
 	*/
-	epochInfo, err := x.getEpochSwitchInfo(blockChainReader, nil, quorumCert.ProposedBlockInfo.Hash)
+	epochInfo, err := x.getEpochSwitchInfo(blockChainReader, parentHeader, quorumCert.ProposedBlockInfo.Hash)
 	if err != nil {
 		log.Error("[verifyQC] Error when getting epoch switch Info to verify QC", "Error", err)
 		return fmt.Errorf("Fail to verify QC due to failure in getting epoch switch info")

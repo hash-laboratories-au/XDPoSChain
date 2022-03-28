@@ -91,6 +91,7 @@ func TestPoolKeyFormat(t *testing.T) {
 
 	voteKey := strings.Split(voteMsg.PoolKey(), ":")
 	assert.Equal(t, "5", voteKey[0])
-	assert.Equal(t, "4", voteKey[1])
-	assert.Equal(t, common.Hash{1}.String(), voteKey[2])
+	assert.Equal(t, "450", voteKey[1])
+	assert.Equal(t, "4", voteKey[2])
+	assert.Equal(t, common.Hash{1}.String(), voteKey[3])
 }

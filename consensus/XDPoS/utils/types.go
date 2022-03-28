@@ -172,7 +172,7 @@ func TimeoutSigHash(m *TimeoutForSign) common.Hash {
 
 func (m *Vote) PoolKey() string {
 	// return the voted block hash
-	return fmt.Sprint(m.ProposedBlockInfo.Round, ":", m.ProposedBlockInfo.Number, ":", m.ProposedBlockInfo.Hash.Hex())
+	return fmt.Sprint(m.ProposedBlockInfo.Round, ":", m.GapNumber, ":", m.ProposedBlockInfo.Number, ":", m.ProposedBlockInfo.Hash.Hex())
 }
 
 func (m *Timeout) PoolKey() string {

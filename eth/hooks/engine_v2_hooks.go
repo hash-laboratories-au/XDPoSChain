@@ -56,13 +56,13 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 		penalties := []common.Address{}
 		for miner, total := range statMiners {
 			if total < common.MinimunMinerBlockPerEpoch {
-				log.Debug("Find a node not enough requirement create block", "addr", miner.Hex(), "total", total)
+				log.Info("Find a node not enough requirement create block", "addr", miner.Hex(), "total", total)
 				penalties = append(penalties, miner)
 			}
 		}
 		for _, addr := range preMasternodes {
 			if _, exist := statMiners[addr]; !exist {
-				log.Debug("Find a node don't create block", "addr", addr.Hex())
+				log.Info("Find a node don't create block", "addr", addr.Hex())
 				penalties = append(penalties, addr)
 			}
 		}
@@ -123,7 +123,7 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 			}
 		}
 
-		log.Debug("Time Calculated HookPenaltyV2 ", "block", number, "pen comeback nodes", len(penComebacks), "not enough miner", len(penalties), "time", common.PrettyDuration(time.Since(start)))
+		log.Info("Time Calculated HookPenaltyV2 ", "block", number, "pen comeback nodes", len(penComebacks), "not enough miner", len(penalties), "time", common.PrettyDuration(time.Since(start)))
 		for _, comeback := range penComebacks {
 			ok := true
 			for _, p := range penalties {

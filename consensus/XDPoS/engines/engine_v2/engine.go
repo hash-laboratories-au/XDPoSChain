@@ -983,6 +983,7 @@ func (x *XDPoS_v2) calcMasternodes(chain consensus.ChainReader, blockNum *big.In
 			log.Error("[calcMasternodes] Adaptor v2 HookPenalty has error", "err", err)
 			return nil, nil, err
 		}
+		log.Info("Penalties list", "penalties", penalties)
 		masternodes := common.RemoveItemFromArray(candidates, penalties)
 		return masternodes, penalties, nil
 	}

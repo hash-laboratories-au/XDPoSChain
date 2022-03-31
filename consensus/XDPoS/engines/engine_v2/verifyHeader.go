@@ -194,5 +194,11 @@ func (x *XDPoS_v2) isValidatorsLegit(chain consensus.ChainReader, header *types.
 		}
 	}
 	validatorsAddress := common.ExtractAddressFromBytes(header.Validators)
+	for i, m := range validatorsAddress {
+		log.Warn("validatorsAddress", "index", i, "address", m)
+	}
+	for i, m := range finalValidMasternodes {
+		log.Warn("finalValidMasternodes", "index", i, "address", m)
+	}
 	return utils.CompareSignersLists(finalValidMasternodes, validatorsAddress), nil
 }

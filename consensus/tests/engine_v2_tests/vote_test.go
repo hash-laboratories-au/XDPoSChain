@@ -557,7 +557,8 @@ func TestVoteMessageHandlerWrongGapNumber(t *testing.T) {
 	}
 
 	err := engineV2.VoteHandler(blockchain, voteMsg)
-	assert.True(t, strings.Contains(err.Error(), "gap number mismatch"))
+	// Shall not even trigger the vote threashold as vote pool key also contains the gapNumber
+	assert.Nil(t, err)
 }
 
 func TestVotePoolKeepGoodHygiene(t *testing.T) {

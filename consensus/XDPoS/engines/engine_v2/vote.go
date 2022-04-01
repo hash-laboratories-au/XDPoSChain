@@ -81,19 +81,6 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 		if err != nil {
 			return err
 		}
-		// verify vote.GapNumber
-		epochSwitchInfo, err := x.getEpochSwitchInfo(chain, nil, voteMsg.ProposedBlockInfo.Hash)
-		if err != nil {
-			log.Error("getEpochSwitchInfo when handle Vote", "BlockInfoHash", voteMsg.ProposedBlockInfo.Hash, "Error", err)
-			return err
-		}
-		epochSwitchNumber := epochSwitchInfo.EpochSwitchBlockInfo.Number.Uint64()
-		gapNumber := epochSwitchNumber - epochSwitchNumber%x.config.Epoch - x.config.Gap
-		if gapNumber != voteMsg.GapNumber {
-			log.Error("[voteHandler] gap number mismatch", "BlockInfoHash", voteMsg.ProposedBlockInfo.Hash, "Gap", voteMsg.GapNumber, "GapShouldBe", gapNumber)
-			return fmt.Errorf("gap number mismatch %v", voteMsg)
-		}
-
 		err = x.onVotePoolThresholdReached(chain, pooledVotes, voteMsg, proposedBlockHeader)
 		if err != nil {
 			return err
@@ -217,7 +204,9 @@ func (x *XDPoS_v2) isExtendingFromAncestor(blockChainReader consensus.ChainReade
 }
 
 func (x *XDPoS_v2) hygieneVotePool() {
+	x.lock.RLock()
 	round := x.currentRound
+	x.lock.RUnlock()
 	votePoolKeys := x.votePool.PoolObjKeysList()
 
 	// Extract round number

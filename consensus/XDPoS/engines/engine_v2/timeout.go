@@ -231,7 +231,9 @@ func (x *XDPoS_v2) OnCountdownTimeout(time time.Time, chain interface{}) error {
 }
 
 func (x *XDPoS_v2) hygieneTimeoutPool() {
+	x.lock.RLock()
 	currentRound := x.currentRound
+	x.lock.RUnlock()
 	timeoutPoolKeys := x.timeoutPool.PoolObjKeysList()
 
 	// Extract round number

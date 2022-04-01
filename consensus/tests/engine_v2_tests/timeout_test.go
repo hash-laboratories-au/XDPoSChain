@@ -1,7 +1,6 @@
 package engine_v2_tests
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,7 +24,6 @@ func TestCountdownTimeoutToSendTimeoutMessage(t *testing.T) {
 	assert.Equal(t, poolSize, 1)
 	assert.NotNil(t, timeoutMsg)
 	assert.Equal(t, uint64(1350), timeoutMsg.(*utils.Timeout).GapNumber)
-	fmt.Println(timeoutMsg.(*utils.Timeout).GapNumber)
 	assert.Equal(t, utils.Round(1), timeoutMsg.(*utils.Timeout).Round)
 }
 

@@ -59,16 +59,16 @@ type XDPoS_v2 struct {
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *XDPoS_v2 {
-	// Setup Timer
+	// Setup timeoutTimer
 	duration := time.Duration(config.V2.TimeoutPeriod) * time.Second
-	timer := countdown.NewCountDown(duration)
-	timeoutPool := utils.NewPool(config.V2.CertThreshold)
+	timeoutTimer := countdown.NewCountDown(duration)
 
 	snapshots, _ := lru.NewARC(utils.InmemorySnapshots)
 	signatures, _ := lru.NewARC(utils.InmemorySnapshots)
 	epochSwitches, _ := lru.NewARC(int(utils.InmemoryEpochs))
 	verifiedHeaders, _ := lru.NewARC(utils.InmemorySnapshots)
 
+	timeoutPool := utils.NewPool(config.V2.CertThreshold)
 	votePool := utils.NewPool(config.V2.CertThreshold)
 	engine := &XDPoS_v2{
 		config:       config,
@@ -80,7 +80,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *
 		verifiedHeaders: verifiedHeaders,
 		snapshots:       snapshots,
 		epochSwitches:   epochSwitches,
-		timeoutWorker:   timer,
+		timeoutWorker:   timeoutTimer,
 		BroadcastCh:     make(chan interface{}),
 		waitPeriodCh:    waitPeriodCh,
 
@@ -104,8 +104,9 @@ func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *
 		highestCommitBlock: nil,
 	}
 	// Add callback to the timer
-	timer.OnTimeoutFn = engine.OnCountdownTimeout
+	timeoutTimer.OnTimeoutFn = engine.OnCountdownTimeout
 
+	engine.periodicJob()
 	return engine
 }
 
@@ -688,16 +689,25 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 */
 
 // To be used by different message verification. Verify local DB block info against the received block information(i.e hash, blockNum, round)
-func (x *XDPoS_v2) VerifyBlockInfo(blockChainReader consensus.ChainReader, blockInfo *utils.BlockInfo) error {
+func (x *XDPoS_v2) VerifyBlockInfo(blockChainReader consensus.ChainReader, blockInfo *utils.BlockInfo, blockHeader *types.Header) error {
 	/*
 		1. Check if is able to get header by hash from the chain
 		2. Check the header from step 1 matches what's in the blockInfo. This includes the block number and the round
 	*/
-	blockHeader := blockChainReader.GetHeaderByHash(blockInfo.Hash)
 	if blockHeader == nil {
-		log.Warn("[VerifyBlockInfo] No such header in the chain", "BlockInfoHash", blockInfo.Hash.Hex(), "BlockInfoNum", blockInfo.Number, "BlockInfoRound", blockInfo.Round, "currentHeaderNum", blockChainReader.CurrentHeader().Number)
-		return fmt.Errorf("[VerifyBlockInfo] header doesn't exist for the received blockInfo at hash: %v", blockInfo.Hash.Hex())
+		blockHeader = blockChainReader.GetHeaderByHash(blockInfo.Hash)
+		if blockHeader == nil {
+			log.Warn("[VerifyBlockInfo] No such header in the chain", "BlockInfoHash", blockInfo.Hash.Hex(), "BlockInfoNum", blockInfo.Number, "BlockInfoRound", blockInfo.Round, "currentHeaderNum", blockChainReader.CurrentHeader().Number)
+			return fmt.Errorf("[VerifyBlockInfo] header doesn't exist for the received blockInfo at hash: %v", blockInfo.Hash.Hex())
+		}
+	} else {
+		// If blockHeader present, then its value shall consistent with what's provided in the blockInfo
+		if blockHeader.Hash() != blockInfo.Hash {
+			log.Warn("[VerifyBlockInfo] BlockHeader and blockInfo mismatch", "BlockInfoHash", blockInfo.Hash.Hex(), "BlockHeaderHash", blockHeader.Hash())
+			return fmt.Errorf("[VerifyBlockInfo] Provided blockheader does not match what's in the blockInfo")
+		}
 	}
+
 	if blockHeader.Number.Cmp(blockInfo.Number) != 0 {
 		log.Warn("[VerifyBlockInfo] Block Number mismatch", "BlockInfoHash", blockInfo.Hash.Hex(), "BlockInfoNum", blockInfo.Number, "BlockInfoRound", blockInfo.Round, "blockHeaderNum", blockHeader.Number)
 		return fmt.Errorf("[VerifyBlockInfo] chain header number does not match for the received blockInfo at hash: %v", blockInfo.Hash.Hex())
@@ -791,7 +801,8 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 		log.Error("[verifyQC] gap number mismatch", "BlockInfoHash", quorumCert.ProposedBlockInfo.Hash, "Gap", quorumCert.GapNumber, "GapShouldBe", gapNumber)
 		return fmt.Errorf("gap number mismatch %v", quorumCert)
 	}
-	return x.VerifyBlockInfo(blockChainReader, quorumCert.ProposedBlockInfo)
+
+	return x.VerifyBlockInfo(blockChainReader, quorumCert.ProposedBlockInfo, parentHeader)
 }
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
@@ -1042,4 +1053,15 @@ func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types
 		return fmt.Errorf("Not in the master node list, not suppose to %v", sendType)
 	}
 	return nil
+}
+
+// Periodlly execution(Attached to engine initialisation during "new"). Used for pool cleaning etc
+func (x *XDPoS_v2) periodicJob() {
+	go func() {
+		for {
+			<-time.After(utils.PeriodicJobPeriod * time.Second)
+			x.hygieneVotePool()
+			x.hygieneTimeoutPool()
+		}
+	}()
 }

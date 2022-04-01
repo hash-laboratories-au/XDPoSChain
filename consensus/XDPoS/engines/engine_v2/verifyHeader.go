@@ -170,7 +170,7 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 func (x *XDPoS_v2) isValidatorsLegit(chain consensus.ChainReader, header *types.Header) (bool, error) {
 	snap, err := x.getSnapshot(chain, header.Number.Uint64(), false)
 	if err != nil {
-		log.Error("[checkMasternodesOnEpochSwitch] Error while trying to get snapshot", "BlockNumber", header.Number.Int64(), "Hash", header.Hash().Hex(), "error", err)
+		log.Error("[isValidatorsLegit] Error while trying to get snapshot", "BlockNumber", header.Number.Int64(), "Hash", header.Hash().Hex(), "error", err)
 		return false, err
 	}
 	// snap.NextEpochMasterNodes

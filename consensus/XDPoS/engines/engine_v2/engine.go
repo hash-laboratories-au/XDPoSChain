@@ -44,11 +44,12 @@ type XDPoS_v2 struct {
 	timeoutWorker *countdown.CountdownTimer // Timer to generate broadcast timeout msg if threashold reached
 	timeoutCount  int                       // number of timeout being sent
 
-	timeoutPool       *utils.Pool
-	votePool          *utils.Pool
-	currentRound      utils.Round
-	highestVotedRound utils.Round
-	highestQuorumCert *utils.QuorumCert
+	timeoutPool           *utils.Pool
+	votePool              *utils.Pool
+	currentRound          utils.Round
+	highestSelfMinedRound utils.Round
+	highestVotedRound     utils.Round
+	highestQuorumCert     *utils.QuorumCert
 	// lockQuorumCert in XDPoS Consensus 2.0, used in voting rule
 	lockQuorumCert     *utils.QuorumCert
 	highestTimeoutCert *utils.TimeoutCert
@@ -86,6 +87,8 @@ func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *
 
 		timeoutPool: timeoutPool,
 		votePool:    votePool,
+
+		highestSelfMinedRound: utils.Round(0),
 
 		highestTimeoutCert: &utils.TimeoutCert{
 			Round:      utils.Round(0),
@@ -225,10 +228,10 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 	round := x.currentRound
 	isMyTurn, err := x.yourturn(chain, round, parent, signer)
 	if err != nil {
-		log.Error("[Yourturn] Error while checking if i am qualified to mine", "round", round, "error", err)
+		log.Warn("[Yourturn] Error while checking if i am qualified to mine", "round", round, "error", err)
 	}
 
-	return isMyTurn, nil
+	return isMyTurn, err
 }
 
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
@@ -272,7 +275,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 
 	isMyTurn, err := x.yourturn(chain, currentRound, parent, signer)
 	if err != nil {
-		log.Error("[Prepare] Error while checking if it's still my turn to mine", "round", currentRound, "ParentHash", parent.Hash().Hex(), "ParentNumber", parent.Number.Uint64(), "error", err)
+		log.Error("[Prepare] Error while checking if it's still my turn to mine", "currentRound", currentRound, "ParentHash", parent.Hash().Hex(), "ParentNumber", parent.Number.Uint64(), "error", err)
 		return err
 	}
 	if !isMyTurn {
@@ -394,6 +397,15 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 		return nil, err
 	}
 	header.Validator = signature
+
+	// Mark the highestSelfMinedRound to make sure we only mine once per round
+	var decodedExtraField utils.ExtraFields_v2
+	err = utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
+	if err != nil {
+		log.Error("[Seal] Error when decode extra field to get the round number from v2 block during sealing", "Hash", header.Hash().Hex(), "Number", header.Number.Uint64(), "Error", err)
+		return nil, err
+	}
+	x.highestSelfMinedRound = decodedExtraField.Round
 
 	return block.WithSeal(header), nil
 }
@@ -988,17 +1000,25 @@ func (x *XDPoS_v2) calcMasternodes(chain consensus.ChainReader, blockNum *big.In
 		return nil, nil, err
 	}
 	candidates := snap.NextEpochMasterNodes
-	if x.HookPenalty != nil {
-		penalties, err := x.HookPenalty(chain, blockNum, parentHash, candidates)
-		if err != nil {
-			log.Error("[calcMasternodes] Adaptor v2 HookPenalty has error", "err", err)
-			return nil, nil, err
-		}
-		log.Info("Penalties list", "penalties", penalties)
-		masternodes := common.RemoveItemFromArray(candidates, penalties)
-		return masternodes, penalties, nil
+
+	if blockNum.Uint64() == x.config.V2.SwitchBlock.Uint64()+1 {
+		log.Info("[calcMasternodes] examing first v2 block")
+		return candidates, []common.Address{}, nil
 	}
-	return candidates, []common.Address{}, nil
+
+	if x.HookPenalty == nil {
+		log.Info("[calcMasternodes] no hook penalty defined")
+		return candidates, []common.Address{}, nil
+	}
+
+	penalties, err := x.HookPenalty(chain, blockNum, parentHash, candidates)
+	if err != nil {
+		log.Error("[calcMasternodes] Adaptor v2 HookPenalty has error", "err", err)
+		return nil, nil, err
+	}
+	masternodes := common.RemoveItemFromArray(candidates, penalties)
+	return masternodes, penalties, nil
+
 }
 
 // Given hash, get master node from the epoch switch block of the epoch

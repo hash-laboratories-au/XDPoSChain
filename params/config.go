@@ -50,7 +50,7 @@ var (
 	}
 	DevnetXDPoSV2Config = &V2{
 		SwitchBlock:          big.NewInt(7218000),
-		CertThreshold:        6,
+		CertThreshold:        4,
 		TimeoutSyncThreshold: 3,
 		TimeoutPeriod:        5,
 		WaitPeriod:           1,

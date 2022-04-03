@@ -51,10 +51,10 @@ var (
 	DevnetXDPoSV2Config = &V2{
 		SwitchBlock:          big.NewInt(7218000),
 		CertThreshold:        6,
-		TimeoutSyncThreshold: 5,
-		TimeoutPeriod:        10,
-		WaitPeriod:           2,
-		MinePeriod:           2,
+		TimeoutSyncThreshold: 3,
+		TimeoutPeriod:        5,
+		WaitPeriod:           1,
+		MinePeriod:           1,
 	}
 
 	// XDPoSChain mainnet config

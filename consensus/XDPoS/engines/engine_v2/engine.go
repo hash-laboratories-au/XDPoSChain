@@ -442,7 +442,7 @@ func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *type
 		}
 	}
 
-	log.Warn("Not authorised address", "Address", address.Hex(), "Hash", header.Hash().Hex())
+	log.Warn("Not authorised address", "Address", address.Hex(), "Hash", header.Hash().Hex(), "round", round)
 	for index, mn := range masterNodes {
 		log.Warn("Master node list item", "mn", mn.Hex(), "index", index)
 	}

@@ -154,6 +154,7 @@ func (x *XDPoS_v2) processTC(blockChainReader consensus.ChainReader, timeoutCert
 	3. send to broadcast channel
 */
 func (x *XDPoS_v2) sendTimeout(chain consensus.ChainReader) error {
+	log.Info("[sendTimeout]")
 	// Construct the gapNumber
 	var gapNumber uint64
 	currentBlockHeader := chain.CurrentHeader()

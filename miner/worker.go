@@ -520,22 +520,18 @@ func abs(x int64) int64 {
 }
 
 func (self *worker) commitNewWork() {
-	log.Info("[commit new work] try to get all the lock")
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	self.uncleMu.Lock()
 	defer self.uncleMu.Unlock()
 	self.currentMu.Lock()
 	defer self.currentMu.Unlock()
-	log.Info("[commit new work] got all the lock")
-	defer log.Info("[commit new work] release all the lock")
 
 	tstart := time.Now()
 
 	c := self.engine.(*XDPoS.XDPoS)
 	var parent *types.Block
 	if c != nil {
-		log.Info("[commit new work] find parent block to assign")
 		parent = c.FindParentBlockToAssign(self.chain, self.chain.CurrentBlock())
 	} else {
 		parent = self.chain.CurrentBlock()
@@ -553,7 +549,6 @@ func (self *worker) commitNewWork() {
 	if atomic.LoadInt32(&self.mining) == 1 {
 		// check if we are right after parent's coinbase in the list
 		if self.config.XDPoS != nil {
-			log.Info("[commit new work] Go yourturn")
 			ok, err := c.YourTurn(self.chain, parent.Header(), self.coinbase)
 			if err != nil {
 				log.Warn("Failed when trying to commit new work", "err", err)

@@ -32,8 +32,8 @@ func (x *XDPoS_v2) getPreviousEpochSwitchInfoByHash(chain consensus.ChainReader,
 func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types.Header, hash common.Hash) (*utils.EpochSwitchInfo, error) {
 	e, ok := x.epochSwitches.Get(hash)
 	if ok {
-		log.Info("[getEpochSwitchInfo] cache hit", "hash", hash.Hex())
 		epochSwitchInfo := e.(*utils.EpochSwitchInfo)
+		log.Info("[getEpochSwitchInfo] cache hit", "number", epochSwitchInfo.EpochSwitchBlockInfo.Number, "hash", hash.Hex())
 		return epochSwitchInfo, nil
 	}
 	h := header

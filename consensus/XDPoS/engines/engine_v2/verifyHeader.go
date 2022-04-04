@@ -15,6 +15,7 @@ import (
 
 // Verify individual header
 func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header, fullVerify bool) error {
+	log.Info("[verifyHeader]")
 	// If we're running a engine faking, accept any block as valid
 	if x.config.V2.SkipV2Validation {
 		return nil

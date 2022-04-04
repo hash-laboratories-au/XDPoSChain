@@ -32,13 +32,13 @@ func (x *XDPoS_v2) getPreviousEpochSwitchInfoByHash(chain consensus.ChainReader,
 func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types.Header, hash common.Hash) (*utils.EpochSwitchInfo, error) {
 	e, ok := x.epochSwitches.Get(hash)
 	if ok {
-		log.Debug("[getEpochSwitchInfo] cache hit", "hash", hash.Hex())
+		log.Info("[getEpochSwitchInfo] cache hit", "hash", hash.Hex())
 		epochSwitchInfo := e.(*utils.EpochSwitchInfo)
 		return epochSwitchInfo, nil
 	}
 	h := header
 	if h == nil {
-		log.Debug("[getEpochSwitchInfo] header missing, get header", "hash", hash.Hex())
+		log.Info("[getEpochSwitchInfo] header missing, get header", "hash", hash.Hex())
 		h = chain.GetHeaderByHash(hash)
 		if h == nil {
 			log.Warn("[getEpochSwitchInfo] can not find header from db", "hash", hash.Hex())
@@ -50,7 +50,7 @@ func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types
 		return nil, err
 	}
 	if isEpochSwitch {
-		log.Debug("[getEpochSwitchInfo] header is epoch switch", "hash", hash.Hex(), "number", h.Number.Uint64())
+		log.Info("[getEpochSwitchInfo] header is epoch switch", "hash", hash.Hex(), "number", h.Number.Uint64())
 		quorumCert, round, masternodes, err := x.getExtraFields(h)
 		if err != nil {
 			return nil, err

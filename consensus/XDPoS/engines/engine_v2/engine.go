@@ -207,8 +207,11 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 
 // Check if it's my turn to mine a block. Note: The second return value `preIndex` is useless in V2 engine
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
+	log.Info("[Yourturn] get lock")
 	x.lock.RLock()
+	log.Info("[Yourturn] got lock")
 	defer x.lock.RUnlock()
+	defer log.Info("[Yourturn] release lock")
 
 	if !x.isInitilised {
 		err := x.Initial(chain, parent)
@@ -238,10 +241,13 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
 
+	log.Info("[Prepare] get lock")
 	x.lock.RLock()
+	log.Info("[Prepare] got lock")
 	currentRound := x.currentRound
 	highestQC := x.highestQuorumCert
 	x.lock.RUnlock()
+	log.Info("[Prepare] release lock")
 
 	if header.ParentHash != highestQC.ProposedBlockInfo.Hash {
 		log.Warn("[Prepare] parent hash and QC hash does not match", "blockNum", header.Number, "parentHash", header.ParentHash, "QCHash", highestQC.ProposedBlockInfo.Hash, "QCNumber", highestQC.ProposedBlockInfo.Number)
@@ -372,6 +378,7 @@ func (x *XDPoS_v2) Author(header *types.Header) (common.Address, error) {
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
 func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
+	log.Info("[Seal] start")
 	header := block.Header()
 
 	// Sealing the genesis block is not supported
@@ -407,6 +414,7 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 	x.highestSelfMinedRound = decodedExtraField.Round
 
+	log.Info("[Seal] finish")
 	return block.WithSeal(header), nil
 }
 

@@ -115,6 +115,9 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 			log.Error("[verifyHeader] Fail to calculate master nodes list with penalty", "Number", header.Number, "Hash", header.Hash())
 			return err
 		}
+		for i, m := range penalties {
+			log.Info("Penalty list", "i", i, "node", m)
+		}
 
 		if !utils.CompareSignersLists(common.ExtractAddressFromBytes(header.Penalties), penalties) {
 			return utils.ErrPenaltyListDoesNotMatch

@@ -985,6 +985,10 @@ func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 		log.Error("[GetMasternodes] Adaptor v2 getEpochSwitchInfo has error, potentially bug", "err", err)
 		return []common.Address{}
 	}
+	log.Info("[GetMasterNodes]")
+	for i, m := range epochSwitchInfo.Masternodes {
+		log.Info("[GetMasternodes]", "i", i, "node", m)
+	}
 	return epochSwitchInfo.Masternodes
 }
 

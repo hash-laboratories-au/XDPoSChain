@@ -49,11 +49,11 @@ var (
 		SkipV2Validation:     true,
 	}
 	DevnetXDPoSV2Config = &V2{
-		SwitchBlock:          big.NewInt(7218000),
-		CertThreshold:        3,
-		TimeoutSyncThreshold: 10,
-		TimeoutPeriod:        10,
-		WaitPeriod:           5,
+		SwitchBlock:          big.NewInt(7209000),
+		CertThreshold:        6,
+		TimeoutSyncThreshold: 3,
+		TimeoutPeriod:        5,
+		WaitPeriod:           2,
 		MinePeriod:           2,
 	}
 

@@ -192,16 +192,20 @@ func (x *XDPoS_v2) isValidatorsLegit(chain consensus.ChainReader, header *types.
 	penaltyMap := make(map[common.Address]bool)
 	for _, item := range penaltyList {
 		penaltyMap[item] = true
+		log.Info("[isValidatorsLegit] ", "item", item)
 	}
 
 	var finalValidMasternodes []common.Address
 	for _, mn := range snap.NextEpochMasterNodes {
 		if penaltyMap[mn] {
+			log.Info("[isValidatorsLegit] skip", "mn", mn)
 			continue
 		} else {
 			finalValidMasternodes = append(finalValidMasternodes, mn)
+			log.Info("[isValidatorsLegit] ", "mn", mn)
 		}
 	}
+
 	validatorsAddress := common.ExtractAddressFromBytes(header.Validators)
 	for i, m := range validatorsAddress {
 		log.Warn("validatorsAddress", "index", i, "address", m)

@@ -182,6 +182,7 @@ func (x *XDPoS_v2) isValidatorsLegit(chain consensus.ChainReader, header *types.
 		return true, nil
 	}
 
+	log.Info("[isValidatorsLegit] get snapshot", "number", header.Number.Uint64())
 	snap, err := x.getSnapshot(chain, header.Number.Uint64(), false)
 	if err != nil {
 		log.Error("[isValidatorsLegit] Error while trying to get snapshot", "BlockNumber", header.Number.Int64(), "Hash", header.Hash().Hex(), "error", err)
@@ -197,12 +198,13 @@ func (x *XDPoS_v2) isValidatorsLegit(chain consensus.ChainReader, header *types.
 
 	var finalValidMasternodes []common.Address
 	for _, mn := range snap.NextEpochMasterNodes {
+		log.Info("[isValidatorsLegit] from NextEpochMasterNodes", "mn", mn)
 		if penaltyMap[mn] {
 			log.Info("[isValidatorsLegit] skip", "mn", mn)
 			continue
 		} else {
 			finalValidMasternodes = append(finalValidMasternodes, mn)
-			log.Info("[isValidatorsLegit] ", "mn", mn)
+			log.Info("[isValidatorsLegit] append", "mn", mn)
 		}
 	}
 

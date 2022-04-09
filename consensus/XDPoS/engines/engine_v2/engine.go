@@ -181,7 +181,10 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 			log.Error("[Initial] Error while get masternodes", "error", err)
 			return err
 		}
-		log.Info("[initial]", "masternodes", masternodes)
+		for i, m := range masternodes {
+			log.Info("[initial]", "index", i, "m", m.Hex())
+		}
+
 		snap := newSnapshot(lastGapNum, lastGapHeader.Hash(), masternodes)
 		x.snapshots.Add(snap.Hash, snap)
 		err = storeSnapshot(snap, x.db)

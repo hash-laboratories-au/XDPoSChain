@@ -23,7 +23,7 @@ type Forensics struct {
 }
 
 // Initiate a forensics process
-func (x *XDPoS_v2) AttschForensics() {
+func (x *XDPoS_v2) AttachForensics() {
 	receiver := make(chan utils.QuorumCert)
 	abort := make(chan struct{})
 

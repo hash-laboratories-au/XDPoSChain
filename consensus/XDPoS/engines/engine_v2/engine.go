@@ -113,7 +113,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *
 
 	engine.periodicJob()
 
-	engine.AttschForensics()
+	engine.AttachForensics()
 	return engine
 }
 

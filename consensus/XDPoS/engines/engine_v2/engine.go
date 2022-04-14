@@ -1018,7 +1018,9 @@ func (x *XDPoS_v2) calcMasternodes(chain consensus.ChainReader, blockNum *big.In
 		return nil, nil, err
 	}
 	candidates := snap.NextEpochMasterNodes
-
+	for i, m := range candidates {
+		log.Info("[calcMasternodes] candidates", "index", i, "m", m.Hex())
+	}
 	if blockNum.Uint64() == x.config.V2.SwitchBlock.Uint64()+1 {
 		log.Info("[calcMasternodes] examing first v2 block")
 		return candidates, []common.Address{}, nil
@@ -1035,6 +1037,9 @@ func (x *XDPoS_v2) calcMasternodes(chain consensus.ChainReader, blockNum *big.In
 		return nil, nil, err
 	}
 	masternodes := common.RemoveItemFromArray(candidates, penalties)
+	for i, m := range candidates {
+		log.Info("[calcMasternodes] candidates", "index", i, "m", m.Hex())
+	}
 	return masternodes, penalties, nil
 
 }

@@ -86,7 +86,7 @@ func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64, isGap
 	// If an in-memory SnapshotV2 was found, use that
 	if s, ok := x.snapshots.Get(gapBlockHash); ok {
 		snap := s.(*SnapshotV2)
-		log.Trace("Loaded snapshot from memory", "number", gapBlockNum, "hash", gapBlockHash)
+		log.Info("Loaded snapshot from memory", "number", gapBlockNum, "hash", gapBlockHash)
 		return snap, nil
 	}
 	// If an on-disk checkpoint snapshot can be found, use that
@@ -96,7 +96,7 @@ func (x *XDPoS_v2) getSnapshot(chain consensus.ChainReader, number uint64, isGap
 		return nil, err
 	}
 
-	log.Trace("Loaded snapshot from disk", "number", gapBlockNum, "hash", gapBlockHash)
+	log.Info("Loaded snapshot from disk", "number", gapBlockNum, "hash", gapBlockHash)
 	x.snapshots.Add(snap.Hash, snap)
 	return snap, nil
 }

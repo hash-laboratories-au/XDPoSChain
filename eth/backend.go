@@ -294,7 +294,7 @@ func New(ctx *node.ServiceContext, config *Config, XDCXServ *XDCx.XDCX, lendingS
 			// getSnapshot from parent block if it exists
 			parentHeader := eth.blockchain.GetHeader(currentHeader.ParentHash, currentHeader.Number.Uint64()-1)
 			if parentHeader != nil {
-				log.Info("[eth.txPool.IsSigner] Passing parent heder into IsAuthorisedAddress", "parentHeaderNum", parentHeader.Number.Uint64())
+				log.Debug("[eth.txPool.IsSigner] Passing parent heder into IsAuthorisedAddress", "parentHeaderNum", parentHeader.Number.Uint64())
 				// not genesis block
 				header = parentHeader
 			}

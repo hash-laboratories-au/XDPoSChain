@@ -243,14 +243,10 @@ func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, s
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) error {
-
-	log.Info("[Prepare] get lock")
 	x.lock.RLock()
-	log.Info("[Prepare] got lock")
 	currentRound := x.currentRound
 	highestQC := x.highestQuorumCert
 	x.lock.RUnlock()
-	log.Info("[Prepare] release lock")
 
 	if header.ParentHash != highestQC.ProposedBlockInfo.Hash {
 		log.Warn("[Prepare] parent hash and QC hash does not match", "blockNum", header.Number, "parentHash", header.ParentHash, "QCHash", highestQC.ProposedBlockInfo.Hash, "QCNumber", highestQC.ProposedBlockInfo.Number)
@@ -381,7 +377,6 @@ func (x *XDPoS_v2) Author(header *types.Header) (common.Address, error) {
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
 func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
-	log.Info("[Seal] start")
 	header := block.Header()
 
 	// Sealing the genesis block is not supported
@@ -417,7 +412,6 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	}
 	x.highestSelfMinedRound = decodedExtraField.Round
 
-	log.Info("[Seal] finish")
 	return block.WithSeal(header), nil
 }
 
@@ -429,7 +423,6 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 }
 
 func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
-	log.Info("[IsAuthorisedAddress]")
 	x.lock.RLock()
 	defer x.lock.RUnlock()
 
@@ -515,7 +508,9 @@ func (x *XDPoS_v2) VerifyHeaders(chain consensus.ChainReader, headers []*types.H
 	go func() {
 		for i, header := range headers {
 			err := x.verifyHeader(chain, header, headers[:i], fullVerifies[i])
-			log.Warn("[VerifyHeaders] Fail to verify header", "fullVerify", fullVerifies[i], "blockNum", header.Number, "blockHash", header.Hash(), "error", err)
+			if err != nil {
+				log.Warn("[VerifyHeaders] Fail to verify header", "fullVerify", fullVerifies[i], "blockNum", header.Number, "blockHash", header.Hash(), "error", err)
+			}
 			select {
 			case <-abort:
 				return
@@ -991,7 +986,7 @@ func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 		log.Error("[GetMasternodes] Adaptor v2 getEpochSwitchInfo has error, potentially bug", "err", err)
 		return []common.Address{}
 	}
-	log.Info("[GetMasterNodes]")
+	log.Info("[GetMasterNodes]", "number", header.Number.Int64())
 	for i, m := range epochSwitchInfo.Masternodes {
 		log.Info("[GetMasternodes]", "i", i, "node", m)
 	}

@@ -297,7 +297,6 @@ func (self *worker) update() {
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
 
 		case <-c:
-			log.Info("commit new work", "self_mining", self.mining)
 			if atomic.LoadInt32(&self.mining) == 1 {
 				self.commitNewWork()
 			}

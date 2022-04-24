@@ -94,7 +94,8 @@ func (x *XDPoS_v2) isEpochSwitchAtRound(round utils.Round, parentHeader *types.H
 		return false, 0, err
 	}
 	if round <= parentRound {
-		return false, 0, fmt.Errorf("round %d is no larger than parent round %d", round, parentRound)
+		// this round is no larger than parentRound, should return false
+		return false, epochNum, nil
 	}
 
 	epochStartRound := round - round%utils.Round(x.config.Epoch)

@@ -47,12 +47,12 @@ func TestIsYourTurnConsensusV2(t *testing.T) {
 
 	time.Sleep(time.Duration(minePeriod) * time.Second)
 	adaptor.EngineV2.SetNewRoundFaker(blockchain, 2, false)
-	// The second address is valid as the round starting from 2
+	// The third address is valid as the round starting from 2
 	isYourTurn, err = adaptor.YourTurn(blockchain, currentBlock.Header(), common.HexToAddress("xdc71562b71999873DB5b286dF957af199Ec94617F7"))
 	assert.Nil(t, err)
 	assert.True(t, isYourTurn)
 
-	// The first and third address are not valid
+	// The first and second address are not valid
 	isYourTurn, err = adaptor.YourTurn(blockchain, currentBlock.Header(), common.HexToAddress("xdc703c4b2bD70c169f5717101CaeE543299Fc946C7"))
 	assert.Nil(t, err)
 	assert.False(t, isYourTurn)

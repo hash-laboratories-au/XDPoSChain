@@ -9,6 +9,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
+	"github.com/XinFinOrg/XDPoSChain/crypto"
 	"github.com/XinFinOrg/XDPoSChain/log"
 )
 
@@ -56,7 +57,7 @@ func (f *Forensics) ProcessForensics(chain consensus.ChainReader, incomingQC uti
 	if err != nil {
 		return err
 	}
-	isOnTheChain, err := f.checkQCsOnTheSameChain(chain, highestCommittedQCs, quorunCerts)
+	isOnTheChain, lowerBlockNumQCs, higherBlockNumQCs, err := f.checkQCsOnTheSameChain(chain, highestCommittedQCs, quorunCerts)
 	if err != nil {
 		return err
 	}
@@ -66,6 +67,15 @@ func (f *Forensics) ProcessForensics(chain consensus.ChainReader, incomingQC uti
 		return nil
 	}
 	// Trigger the safety Alarm if failed
+	// First, find the QC in the two sets that have the same round
+	foundSameRoundQC, lqc, hqc := f.findQCsInSameRound(lowerBlockNumQCs, higherBlockNumQCs)
+
+	if foundSameRoundQC {
+		attackersAddress := f.FindCommonSigners(lqc, hqc)
+		f.SendForensicProof(attackersAddress)
+	} else {
+		// Not found, need a more complex approach to find the two QC
+	}
 	return nil
 }
 
@@ -105,7 +115,7 @@ func (f *Forensics) SetCommittedQCs(headers []types.Header, incomingQC utils.Quo
 }
 
 // Last step of forensics which sends out detailed proof to report service.
-func (f *Forensics) SendForensicProof() {
+func (f *Forensics) SendForensicProof(attackersAddress []common.Address) {
 }
 
 // Utils function to help find the n-th previous QC. It returns an array of QC in ascending order including the currentQc as the last item in the array
@@ -139,7 +149,7 @@ func (f *Forensics) findParentsQc(chain consensus.ChainReader, currentQc utils.Q
 }
 
 // Check whether the given QCs are on the same chain as the stored committed QCs(f.HighestCommittedQCs) regardless their orders
-func (f *Forensics) checkQCsOnTheSameChain(chain consensus.ChainReader, highestCommittedQCs []utils.QuorumCert, incomingQCandItsParents []utils.QuorumCert) (bool, error) {
+func (f *Forensics) checkQCsOnTheSameChain(chain consensus.ChainReader, highestCommittedQCs []utils.QuorumCert, incomingQCandItsParents []utils.QuorumCert) (bool, []utils.QuorumCert, []utils.QuorumCert, error) {
 	// Re-order two sets of QCs by block Number
 	lowerBlockNumQCs := highestCommittedQCs
 	higherBlockNumQCs := incomingQCandItsParents
@@ -155,17 +165,64 @@ func (f *Forensics) checkQCsOnTheSameChain(chain consensus.ChainReader, highestC
 		err := utils.DecodeBytesExtraFields(parentHeader.Extra, &decodedExtraField)
 		if err != nil {
 			log.Error("[ProcessForensics] Fail to decode extra when checking the two QCs set on the same chain", "Error", err)
-			return false, err
+			return false, lowerBlockNumQCs, higherBlockNumQCs, err
 		}
 		proposedBlockInfo = decodedExtraField.QuorumCert.ProposedBlockInfo
 	}
 	// Check the final proposed blockInfo is the same as what we have from lowerBlockNumQCs[0]
 	if reflect.DeepEqual(proposedBlockInfo, lowerBlockNumQCs[0].ProposedBlockInfo) {
-		return true, nil
+		return true, lowerBlockNumQCs, higherBlockNumQCs, nil
 	}
 
-	return false, nil
+	return false, lowerBlockNumQCs, higherBlockNumQCs, nil
 }
 
-func (f *Forensics) findCommonSigners(currentQc utils.QuorumCert, higherQc utils.QuorumCert) {
+// Given the two QCs set, find if there are any QC that have the same round
+func (f *Forensics) findQCsInSameRound(lowerBlockNumQCs []utils.QuorumCert, higherBlockNumQCs []utils.QuorumCert) (bool, utils.QuorumCert, utils.QuorumCert) {
+	for _, lqc := range lowerBlockNumQCs {
+		for _, hqc := range higherBlockNumQCs {
+			if lqc.ProposedBlockInfo.Round == hqc.ProposedBlockInfo.Round {
+				return true, lqc, hqc
+			}
+		}
+	}
+	return false, utils.QuorumCert{}, utils.QuorumCert{}
+}
+
+func (f *Forensics) FindCommonSigners(lowerBlockNumQC utils.QuorumCert, higherBlockNumQC utils.QuorumCert) []common.Address {
+	var commonSigners []common.Address
+	lowerBlockNumQcSignersMap := make(map[string]bool)
+	// The QC signatures are signed by votes special struct VoteForSign
+	lowerBlockNumQcSignedHash := utils.VoteSigHash(&utils.VoteForSign{
+		ProposedBlockInfo: lowerBlockNumQC.ProposedBlockInfo,
+		GapNumber:         lowerBlockNumQC.GapNumber,
+	})
+	for _, signature := range lowerBlockNumQC.Signatures {
+		var signerAddress common.Address
+		pubkey, err := crypto.Ecrecover(lowerBlockNumQcSignedHash.Bytes(), signature)
+		if err != nil {
+			log.Error("[FindCommonSigners] Fail to Ecrecover signer from the lowerBlockNumQcSignedHash", "lowerBlockNumQC.GapNumber", lowerBlockNumQC.GapNumber, "lowerBlockNumQC.ProposedBlockInfo", lowerBlockNumQC.ProposedBlockInfo)
+		}
+
+		copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
+		lowerBlockNumQcSignersMap[signerAddress.Hex()] = true
+	}
+	// Now, Let's check if higherBlockNumQC have any signers that have in common with lowerBlockNumQcSignersMap(from lowerBlockNumQC)
+	higherBlockNumQcSignedHash := utils.VoteSigHash(&utils.VoteForSign{
+		ProposedBlockInfo: higherBlockNumQC.ProposedBlockInfo,
+		GapNumber:         higherBlockNumQC.GapNumber,
+	})
+	for _, signature := range higherBlockNumQC.Signatures {
+		var signerAddress common.Address
+		pubkey, err := crypto.Ecrecover(higherBlockNumQcSignedHash.Bytes(), signature)
+		if err != nil {
+			log.Error("[FindCommonSigners] Fail to Ecrecover signer from the higherBlockNumQcSignedHash", "higherBlockNumQC.GapNumber", higherBlockNumQC.GapNumber, "higherBlockNumQC.ProposedBlockInfo", higherBlockNumQC.ProposedBlockInfo)
+		}
+
+		copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
+		if lowerBlockNumQcSignersMap[signerAddress.Hex()] {
+			commonSigners = append(commonSigners, signerAddress)
+		}
+	}
+	return commonSigners
 }

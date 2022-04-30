@@ -861,6 +861,8 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuo
 		}
 	}
 	log.Trace("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
+	// Forensics monitoring
+	go x.forensics.ProcessForensics(blockChainReader, *incomingQuorumCert)
 	return nil
 }
 

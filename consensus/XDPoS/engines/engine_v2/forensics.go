@@ -79,7 +79,7 @@ func (f *Forensics) SetCommittedQCs(headers []types.Header, incomingQC utils.Quo
 	Link to the flow diagram: https://hashlabs.atlassian.net/wiki/spaces/HASHLABS/pages/97878029/Forensics+Diagram+flow
 */
 func (f *Forensics) ProcessForensics(chain consensus.ChainReader, incomingQC utils.QuorumCert) error {
-	log.Info("Received a QC in forensics", "QC", incomingQC)
+	log.Debug("Received a QC in forensics", "QC", incomingQC)
 	// Clone the values to a temporary variable
 	highestCommittedQCs := f.HighestCommittedQCs
 	if len(highestCommittedQCs) != NUM_OF_FORENSICS_QC {
@@ -87,7 +87,7 @@ func (f *Forensics) ProcessForensics(chain consensus.ChainReader, incomingQC uti
 		return fmt.Errorf("HighestCommittedQCs value not set")
 	}
 	// Find the QC1 and QC2. We only care 2 parents in front of the incomingQC. The returned value contains QC1, QC2 and QC3(the incomingQC)
-	incomingQuorunCerts, err := f.findParentsQc(chain, incomingQC, 2)
+	incomingQuorunCerts, err := f.findAncestorQCs(chain, incomingQC, 2)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (f *Forensics) ProcessForensics(chain consensus.ChainReader, incomingQC uti
 	foundSameRoundQC, sameRoundHCQC, sameRoundQC := f.findQCsInSameRound(highestCommittedQCs, incomingQuorunCerts)
 
 	if foundSameRoundQC {
-		attackersAddress := f.FindCommonSigners(sameRoundHCQC, sameRoundQC)
+		attackersAddress := f.findCommonSigners(sameRoundHCQC, sameRoundQC)
 		f.SendForensicProof(attackersAddress, sameRoundHCQC, sameRoundQC)
 	} else {
 		// Not found, need a more complex approach to find the two QC
@@ -114,7 +114,7 @@ func (f *Forensics) ProcessForensics(chain consensus.ChainReader, incomingQC uti
 			log.Error("[ProcessForensics] Error while trying to find ancestor QC through round number", "Error", err)
 		}
 		// Find the common signers within ancestorQC and lowerRoundQCs[NUM_OF_FORENSICS_QC-1]
-		attackersAddress := f.FindCommonSigners(ancestorQC, lowerRoundQCs[NUM_OF_FORENSICS_QC-1])
+		attackersAddress := f.findCommonSigners(ancestorQC, lowerRoundQCs[NUM_OF_FORENSICS_QC-1])
 		f.SendForensicProof(attackersAddress, ancestorQC, lowerRoundQCs[NUM_OF_FORENSICS_QC-1])
 	}
 
@@ -127,7 +127,7 @@ func (f *Forensics) SendForensicProof(attackersAddress []common.Address, lqc uti
 }
 
 // Utils function to help find the n-th previous QC. It returns an array of QC in ascending order including the currentQc as the last item in the array
-func (f *Forensics) findParentsQc(chain consensus.ChainReader, currentQc utils.QuorumCert, distanceFromCurrrentQc int) ([]utils.QuorumCert, error) {
+func (f *Forensics) findAncestorQCs(chain consensus.ChainReader, currentQc utils.QuorumCert, distanceFromCurrrentQc int) ([]utils.QuorumCert, error) {
 	var quorumCerts []utils.QuorumCert
 	quorumCertificate := currentQc
 	// Append the initial value
@@ -137,13 +137,13 @@ func (f *Forensics) findParentsQc(chain consensus.ChainReader, currentQc utils.Q
 		parentHash := quorumCertificate.ProposedBlockInfo.Hash
 		parentHeader := chain.GetHeaderByHash(parentHash)
 		if parentHeader == nil {
-			log.Error("[findParentsQc] Forensics findParentsQc unable to find its parent block header", "BlockNum", parentHeader.Number.Int64(), "ParentHash", parentHash.Hex())
+			log.Error("[findAncestorQCs] Forensics findAncestorQCs unable to find its parent block header", "BlockNum", parentHeader.Number.Int64(), "ParentHash", parentHash.Hex())
 			return nil, fmt.Errorf("Unable to find parent block header in forensics")
 		}
 		var decodedExtraField utils.ExtraFields_v2
 		err := utils.DecodeBytesExtraFields(parentHeader.Extra, &decodedExtraField)
 		if err != nil {
-			log.Error("[findParentsQc] Error while trying to decode from parent block extra", "BlockNum", parentHeader.Number.Int64(), "ParentHash", parentHash.Hex())
+			log.Error("[findAncestorQCs] Error while trying to decode from parent block extra", "BlockNum", parentHeader.Number.Int64(), "ParentHash", parentHash.Hex())
 		}
 		quorumCertificate = *decodedExtraField.QuorumCert
 		quorumCerts = append(quorumCerts, quorumCertificate)
@@ -198,7 +198,7 @@ func (f *Forensics) findQCsInSameRound(quorumCerts1 []utils.QuorumCert, quorumCe
 }
 
 // Find the common address that have signed both QCs
-func (f *Forensics) FindCommonSigners(quorumCert1 utils.QuorumCert, quorumCert2 utils.QuorumCert) []common.Address {
+func (f *Forensics) findCommonSigners(quorumCert1 utils.QuorumCert, quorumCert2 utils.QuorumCert) []common.Address {
 	var commonSigners []common.Address
 	quorumCert1SignersMap := make(map[string]bool)
 	// The QC signatures are signed by votes special struct VoteForSign
@@ -210,7 +210,7 @@ func (f *Forensics) FindCommonSigners(quorumCert1 utils.QuorumCert, quorumCert2 
 		var signerAddress common.Address
 		pubkey, err := crypto.Ecrecover(quorumCert1SignedHash.Bytes(), signature)
 		if err != nil {
-			log.Error("[FindCommonSigners] Fail to Ecrecover signer from the quorumCert1SignedHash", "quorumCert1.GapNumber", quorumCert1.GapNumber, "quorumCert1.ProposedBlockInfo", quorumCert1.ProposedBlockInfo)
+			log.Error("[findCommonSigners] Fail to Ecrecover signer from the quorumCert1SignedHash", "quorumCert1.GapNumber", quorumCert1.GapNumber, "quorumCert1.ProposedBlockInfo", quorumCert1.ProposedBlockInfo)
 		}
 
 		copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
@@ -225,7 +225,7 @@ func (f *Forensics) FindCommonSigners(quorumCert1 utils.QuorumCert, quorumCert2 
 		var signerAddress common.Address
 		pubkey, err := crypto.Ecrecover(quorumCert2SignedHash.Bytes(), signature)
 		if err != nil {
-			log.Error("[FindCommonSigners] Fail to Ecrecover signer from the quorumCert2SignedHash", "quorumCert2.GapNumber", quorumCert2.GapNumber, "quorumCert2.ProposedBlockInfo", quorumCert2.ProposedBlockInfo)
+			log.Error("[findCommonSigners] Fail to Ecrecover signer from the quorumCert2SignedHash", "quorumCert2.GapNumber", quorumCert2.GapNumber, "quorumCert2.ProposedBlockInfo", quorumCert2.ProposedBlockInfo)
 		}
 
 		copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])

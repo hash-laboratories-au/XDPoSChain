@@ -2,7 +2,6 @@ package engine_v2_tests
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -108,7 +107,7 @@ func TestSetCommittedQCsInOrder(t *testing.T) {
 }
 
 // Happty path
-func TestProcessForensics(t *testing.T) {
+func TestForensicsMonitoring(t *testing.T) {
 	blockchain, _, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 915, params.TestXDPoSMockChainConfig, nil)
 	forensics := blockchain.Engine().(*XDPoS.XDPoS).EngineV2.GetForensicsFaker()
 	var decodedCurrentblockExtraField utils.ExtraFields_v2
@@ -121,28 +120,16 @@ func TestProcessForensics(t *testing.T) {
 	var decodedBlock905ExtraField utils.ExtraFields_v2
 	err = utils.DecodeBytesExtraFields(blockchain.GetHeaderByNumber(905).Extra, &decodedBlock905ExtraField)
 	assert.Nil(t, err)
+
 	err = forensics.SetCommittedQCs(append(headers, *blockchain.GetHeaderByNumber(903), *blockchain.GetHeaderByNumber(904)), *decodedBlock905ExtraField.QuorumCert)
 	assert.Nil(t, err)
-	err = forensics.ProcessForensics(blockchain, *incomingQC)
+	var newIncomingQcHeaders []types.Header
+	newIncomingQcHeaders = append(newIncomingQcHeaders, *blockchain.GetHeaderByNumber(913), *blockchain.GetHeaderByNumber(914))
+	err = forensics.ForensicsMonitoring(blockchain, newIncomingQcHeaders, *incomingQC)
 	assert.Nil(t, err)
 }
 
-func TestProcessForensicsThrowErrorIfHigestCommittedQCsNotSet(t *testing.T) {
-	blockchain, _, currentBlock, _, _, _ := PrepareXDCTestBlockChainForV2Engine(t, 915, params.TestXDPoSMockChainConfig, nil)
-	forensics := blockchain.Engine().(*XDPoS.XDPoS).EngineV2.GetForensicsFaker()
-
-	var decodedExtraField utils.ExtraFields_v2
-	// Decode the QC from latest block
-	err := utils.DecodeBytesExtraFields(currentBlock.Header().Extra, &decodedExtraField)
-	assert.Nil(t, err)
-
-	incomingQC := decodedExtraField.QuorumCert
-	// Throw error as the HighestCommittedQCs has not been set
-	err = forensics.ProcessForensics(blockchain, *incomingQC)
-	assert.Equal(t, fmt.Errorf("HighestCommittedQCs value not set"), err)
-}
-
-func TestProcessForensicsNotOnSameChainButHaveSameRoundQC(t *testing.T) {
+func TestForensicsMonitoringNotOnSameChainButHaveSameRoundQC(t *testing.T) {
 	var numOfForks = new(int)
 	*numOfForks = 10
 	var forkRoundDifference = new(int)
@@ -164,12 +151,17 @@ func TestProcessForensicsNotOnSameChainButHaveSameRoundQC(t *testing.T) {
 	assert.Nil(t, err)
 
 	incomingQC := decodedExtraField.QuorumCert
-	err = forensics.ProcessForensics(blockchain, *incomingQC)
+
+	var forkedHeaders []types.Header
+	parentOfForkedHeader := blockchain.GetBlockByHash(currentForkBlock.ParentHash()).Header()
+	grandParentOfForkedHeader := blockchain.GetBlockByHash(parentOfForkedHeader.ParentHash).Header()
+	forkedHeaders = append(forkedHeaders, *grandParentOfForkedHeader, *parentOfForkedHeader)
+	err = forensics.ForensicsMonitoring(blockchain, forkedHeaders, *incomingQC)
 	assert.Nil(t, err)
 	// TODO: Check SendForensicProof triggered
 }
 
-func TestProcessForensicsNotOnSameChainDoNotHaveSameRoundQC(t *testing.T) {
+func TestForensicsMonitoringNotOnSameChainDoNotHaveSameRoundQC(t *testing.T) {
 	var numOfForks = new(int)
 	*numOfForks = 10
 	var forkRoundDifference = new(int)
@@ -193,7 +185,12 @@ func TestProcessForensicsNotOnSameChainDoNotHaveSameRoundQC(t *testing.T) {
 	assert.Nil(t, err)
 
 	incomingQC := decodedExtraField.QuorumCert
-	err = forensics.ProcessForensics(blockchain, *incomingQC)
+	var forkedHeaders []types.Header
+	parentOfForkedHeader := blockchain.GetBlockByHash(currentForkBlock.ParentHash()).Header()
+	grandParentOfForkedHeader := blockchain.GetBlockByHash(parentOfForkedHeader.ParentHash).Header()
+	forkedHeaders = append(forkedHeaders, *grandParentOfForkedHeader, *parentOfForkedHeader)
+
+	err = forensics.ForensicsMonitoring(blockchain, forkedHeaders, *incomingQC)
 	assert.Nil(t, err)
 	// TODO: Check SendForensicProof triggered
 }

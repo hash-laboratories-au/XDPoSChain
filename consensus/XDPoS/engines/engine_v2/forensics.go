@@ -37,6 +37,11 @@ func NewForensics() *Forensics {
 	return &Forensics{}
 }
 
+func (f *Forensics) ForensicsMonitoring(chain consensus.ChainReader, headerQcToBeCommitted []types.Header, incomingQC utils.QuorumCert) error {
+	f.ProcessForensics(chain, incomingQC)
+	return f.SetCommittedQCs(headerQcToBeCommitted, incomingQC)
+}
+
 // Set the forensics committed QCs list. The order is from grandparent to current header. i.e it shall follow the QC in its header as follow [hcqc1, hcqc2, hcqc3]
 func (f *Forensics) SetCommittedQCs(headers []types.Header, incomingQC utils.QuorumCert) error {
 	// highestCommitQCs is an array, assign the parentBlockQc and its child as well as its grandchild QC into this array for forensics purposes.

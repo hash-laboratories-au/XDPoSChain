@@ -126,6 +126,7 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 		}
 
 		for _, comeback := range penComebacks {
+			log.Info("[HookPenalty] comeback node", "addr", comeback)
 			ok := true
 			for _, p := range penalties {
 				if p == comeback {

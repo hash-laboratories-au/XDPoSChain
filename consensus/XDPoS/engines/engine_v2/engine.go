@@ -464,7 +464,6 @@ func (x *XDPoS_v2) GetSnapshot(chain consensus.ChainReader, header *types.Header
 
 func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.Header, ms []utils.Masternode) error {
 	number := header.Number.Uint64()
-	log.Trace("[UpdateMasternodes] take snapshot", "number", number, "hash", header.Hash())
 
 	masterNodes := []common.Address{}
 	for _, m := range ms {
@@ -473,7 +472,7 @@ func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.
 
 	x.lock.RLock()
 	snap := newSnapshot(number, header.Hash(), masterNodes)
-	log.Info("[UpdateMasternodes]", "number", number, "masterNodes", masterNodes)
+	log.Trace("[UpdateMasternodes] take snapshot", "number", number, "hash", header.Hash())
 	x.lock.RUnlock()
 
 	err := storeSnapshot(snap, x.db)
@@ -483,11 +482,10 @@ func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.
 	}
 	x.snapshots.Add(snap.Hash, snap)
 
-	nm := []string{}
-	for _, n := range ms {
-		nm = append(nm, n.Address.String())
+	log.Info("[UpdateMasternodes] New set of masternodes has been updated to snapshot", "number", snap.Number, "hash", snap.Hash)
+	for i, n := range ms {
+		log.Info("masternode", "index", i, "address", n.Address.String())
 	}
-	log.Info("New set of masternodes has been updated to snapshot", "number", snap.Number, "hash", snap.Hash, "new masternodes", nm)
 
 	return nil
 }
@@ -984,9 +982,6 @@ func (x *XDPoS_v2) GetMasternodes(chain consensus.ChainReader, header *types.Hea
 		return []common.Address{}
 	}
 	log.Info("[GetMasterNodes]", "number", header.Number.Int64())
-	for i, m := range epochSwitchInfo.Masternodes {
-		log.Info("[GetMasternodes]", "i", i, "node", m)
-	}
 	return epochSwitchInfo.Masternodes
 }
 
@@ -1028,13 +1023,9 @@ func (x *XDPoS_v2) calcMasternodes(chain consensus.ChainReader, blockNum *big.In
 		log.Error("[calcMasternodes] Adaptor v2 HookPenalty has error", "err", err)
 		return nil, nil, err
 	}
-	for i, m := range candidates {
-		log.Info("[calcMasternodes] candidates before RemoveItemFromArray", "index", i, "m", m.Hex())
-	}
+
 	masternodes := common.RemoveItemFromArray(candidates, penalties)
-	for i, m := range candidates {
-		log.Info("[calcMasternodes] candidates after RemoveItemFromArray", "index", i, "m", m.Hex())
-	}
+
 	return masternodes, penalties, nil
 
 }

@@ -72,6 +72,7 @@ func (x *XDPoS_v2) onTimeoutPoolThresholdReached(blockChainReader consensus.Chai
 }
 
 func (x *XDPoS_v2) verifyTC(chain consensus.ChainReader, timeoutCert *utils.TimeoutCert) error {
+	log.Info("[verifyTC]")
 	/*
 		1. Get epoch master node list by gapNumber
 		2. Check number of signatures > threshold, as well as it's format. (Same as verifyQC)
@@ -139,10 +140,7 @@ func (x *XDPoS_v2) processTC(blockChainReader consensus.ChainReader, timeoutCert
 		x.highestTimeoutCert = timeoutCert
 	}
 	if timeoutCert.Round >= x.currentRound {
-		err := x.setNewRound(blockChainReader, timeoutCert.Round+1)
-		if err != nil {
-			return err
-		}
+		x.setNewRound(blockChainReader, timeoutCert.Round+1)
 	}
 	return nil
 }

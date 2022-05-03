@@ -210,7 +210,11 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 
 // Check if it's my turn to mine a block. Note: The second return value `preIndex` is useless in V2 engine
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
+
+	log.Info("[YourTurn] get lock")
 	x.lock.RLock()
+	log.Info("[YourTurn] got lock")
+	defer log.Info("[YourTurn] release lock")
 	defer x.lock.RUnlock()
 
 	if !x.isInitilised {
@@ -520,6 +524,7 @@ func (x *XDPoS_v2) VerifyHeaders(chain consensus.ChainReader, headers []*types.H
 */
 // Verify syncInfo and trigger process QC or TC if successful
 func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *utils.SyncInfo) (bool, error) {
+	log.Info("[VerifySyncInfoMessage]")
 	/*
 		1. Check QC and TC against highest QC TC. Skip if none of them need to be updated
 		2. Verify items including:
@@ -647,7 +652,11 @@ func (x *XDPoS_v2) TimeoutHandler(blockChainReader consensus.ChainReader, timeou
 	Proposed Block workflow
 */
 func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader *types.Header) error {
+	log.Info("[ProporoposedBlockHandler] get lock")
 	x.lock.Lock()
+	log.Info("[ProporoposedBlockHandler] got lock")
+
+	defer log.Info("[ProporoposedBlockHandler] release lock")
 	defer x.lock.Unlock()
 
 	/*
@@ -811,6 +820,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	if haveError != nil {
 		return haveError
 	}
+	log.Info("[verifyQC] signatures are verified")
 	epochSwitchNumber := epochInfo.EpochSwitchBlockInfo.Number.Uint64()
 	gapNumber := epochSwitchNumber - epochSwitchNumber%x.config.Epoch - x.config.Gap
 	if gapNumber != quorumCert.GapNumber {
@@ -854,11 +864,7 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 	}
 	// 4. Set new round
 	if quorumCert.ProposedBlockInfo.Round >= x.currentRound {
-		err := x.setNewRound(blockChainReader, quorumCert.ProposedBlockInfo.Round+1)
-		if err != nil {
-			log.Error("[processQC] Fail to setNewRound", "new round to set", quorumCert.ProposedBlockInfo.Round+1)
-			return err
-		}
+		x.setNewRound(blockChainReader, quorumCert.ProposedBlockInfo.Round+1)
 	}
 	log.Trace("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
 	return nil
@@ -869,14 +875,13 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, quorumCert 
 	2. Reset timer
 	3. Reset vote and timeout Pools
 */
-func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round utils.Round) error {
+func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round utils.Round) {
+	log.Info("[setNewRound] new round and reset pools and workers", "round", round)
 	x.currentRound = round
 	x.timeoutCount = 0
-	//TODO: tell miner now it's a new round and start mine if it's leader
 	x.timeoutWorker.Reset(blockChainReader)
 	//TODO: vote pools
 	x.timeoutPool.Clear()
-	return nil
 }
 
 func (x *XDPoS_v2) broadcastToBftChannel(msg interface{}) {
@@ -1066,7 +1071,7 @@ func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types
 	signer := x.signer
 	x.signLock.RUnlock()
 	// Check if the node can send this sendType
-	log.Info("[allowedToSend]")
+	log.Info("[allowedToSend]", "type", sendType)
 	masterNodes := x.GetMasternodes(chain, blockHeader)
 	for i, mn := range masterNodes {
 		if signer == mn {

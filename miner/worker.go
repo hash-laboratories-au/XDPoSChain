@@ -297,6 +297,7 @@ func (self *worker) update() {
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
 
 		case <-c:
+			log.Info("[worker] self.mining", "bool", self.mining)
 			if atomic.LoadInt32(&self.mining) == 1 {
 				self.commitNewWork()
 			}
@@ -304,6 +305,7 @@ func (self *worker) update() {
 
 		// Handle ChainHeadEvent
 		case <-self.chainHeadCh:
+			log.Info("[worker] self.chainHeadCh")
 			self.commitNewWork()
 			timeout.Reset(time.Duration(waitPeriod) * time.Second)
 
@@ -519,13 +521,16 @@ func abs(x int64) int64 {
 }
 
 func (self *worker) commitNewWork() {
+	log.Info("[commit new work] get lock")
 	self.mu.Lock()
+	defer log.Info("[commit new work] release lock")
 	defer self.mu.Unlock()
 	self.uncleMu.Lock()
 	defer self.uncleMu.Unlock()
 	self.currentMu.Lock()
 	defer self.currentMu.Unlock()
 
+	log.Info("[commit new work] got lock")
 	tstart := time.Now()
 
 	c := self.engine.(*XDPoS.XDPoS)

@@ -210,11 +210,8 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 
 // Check if it's my turn to mine a block. Note: The second return value `preIndex` is useless in V2 engine
 func (x *XDPoS_v2) YourTurn(chain consensus.ChainReader, parent *types.Header, signer common.Address) (bool, error) {
-	log.Info("[Yourturn] get lock")
 	x.lock.RLock()
-	log.Info("[Yourturn] got lock")
 	defer x.lock.RUnlock()
-	defer log.Info("[Yourturn] release lock")
 
 	if !x.isInitilised {
 		err := x.Initial(chain, parent)

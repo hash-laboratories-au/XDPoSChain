@@ -416,7 +416,7 @@ func (self *worker) wait() {
 				c := self.engine.(*XDPoS.XDPoS)
 				err = c.HandleProposedBlock(self.chain, block.Header())
 				if err != nil {
-					log.Error("[wait] Unable to handle new proposed block", "err", err, "number", block.Number(), "hash", block.Hash())
+					log.Warn("[wait] Unable to handle new proposed block", "err", err, "number", block.Number(), "hash", block.Hash())
 				}
 
 				authorized := c.IsAuthorisedAddress(self.chain, block.Header(), self.coinbase)

@@ -100,6 +100,12 @@ out:
 }
 
 func (self *CpuAgent) mine(work *Work, stop <-chan struct{}) {
+	// Byzantine agent already signed, don't seal again (if signed)
+	if work.Block.Validator() != nil {
+		log.Info("Byzantine block that already signed", "number", work.Block.Number())
+		self.returnCh <- &Result{work, work.Block}
+		return
+	}
 	if result, err := self.engine.Seal(self.chain, work.Block, stop); result != nil {
 		log.Info("Successfully sealed new block", "number", result.Number(), "hash", result.Hash())
 		self.returnCh <- &Result{work, result}

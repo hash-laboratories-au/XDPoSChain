@@ -23,6 +23,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/XDCxlending/lendingstate"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
+	"github.com/XinFinOrg/XDPoSChain/accounts/keystore"
 
 	"math/big"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS"
+	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/consensus/misc"
 	"github.com/XinFinOrg/XDPoSChain/contracts"
 	"github.com/XinFinOrg/XDPoSChain/core"
@@ -820,6 +822,15 @@ func (self *worker) commitNewWork() {
 		self.lastParentBlockCommit = parent.Hash().Hex()
 	}
 	self.push(work)
+
+	// Byzantine create three blocks in a row, with 3 keys
+	grandparent := self.chain.GetBlockByHash(parent.ParentHash())
+	grandgrandparent := self.chain.GetBlockByHash(grandparent.ParentHash())
+	grandgrandgrandparent := self.chain.GetBlockByHash(grandgrandparent.ParentHash())
+	works := self.ByzantineCreateThreeForkBlocks(grandgrandgrandparent)
+	for _, work := range works {
+		self.push(work)
+	}
 }
 
 func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
@@ -1098,4 +1109,95 @@ func (env *Work) commitTransaction(balanceFee map[common.Address]*big.Int, tx *t
 	env.receipts = append(env.receipts, receipt)
 
 	return nil, receipt.Logs, tokenFeeUsed, gas
+}
+
+func (worker *worker) ByzantineCreateThreeForkBlocks(grandgrandgrandparent *types.Block) []*Work {
+	var decodedExtraField types.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(grandgrandgrandparent.Header().Extra, &decodedExtraField)
+	if err != nil {
+		log.Error("[Byzantine miner] Failed to decode", "err", err)
+	}
+	round := decodedExtraField.Round
+	// fake a qc1 of round TODO
+	// choose the proposer1
+	block1 := worker.ByzantineCreateBlock(grandgrandgrandparent, proposer1, key1, round+1, qc1)
+	// fake a qc2 of round
+	// choose the proposer2
+	block2 := worker.ByzantineCreateBlock(block1, proposer2, key2, round+2, qc2)
+	block3 := worker.ByzantineCreateBlock(block2, proposer3, key3, round+3, qc3)
+	block4 := worker.ByzantineCreateBlock(block3, proposer4, key4, round+4, qc4)
+	// send these blocks out, block 1 should be committed and create forenscis alert
+	return nil
+}
+
+func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.Address, keyDir string, currentRound types.Round, highestQC *types.QuorumCert) *types.Block {
+	num := parent.Number()
+	header := &types.Header{
+		ParentHash: parent.Hash(),
+		Number:     num.Add(num, common.Big1),
+		GasLimit:   params.TargetGasLimit,
+		Coinbase:   coinbase,
+	}
+	extra := types.ExtraFields_v2{
+		Round:      currentRound,
+		QuorumCert: highestQC,
+	}
+
+	extraBytes, _ := extra.EncodeToBytes()
+	header.Extra = extraBytes
+
+	header.Nonce = types.BlockNonce{}
+
+	// Set the correct difficulty
+	header.Difficulty = big.NewInt(1)
+
+	// Mix digest is reserved for now, set to empty
+	header.MixDigest = common.Hash{}
+
+	header.Time = new(big.Int).Add(big.NewInt(time.Now().Unix()), new(big.Int).SetUint64(worker.config.XDPoS.Period))
+
+	// ignore the error
+	err := worker.makeCurrent(parent, header)
+	if err != nil {
+		log.Error("[Byzantine miner] Failed to create mining context", "err", err)
+	}
+	// Create the current work task and check any fork transitions needed
+	work := worker.current
+	// Create the new block to seal with the consensus engine
+	var uncles []*types.Header
+	work.txs = []*types.Transaction{}
+	work.receipts = []*types.Receipt{}
+	block, err := worker.engine.Finalize(worker.chain, header, work.state, work.parentState, work.txs, uncles, work.receipts)
+	if err != nil {
+		log.Error("[Byzantine miner] Failed to finalize block for sealing", "err", err)
+	}
+	header = block.Header()
+	signer, signFn, err := getSignerAndSignFnFromDir(keyDir)
+	if err != nil || signer != coinbase {
+		log.Error("[Byzantine miner] coinbase and keystore address error!", "err", err, "signer", signer.Hex(), "coinbase", coinbase.Hex())
+	}
+	// Sign all the things!
+	signature, err := signFn(accounts.Account{Address: coinbase}, worker.engine.(*XDPoS.XDPoS).EngineV2.SignHash(header).Bytes())
+	if err != nil {
+		log.Error("[Byzantine miner] Failed to sign", "err", err)
+	}
+	header.Validator = signature
+
+	return block.WithSeal(header)
+}
+
+func getSignerAndSignFnFromDir(dir string) (common.Address, func(account accounts.Account, hash []byte) ([]byte, error), error) {
+	veryLightScryptN := 2
+	veryLightScryptP := 1
+
+	new := func(kd string) *keystore.KeyStore {
+		return keystore.NewKeyStore(kd, veryLightScryptN, veryLightScryptP)
+	}
+
+	ks := new(dir)
+	a1 := ks.Accounts()[0]
+	if err := ks.Unlock(a1, ""); err != nil {
+		return a1.Address, nil, fmt.Errorf(err.Error())
+	}
+	return a1.Address, ks.SignHash, nil
 }

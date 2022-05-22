@@ -68,7 +68,7 @@ type XDPoS struct {
 
 // Subscribe to consensus engines forensics events. Currently only exist for engine v2
 func (x *XDPoS) SubscribeForensicsEvent(ch chan<- types.ForensicsEvent) event.Subscription {
-	return x.EngineV2.Forensics.SubscribeForensicsEvent(ch)
+	return x.EngineV2.ForensicsProcessor.SubscribeForensicsEvent(ch)
 }
 
 // New creates a XDPoS delegated-proof-of-stake consensus engine with the initial

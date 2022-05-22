@@ -128,7 +128,7 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 	lowerRoundQC := firstQc
 	higherRoundQC := secondQc
 
-	if (secondQc.ProposedBlockInfo.Round - firstQc.ProposedBlockInfo.Round) < 0 {
+	if secondQc.ProposedBlockInfo.Round < firstQc.ProposedBlockInfo.Round {
 		lowerRoundQC = secondQc
 		higherRoundQC = firstQc
 	}

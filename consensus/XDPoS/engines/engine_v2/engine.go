@@ -46,14 +46,14 @@ type XDPoS_v2 struct {
 
 	timeoutPool           *utils.Pool
 	votePool              *utils.Pool
-	currentRound          utils.Round
-	highestSelfMinedRound utils.Round
-	highestVotedRound     utils.Round
-	highestQuorumCert     *utils.QuorumCert
+	currentRound          types.Round
+	highestSelfMinedRound types.Round
+	highestVotedRound     types.Round
+	highestQuorumCert     *types.QuorumCert
 	// lockQuorumCert in XDPoS Consensus 2.0, used in voting rule
-	lockQuorumCert     *utils.QuorumCert
-	highestTimeoutCert *utils.TimeoutCert
-	highestCommitBlock *utils.BlockInfo
+	lockQuorumCert     *types.QuorumCert
+	highestTimeoutCert *types.TimeoutCert
+	highestCommitBlock *types.BlockInfo
 
 	HookReward  func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (map[string]interface{}, error)
 	HookPenalty func(chain consensus.ChainReader, number *big.Int, parentHash common.Hash, candidates []common.Address) ([]common.Address, error)
@@ -90,22 +90,22 @@ func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *
 		timeoutPool: timeoutPool,
 		votePool:    votePool,
 
-		highestSelfMinedRound: utils.Round(0),
+		highestSelfMinedRound: types.Round(0),
 
-		highestTimeoutCert: &utils.TimeoutCert{
-			Round:      utils.Round(0),
-			Signatures: []utils.Signature{},
+		highestTimeoutCert: &types.TimeoutCert{
+			Round:      types.Round(0),
+			Signatures: []types.Signature{},
 		},
-		highestQuorumCert: &utils.QuorumCert{
-			ProposedBlockInfo: &utils.BlockInfo{
+		highestQuorumCert: &types.QuorumCert{
+			ProposedBlockInfo: &types.BlockInfo{
 				Hash:   common.Hash{},
-				Round:  utils.Round(0),
+				Round:  types.Round(0),
 				Number: big.NewInt(0),
 			},
-			Signatures: []utils.Signature{},
+			Signatures: []types.Signature{},
 			GapNumber:  0,
 		},
-		highestVotedRound:  utils.Round(0),
+		highestVotedRound:  types.Round(0),
 		highestCommitBlock: nil,
 		forensics:          NewForensics(),
 	}
@@ -138,17 +138,17 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 		return nil
 	}
 
-	var quorumCert *utils.QuorumCert
+	var quorumCert *types.QuorumCert
 	var err error
 
 	if header.Number.Int64() == x.config.V2.SwitchBlock.Int64() {
 		log.Info("[Initial] highest QC for consensus v2 first block")
-		blockInfo := &utils.BlockInfo{
+		blockInfo := &types.BlockInfo{
 			Hash:   header.Hash(),
-			Round:  utils.Round(0),
+			Round:  types.Round(0),
 			Number: header.Number,
 		}
-		quorumCert = &utils.QuorumCert{
+		quorumCert = &types.QuorumCert{
 			ProposedBlockInfo: blockInfo,
 			Signatures:        nil,
 			GapNumber:         header.Number.Uint64() - x.config.Gap,
@@ -252,7 +252,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		return consensus.ErrNotReadyToPropose
 	}
 
-	extra := utils.ExtraFields_v2{
+	extra := types.ExtraFields_v2{
 		Round:      currentRound,
 		QuorumCert: highestQC,
 	}
@@ -403,7 +403,7 @@ func (x *XDPoS_v2) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 	header.Validator = signature
 
 	// Mark the highestSelfMinedRound to make sure we only mine once per round
-	var decodedExtraField utils.ExtraFields_v2
+	var decodedExtraField types.ExtraFields_v2
 	err = utils.DecodeBytesExtraFields(header.Extra, &decodedExtraField)
 	if err != nil {
 		log.Error("[Seal] Error when decode extra field to get the round number from v2 block during sealing", "Hash", header.Hash().Hex(), "Number", header.Number.Uint64(), "Error", err)
@@ -522,7 +522,7 @@ func (x *XDPoS_v2) VerifyHeaders(chain consensus.ChainReader, headers []*types.H
 	SyncInfo workflow
 */
 // Verify syncInfo and trigger process QC or TC if successful
-func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *utils.SyncInfo) (bool, error) {
+func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *types.SyncInfo) (bool, error) {
 	/*
 		1. Check QC and TC against highest QC TC. Skip if none of them need to be updated
 		2. Verify items including:
@@ -549,7 +549,7 @@ func (x *XDPoS_v2) VerifySyncInfoMessage(chain consensus.ChainReader, syncInfo *
 	return true, nil
 }
 
-func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.SyncInfo) error {
+func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *types.SyncInfo) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 	/*
@@ -566,7 +566,7 @@ func (x *XDPoS_v2) SyncInfoHandler(chain consensus.ChainReader, syncInfo *utils.
 /*
 	Vote workflow
 */
-func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vote) (bool, error) {
+func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *types.Vote) (bool, error) {
 	/*
 		  1. Check vote round with current round for fast fail(disqualifed)
 		  2. Get masterNode list from snapshot by using vote.GapNumber
@@ -584,8 +584,9 @@ func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vo
 	snapshot, err := x.getSnapshot(chain, vote.GapNumber, true)
 	if err != nil {
 		log.Error("[VerifyVoteMessage] fail to get snapshot for a vote message", "BlockNum", vote.ProposedBlockInfo.Number, "Hash", vote.ProposedBlockInfo.Hash, "Error", err.Error())
+		return false, err
 	}
-	verified, _, err := x.verifyMsgSignature(utils.VoteSigHash(&utils.VoteForSign{
+	verified, _, err := x.verifyMsgSignature(types.VoteSigHash(&types.VoteForSign{
 		ProposedBlockInfo: vote.ProposedBlockInfo,
 		GapNumber:         vote.GapNumber,
 	}), vote.Signature, snapshot.NextEpochMasterNodes)
@@ -599,7 +600,7 @@ func (x *XDPoS_v2) VerifyVoteMessage(chain consensus.ChainReader, vote *utils.Vo
 }
 
 // Consensus entry point for processing vote message to produce QC
-func (x *XDPoS_v2) VoteHandler(chain consensus.ChainReader, voteMsg *utils.Vote) error {
+func (x *XDPoS_v2) VoteHandler(chain consensus.ChainReader, voteMsg *types.Vote) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 	return x.voteHandler(chain, voteMsg)
@@ -617,7 +618,7 @@ func (x *XDPoS_v2) VoteHandler(chain consensus.ChainReader, voteMsg *utils.Vote)
 				- Use the above xdc address to check against the master node list from step 1(For the running epoch)
 		3. Broadcast(Not part of consensus)
 */
-func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg *utils.Timeout) (bool, error) {
+func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg *types.Timeout) (bool, error) {
 	snap, err := x.getSnapshot(chain, timeoutMsg.GapNumber, true)
 	if err != nil {
 		log.Error("[VerifyTimeoutMessage] Fail to get snapshot when verifying timeout message!", "messageGapNumber", timeoutMsg.GapNumber)
@@ -627,7 +628,7 @@ func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg 
 		return false, fmt.Errorf("Empty master node lists from snapshot")
 	}
 
-	verified, _, err := x.verifyMsgSignature(utils.TimeoutSigHash(&utils.TimeoutForSign{
+	verified, _, err := x.verifyMsgSignature(types.TimeoutSigHash(&types.TimeoutForSign{
 		Round:     timeoutMsg.Round,
 		GapNumber: timeoutMsg.GapNumber,
 	}), timeoutMsg.Signature, snap.NextEpochMasterNodes)
@@ -640,7 +641,7 @@ func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg 
 	2. Collect timeout
 	3. Once timeout pool reached threshold, it will trigger the call to the function "onTimeoutPoolThresholdReached"
 */
-func (x *XDPoS_v2) TimeoutHandler(blockChainReader consensus.ChainReader, timeout *utils.Timeout) error {
+func (x *XDPoS_v2) TimeoutHandler(blockChainReader consensus.ChainReader, timeout *types.Timeout) error {
 	x.lock.Lock()
 	defer x.lock.Unlock()
 	return x.timeoutHandler(blockChainReader, timeout)
@@ -667,7 +668,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 	}
 
 	// Generate blockInfo
-	blockInfo := &utils.BlockInfo{
+	blockInfo := &types.BlockInfo{
 		Hash:   blockHeader.Hash(),
 		Round:  round,
 		Number: blockHeader.Number,
@@ -701,7 +702,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 */
 
 // To be used by different message verification. Verify local DB block info against the received block information(i.e hash, blockNum, round)
-func (x *XDPoS_v2) VerifyBlockInfo(blockChainReader consensus.ChainReader, blockInfo *utils.BlockInfo, blockHeader *types.Header) error {
+func (x *XDPoS_v2) VerifyBlockInfo(blockChainReader consensus.ChainReader, blockInfo *types.BlockInfo, blockHeader *types.Header) error {
 	/*
 		1. Check if is able to get header by hash from the chain
 		2. Check the header from step 1 matches what's in the blockInfo. This includes the block number and the round
@@ -748,7 +749,7 @@ func (x *XDPoS_v2) VerifyBlockInfo(blockChainReader consensus.ChainReader, block
 	return nil
 }
 
-func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *utils.QuorumCert, parentHeader *types.Header) error {
+func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *types.QuorumCert, parentHeader *types.Header) error {
 	/*
 		1. Check if num of QC signatures is >= x.config.v2.CertThreshold
 		2. Get epoch master node list by hash
@@ -785,9 +786,9 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	var haveError error
 
 	for _, signature := range signatures {
-		go func(sig utils.Signature) {
+		go func(sig types.Signature) {
 			defer wg.Done()
-			verified, _, err := x.verifyMsgSignature(utils.VoteSigHash(&utils.VoteForSign{
+			verified, _, err := x.verifyMsgSignature(types.VoteSigHash(&types.VoteForSign{
 				ProposedBlockInfo: quorumCert.ProposedBlockInfo,
 				GapNumber:         quorumCert.GapNumber,
 			}), sig, epochInfo.Masternodes)
@@ -818,7 +819,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 }
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
-func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuorumCert *utils.QuorumCert) error {
+func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuorumCert *types.QuorumCert) error {
 	log.Trace("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
 	// 1. Update HighestQC
 	if incomingQuorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
@@ -876,15 +877,15 @@ func (x *XDPoS_v2) broadcastToBftChannel(msg interface{}) {
 	}()
 }
 
-func (x *XDPoS_v2) getSyncInfo() *utils.SyncInfo {
-	return &utils.SyncInfo{
+func (x *XDPoS_v2) getSyncInfo() *types.SyncInfo {
+	return &types.SyncInfo{
 		HighestQuorumCert:  x.highestQuorumCert,
 		HighestTimeoutCert: x.highestTimeoutCert,
 	}
 }
 
 //Find parent and grandparent, check round number, if so, commit grandparent(grandGrandParent of currentBlock)
-func (x *XDPoS_v2) commitBlocks(blockChainReader consensus.ChainReader, proposedBlockHeader *types.Header, proposedBlockRound *utils.Round, incomingQc *utils.QuorumCert) (bool, error) {
+func (x *XDPoS_v2) commitBlocks(blockChainReader consensus.ChainReader, proposedBlockHeader *types.Header, proposedBlockRound *types.Round, incomingQc *types.QuorumCert) (bool, error) {
 	// XDPoS v1.0 switch to v2.0, skip commit
 	if big.NewInt(0).Sub(proposedBlockHeader.Number, big.NewInt(2)).Cmp(x.config.V2.SwitchBlock) <= 0 {
 		return false, nil
@@ -915,7 +916,7 @@ func (x *XDPoS_v2) commitBlocks(blockChainReader consensus.ChainReader, proposed
 	}
 	// Commit the grandParent block
 	if x.highestCommitBlock == nil || (x.highestCommitBlock.Round < round && x.highestCommitBlock.Number.Cmp(grandParentBlock.Number) == -1) {
-		x.highestCommitBlock = &utils.BlockInfo{
+		x.highestCommitBlock = &types.BlockInfo{
 			Number: grandParentBlock.Number,
 			Hash:   grandParentBlock.Hash(),
 			Round:  round,

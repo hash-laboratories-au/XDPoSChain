@@ -862,7 +862,7 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuo
 	2. Reset timer
 	3. Reset vote and timeout Pools
 */
-func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round utils.Round) {
+func (x *XDPoS_v2) setNewRound(blockChainReader consensus.ChainReader, round types.Round) {
 	log.Info("[setNewRound] new round and reset pools and workers", "round", round)
 	x.currentRound = round
 	x.timeoutCount = 0

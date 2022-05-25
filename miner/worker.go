@@ -23,7 +23,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/XDCxlending/lendingstate"
 	"github.com/XinFinOrg/XDPoSChain/accounts"
-	"github.com/XinFinOrg/XDPoSChain/accounts/keystore"
+	"github.com/XinFinOrg/XDPoSChain/crypto"
 
 	"math/big"
 	"sync"
@@ -1130,7 +1130,7 @@ func (worker *worker) ByzantineCreateThreeForkBlocks(grandgrandgrandparent *type
 	return nil
 }
 
-func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.Address, keyDir string, currentRound types.Round, highestQC *types.QuorumCert) *types.Block {
+func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.Address, currentRound types.Round, highestQC *types.QuorumCert, ks *ByzantineKeyStore) *types.Block {
 	num := parent.Number()
 	header := &types.Header{
 		ParentHash: parent.Hash(),
@@ -1172,32 +1172,56 @@ func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.
 		log.Error("[Byzantine miner] Failed to finalize block for sealing", "err", err)
 	}
 	header = block.Header()
-	signer, signFn, err := getSignerAndSignFnFromDir(keyDir)
-	if err != nil || signer != coinbase {
-		log.Error("[Byzantine miner] coinbase and keystore address error!", "err", err, "signer", signer.Hex(), "coinbase", coinbase.Hex())
+	if key := ks.getKeyByAddr(coinbase); key != nil {
+		// Sign all the things!
+		signature, err := crypto.Sign(worker.engine.(*XDPoS.XDPoS).EngineV2.SignHash(header).Bytes(), key)
+		if err != nil {
+			log.Error("[Byzantine miner] Failed to sign", "err", err)
+		}
+		header.Validator = signature
+		return block.WithSeal(header)
 	}
-	// Sign all the things!
-	signature, err := signFn(accounts.Account{Address: coinbase}, worker.engine.(*XDPoS.XDPoS).EngineV2.SignHash(header).Bytes())
+	log.Error("[Byzantine miner] no coinbase addr in keystore!", "coinbase", coinbase.Hex())
+	return nil
+}
+
+func (worker *worker) ByzantineCreateQC(block *types.Block, ks *ByzantineKeyStore) *types.QuorumCert {
+	var decodedExtraField types.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(block.Header().Extra, &decodedExtraField)
 	if err != nil {
-		log.Error("[Byzantine miner] Failed to sign", "err", err)
+		log.Error("[Byzantine miner] Failed to decode", "err", err)
 	}
-	header.Validator = signature
+	round := decodedExtraField.Round
+	blockInfo := &types.BlockInfo{
+		Round:  round,
+		Number: block.Number(),
+		Hash:   block.Hash(),
+	}
+	voteForSign := &types.VoteForSign{
+		ProposedBlockInfo: blockInfo,
+		GapNumber:         block.NumberU64() - block.NumberU64()%uint64(900) - uint64(450),
+	}
 
-	return block.WithSeal(header)
+	qc := &types.QuorumCert{
+		ProposedBlockInfo: blockInfo,
+		GapNumber:         voteForSign.GapNumber,
+		Signatures:        ks.signThreshold(types.VoteSigHash(voteForSign).Bytes()),
+	}
+	return qc
 }
 
-func getSignerAndSignFnFromDir(dir string) (common.Address, func(account accounts.Account, hash []byte) ([]byte, error), error) {
-	veryLightScryptN := 2
-	veryLightScryptP := 1
+// func getSignerAndSignFnFromDir(dir string) (common.Address, func(account accounts.Account, hash []byte) ([]byte, error), error) {
+// 	veryLightScryptN := 2
+// 	veryLightScryptP := 1
 
-	new := func(kd string) *keystore.KeyStore {
-		return keystore.NewKeyStore(kd, veryLightScryptN, veryLightScryptP)
-	}
+// 	new := func(kd string) *keystore.KeyStore {
+// 		return keystore.NewKeyStore(kd, veryLightScryptN, veryLightScryptP)
+// 	}
 
-	ks := new(dir)
-	a1 := ks.Accounts()[0]
-	if err := ks.Unlock(a1, ""); err != nil {
-		return a1.Address, nil, fmt.Errorf(err.Error())
-	}
-	return a1.Address, ks.SignHash, nil
-}
+// 	ks := new(dir)
+// 	a1 := ks.Accounts()[0]
+// 	if err := ks.Unlock(a1, ""); err != nil {
+// 		return a1.Address, nil, fmt.Errorf(err.Error())
+// 	}
+// 	return a1.Address, ks.SignHash, nil
+// }

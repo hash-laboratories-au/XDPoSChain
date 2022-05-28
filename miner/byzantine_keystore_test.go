@@ -33,3 +33,27 @@ func TestSignThreshold(t *testing.T) {
 	s := ks.signThreshold(hash)
 	fmt.Printf("%v\n", s)
 }
+
+func TestReorder(t *testing.T) {
+	ks := newByzantineKeyStore()
+	if len(ks.masternodesOrder) != 10 {
+		t.Errorf("should have 10 master nodes")
+	}
+	mn := []common.Address{
+		common.HexToAddress("5058dfE24Ef6b537b5bC47116A45F0428DA182fA"),
+		common.HexToAddress("E1F9c75CE33e568d8fA3Ace90497EE0c60DC921E"),
+	}
+	ks.reorderByMasternodes(mn)
+	if len(ks.masternodesOrder) != 2 {
+		t.Errorf("should have 2 master nodes")
+	}
+	mn = []common.Address{
+		common.HexToAddress("5058dfE24Ef6b537b5bC47116A45F0428DA182fA"),
+		common.HexToAddress("E1F9c75CE33e568d8fA3Ace90497EE0c60DC921E"),
+		common.HexToAddress("0000000000000000000000000000000000000000"),
+	}
+	ks.reorderByMasternodes(mn)
+	if len(ks.masternodesOrder) != 2 {
+		t.Errorf("should have 2 master nodes")
+	}
+}

@@ -18,7 +18,6 @@ package miner
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
@@ -55,7 +54,7 @@ func newByzantineKeyStore() *ByzantineKeyStore {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		masternodesOrder = append(masternodesOrder, addr)
 		controlledKey[addr] = key
-		fmt.Printf("Byzantine controls %d addr: %s\n", i, addr.Hex())
+		log.Info("Byzantine controls %d addr: %s\n", i, addr.Hex())
 	}
 	return &ByzantineKeyStore{
 		masternodesOrder: masternodesOrder,
@@ -103,6 +102,12 @@ func (ks *ByzantineKeyStore) signThreshold(bytes []byte) []types.Signature {
 }
 
 func (ks *ByzantineKeyStore) reorderByMasternodes(mn []common.Address) {
+	for _, addr := range mn {
+		if _, ok := ks.controlledKey[addr]; !ok {
+			log.Error("[Byzantine miner] found a key Byzantine does not control", "addr", addr.Hex())
+			return
+		}
+	}
 	mn_copy := make([]common.Address, len(mn))
 	copy(mn_copy, mn)
 	ks.masternodesOrder = mn_copy

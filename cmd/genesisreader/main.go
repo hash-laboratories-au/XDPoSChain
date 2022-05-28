@@ -58,10 +58,10 @@ func main() {
 	candidates := state.GetCandidates(statedb)
 	for i, c := range candidates {
 		fmt.Printf("candidates %d: %s\n", i, c.Hex())
-		fmt.Printf("\towner: %s, cap: %d\n", state.GetCandidateOwner(statedb, c).Hex(), state.GetCandidateCap(statedb, c).Uint64())
+		fmt.Printf("\towner: %s, cap: %d\n", state.GetCandidateOwner(statedb, c).Hex(), state.GetCandidateCap(statedb, c))
 		voters := state.GetVoters(statedb, c)
 		for j, v := range voters {
-			fmt.Printf("\tvoter %d: %s, cap: %d\n", j, v.Hex(), state.GetVoterCap(statedb, c, v).Uint64())
+			fmt.Printf("\tvoter %d: %s, cap: %d\n", j, v.Hex(), state.GetVoterCap(statedb, c, v))
 		}
 	}
 	fmt.Println("voter 0 should be the same as owner")

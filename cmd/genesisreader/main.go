@@ -30,6 +30,7 @@ import (
 )
 
 func main() {
+	fmt.Println("Usage: ./genesisreader genesis.json")
 	// Make sure we have a valid genesis JSON
 	genesisPath := os.Args[1]
 	if !strings.Contains(genesisPath, ".json") {
@@ -59,9 +60,9 @@ func main() {
 		fmt.Printf("candidates %d: %s\n", i, c.Hex())
 		fmt.Printf("\towner: %s, cap: %d\n", state.GetCandidateOwner(statedb, c).Hex(), state.GetCandidateCap(statedb, c).Uint64())
 		voters := state.GetVoters(statedb, c)
-		fmt.Println("voter 0 should be the same as owner")
 		for j, v := range voters {
 			fmt.Printf("\tvoter %d: %s, cap: %d\n", j, v.Hex(), state.GetVoterCap(statedb, c, v).Uint64())
 		}
 	}
+	fmt.Println("voter 0 should be the same as owner")
 }

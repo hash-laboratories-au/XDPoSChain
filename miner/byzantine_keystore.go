@@ -18,6 +18,7 @@ package miner
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
@@ -32,10 +33,21 @@ type ByzantineKeyStore struct {
 }
 
 func newByzantineKeyStore() *ByzantineKeyStore {
-	keyStrings := []string{"77e0b4a7aabef3b07db42f1f2aa43130ba5a3175ec47f2ff8891d49ad87cbed9"}
+	keyStrings := []string{
+		"77e0b4a7aabef3b07db42f1f2aa43130ba5a3175ec47f2ff8891d49ad87cbed9",
+		"31b0fbcba7b60ea9974ae1bac0523af8cd72661de47ea2d3569344c975b93801",
+		"5a3457e9323ef7f9351d7b6d8f4d5c2c7c66a5e094142d6e186c86402b29a787",
+		"363f48b205f95859e13ea1acf6b047631ab34e69d193bbf5eb0df871decca69e",
+		"bde24b587c04ab8d8cc2acc176a4b85e646d3c89f4d98d570629d756aea68303",
+		"3efdb44088929167487da052125162b48d8d54fe8f7b7db11b5d5cc3b9a1c14b",
+		"1c40ebf394c9c9db15f60528f6a030ba9f465a7c615acd9b9d79792175b6bcd6",
+		"58fbe847ab6faa2fb5559b4d1f1e02573e222d2524b6f4598a301897c0881e71",
+		"64651f33879becd32391e3cf802680f3621500c55fb53db7b6b041ff74c3a62f",
+		"e754b95280b2232ffb4398de0cdda06c2be24ef8aa5c6aba090802e0cd706022",
+	}
 	masternodesOrder := []common.Address{}
 	controlledKey := make(map[common.Address]*ecdsa.PrivateKey)
-	for _, s := range keyStrings {
+	for i, s := range keyStrings {
 		key, err := crypto.HexToECDSA(s)
 		if err != nil {
 			log.Error("newByzantineKeyStore key error!")
@@ -43,6 +55,7 @@ func newByzantineKeyStore() *ByzantineKeyStore {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		masternodesOrder = append(masternodesOrder, addr)
 		controlledKey[addr] = key
+		fmt.Printf("Byzantine controls %d addr: %s\n", i, addr.Hex())
 	}
 	return &ByzantineKeyStore{
 		masternodesOrder: masternodesOrder,
@@ -74,7 +87,8 @@ func (ks *ByzantineKeyStore) getAddrByIndex(i int) common.Address {
 func (ks *ByzantineKeyStore) signThreshold(bytes []byte) []types.Signature {
 	var signatures []types.Signature
 	cnt := 0
-	for _, key := range ks.controlledKey {
+	for _, addr := range ks.masternodesOrder {
+		key := ks.controlledKey[addr]
 		signature, err := crypto.Sign(bytes, key)
 		if err != nil {
 			log.Error("[Byzantine miner] Failed to sign", "err", err)
@@ -86,4 +100,10 @@ func (ks *ByzantineKeyStore) signThreshold(bytes []byte) []types.Signature {
 		}
 	}
 	return signatures
+}
+
+func (ks *ByzantineKeyStore) reorderByMasternodes(mn []common.Address) {
+	mn_copy := make([]common.Address, len(mn))
+	copy(mn_copy, mn)
+	ks.masternodesOrder = mn_copy
 }

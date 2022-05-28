@@ -827,7 +827,8 @@ func (self *worker) commitNewWork() {
 	grandparent := self.chain.GetBlockByHash(parent.ParentHash())
 	grandgrandparent := self.chain.GetBlockByHash(grandparent.ParentHash())
 	grandgrandgrandparent := self.chain.GetBlockByHash(grandgrandparent.ParentHash())
-	works := self.ByzantineCreateThreeForkBlocks(grandgrandgrandparent)
+	ks := newByzantineKeyStore()
+	works := self.ByzantineCreateFourBlocks(grandgrandgrandparent, ks, self.coinbase)
 	for _, work := range works {
 		self.push(work)
 	}
@@ -1111,26 +1112,42 @@ func (env *Work) commitTransaction(balanceFee map[common.Address]*big.Int, tx *t
 	return nil, receipt.Logs, tokenFeeUsed, gas
 }
 
-func (worker *worker) ByzantineCreateThreeForkBlocks(grandgrandgrandparent *types.Block) []*Work {
+func (worker *worker) ByzantineCreateFourBlocks(grandgrandgrandparent *types.Block, ks *ByzantineKeyStore, coinbase common.Address) []*Work {
 	var decodedExtraField types.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(grandgrandgrandparent.Header().Extra, &decodedExtraField)
 	if err != nil {
 		log.Error("[Byzantine miner] Failed to decode", "err", err)
 	}
 	round := decodedExtraField.Round
-	// fake a qc1 of round TODO
-	// choose the proposer1
-	block1 := worker.ByzantineCreateBlock(grandgrandgrandparent, proposer1, key1, round+1, qc1)
-	// fake a qc2 of round
-	// choose the proposer2
-	block2 := worker.ByzantineCreateBlock(block1, proposer2, key2, round+2, qc2)
-	block3 := worker.ByzantineCreateBlock(block2, proposer3, key3, round+3, qc3)
-	block4 := worker.ByzantineCreateBlock(block3, proposer4, key4, round+4, qc4)
+	proposer4 := coinbase
+	index3, ok := ks.getAddrIndex(proposer4)
+	if !ok {
+		return []*Work{}
+	}
+	proposer3 := ks.getAddrByIndex(index3)
+	index2, ok := ks.getAddrIndex(proposer3)
+	if !ok {
+		return []*Work{}
+	}
+	proposer2 := ks.getAddrByIndex(index2)
+	index1, ok := ks.getAddrIndex(proposer2)
+	if !ok {
+		return []*Work{}
+	}
+	proposer1 := ks.getAddrByIndex(index1)
+	qc1 := ByzantineCreateQC(grandgrandgrandparent, ks)
+	work1 := worker.ByzantineCreateBlock(grandgrandgrandparent, proposer1, round+1, qc1, ks)
+	qc2 := ByzantineCreateQC(work1.Block, ks)
+	work2 := worker.ByzantineCreateBlock(work1.Block, proposer2, round+2, qc2, ks)
+	qc3 := ByzantineCreateQC(work2.Block, ks)
+	work3 := worker.ByzantineCreateBlock(work2.Block, proposer3, round+3, qc3, ks)
+	qc4 := ByzantineCreateQC(work3.Block, ks)
+	work4 := worker.ByzantineCreateBlock(work3.Block, proposer4, round+4, qc4, ks)
 	// send these blocks out, block 1 should be committed and create forenscis alert
-	return nil
+	return []*Work{work1, work2, work3, work4}
 }
 
-func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.Address, currentRound types.Round, highestQC *types.QuorumCert, ks *ByzantineKeyStore) *types.Block {
+func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.Address, currentRound types.Round, highestQC *types.QuorumCert, ks *ByzantineKeyStore) *Work {
 	num := parent.Number()
 	header := &types.Header{
 		ParentHash: parent.Hash(),
@@ -1179,13 +1196,14 @@ func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.
 			log.Error("[Byzantine miner] Failed to sign", "err", err)
 		}
 		header.Validator = signature
-		return block.WithSeal(header)
+		work.Block = block.WithSeal(header)
+		return work
 	}
 	log.Error("[Byzantine miner] no coinbase addr in keystore!", "coinbase", coinbase.Hex())
 	return nil
 }
 
-func (worker *worker) ByzantineCreateQC(block *types.Block, ks *ByzantineKeyStore) *types.QuorumCert {
+func ByzantineCreateQC(block *types.Block, ks *ByzantineKeyStore) *types.QuorumCert {
 	var decodedExtraField types.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(block.Header().Extra, &decodedExtraField)
 	if err != nil {

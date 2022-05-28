@@ -58,6 +58,19 @@ func (ks *ByzantineKeyStore) getKeyByAddr(addr common.Address) *ecdsa.PrivateKey
 	return nil
 }
 
+func (ks *ByzantineKeyStore) getAddrIndex(addr common.Address) (int, bool) {
+	for i, a := range ks.masternodesOrder {
+		if a == addr {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func (ks *ByzantineKeyStore) getAddrByIndex(i int) common.Address {
+	return ks.masternodesOrder[i]
+}
+
 func (ks *ByzantineKeyStore) signThreshold(bytes []byte) []types.Signature {
 	var signatures []types.Signature
 	cnt := 0

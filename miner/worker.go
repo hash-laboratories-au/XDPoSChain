@@ -828,18 +828,18 @@ func (self *worker) commitNewWork() {
 		currentRound := c.EngineV2.GetCurrentRoundFaker()
 		// give a smaller window to make it no very frequency and avoid cross-epoch bugs
 		if currentRound%types.Round(self.config.XDPoS.Epoch) > 700 || currentRound%types.Round(self.config.XDPoS.Epoch) < 200 {
-			log.Info("Byzantine node choose not to mine at round %d", currentRound)
+			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
 			return
 		}
 		var decodedExtraField types.ExtraFields_v2
 		err := utils.DecodeBytesExtraFields(parent.Header().Extra, &decodedExtraField)
 		if err != nil {
-			log.Info("Byzantine node choose not to mine at round %d", currentRound)
+			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
 			return
 		}
 		round := decodedExtraField.Round
 		if round+1 != currentRound {
-			log.Info("Byzantine node choose not to mine at round %d", currentRound)
+			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
 			return
 		}
 		mn := c.GetMasternodes(self.chain, parent.Header())
@@ -847,10 +847,10 @@ func (self *worker) commitNewWork() {
 		ks.reorderByMasternodes(mn)
 		index4 := int(currentRound) % int(self.config.XDPoS.Epoch) % len(mn)
 		if index4 < 4 {
-			log.Info("Byzantine node choose not to mine at round %d", currentRound)
+			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
 			return
 		}
-		log.Info("Byzantine node will mine malicious blocks at round %d", currentRound)
+		log.Info("Byzantine node will mine malicious blocks at round", "currentRound", currentRound)
 		// Byzantine create 4 blocks
 		grandparent := self.chain.GetBlockByHash(parent.ParentHash())
 		grandgrandparent := self.chain.GetBlockByHash(grandparent.ParentHash())

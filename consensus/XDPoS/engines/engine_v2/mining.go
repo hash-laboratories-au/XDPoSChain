@@ -47,7 +47,7 @@ func (x *XDPoS_v2) yourturn(chain consensus.ChainReader, round types.Round, pare
 	}
 
 	for i, s := range masterNodes {
-		log.Warn("[yourturn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
+		log.Debug("[yourturn] Masternode:", "index", i, "address", s.String(), "parentBlockNum", parent.Number)
 	}
 
 	leaderIndex := uint64(round) % x.config.Epoch % uint64(len(masterNodes))

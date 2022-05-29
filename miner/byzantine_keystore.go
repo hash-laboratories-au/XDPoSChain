@@ -54,7 +54,7 @@ func newByzantineKeyStore() *ByzantineKeyStore {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		masternodesOrder = append(masternodesOrder, addr)
 		controlledKey[addr] = key
-		log.Info("Byzantine controls %d addr: %s\n", i, addr.Hex())
+		log.Info("Byzantine controls", "i", i, "addr", addr.Hex())
 	}
 	return &ByzantineKeyStore{
 		masternodesOrder: masternodesOrder,

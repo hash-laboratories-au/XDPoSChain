@@ -1160,8 +1160,8 @@ func (worker *worker) ByzantineCreateFourBlocks(grandgrandgrandparent *types.Blo
 	qc4 := ByzantineCreateQC(work3.Block, ks)
 	work4 := worker.ByzantineCreateBlock(work3.Block, proposer4, round+4, qc4, ks)
 	// send these blocks out, block 1 should be committed and create forenscis alert
-	log.Warn("Byzantine creates 4 blocks, the first block, num %d, hash %s, miner %s, round %d, should be committed and create forensic alert", work1.Block.Number(), work1.Block.Hash().Hex(), proposer1, round+1)
-	log.Warn("The qc Byzantine created and should be in forensic alert is: %v", qc2)
+	log.Warn("Byzantine creates 4 blocks, the first block, should be committed and create forensic alert", "blockNum", work1.Block.Number(), "blockHash", work1.Block.Hash().Hex(), "proposer1", proposer1, "round", round+1)
+	log.Warn("The qc Byzantine created and should be in forensic alert is", "qc2", qc2)
 	return []*Work{work1, work2, work3, work4}
 }
 
@@ -1215,7 +1215,7 @@ func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.
 		}
 		header.Validator = signature
 		work.Block = block.WithSeal(header)
-		log.Warn("Byzantine creates block num %d with controlled addr %s, round %d, hash %s", header.Number, coinbase, currentRound, header.Hash().Hex())
+		log.Warn("Byzantine creates block num", "headerNum", header.Number, "addr", coinbase, "currentRound", currentRound, "header hash", header.Hash().Hex())
 		return work
 	}
 	log.Error("[Byzantine miner] no coinbase addr in keystore!", "coinbase", coinbase.Hex())

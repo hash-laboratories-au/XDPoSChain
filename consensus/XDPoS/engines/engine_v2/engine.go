@@ -679,9 +679,9 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 		return err
 	}
 
-	err = x.allowedToSend(chain, blockHeader, "vote")
-	if err != nil {
-		return err
+	allow := x.allowedToSend(chain, blockHeader, "vote")
+	if !allow {
+		return nil
 	}
 
 	verified, err := x.verifyVotingRule(chain, blockInfo, quorumCert)
@@ -1013,8 +1013,7 @@ func (x *XDPoS_v2) FindParentBlockToAssign(chain consensus.ChainReader) *types.B
 	return parent
 }
 
-func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types.Header, sendType string) error {
-	allowedToSend := false
+func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types.Header, sendType string) bool {
 	// Don't hold the signFn for the whole signing operation
 	x.signLock.RLock()
 	signer := x.signer
@@ -1024,18 +1023,15 @@ func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types
 	for i, mn := range masterNodes {
 		if signer == mn {
 			log.Debug("[allowedToSend] Yes, I'm allowed to send", "sendType", sendType, "MyAddress", signer.Hex(), "Index in master node list", i)
-			allowedToSend = true
-			break
+			return true
 		}
 	}
-	if !allowedToSend {
-		for _, mn := range masterNodes {
-			log.Debug("[allowedToSend] Master node list", "masterNodeAddress", mn.Hash())
-		}
-		log.Warn("[allowedToSend] Not in the Masternode list, not suppose to send", "sendType", sendType, "MyAddress", signer.Hex())
-		return fmt.Errorf("Not in the master node list, not suppose to %v", sendType)
+
+	for _, mn := range masterNodes {
+		log.Debug("[allowedToSend] Master node list", "masterNodeAddress", mn.Hash())
 	}
-	return nil
+	log.Info("[allowedToSend] Not in the Masternode list, not suppose to send message", "sendType", sendType, "MyAddress", signer.Hex())
+	return false
 }
 
 // Periodlly execution(Attached to engine initialisation during "new"). Used for pool cleaning etc

@@ -86,6 +86,7 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		return utils.ErrInvalidDifficulty
 	}
 
+	var masterNodes []common.Address
 	isEpochSwitch, _, err := x.IsEpochSwitch(header) // Verify v2 block that is on the epoch switch
 	if err != nil {
 		log.Error("[verifyHeader] error when checking if header is epoch switch header", "Hash", header.Hash(), "Number", header.Number, "Error", err)
@@ -102,7 +103,8 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 			return utils.ErrInvalidCheckpointSigners
 		}
 
-		_, localPenalties, err := x.calcMasternodes(chain, header.Number, header.ParentHash)
+		localMasterNodes, localPenalties, err := x.calcMasternodes(chain, header.Number, header.ParentHash)
+		masterNodes = localMasterNodes
 		if err != nil {
 			log.Error("[verifyHeader] Fail to calculate master nodes list with penalty", "Number", header.Number, "Hash", header.Hash())
 			return err
@@ -125,6 +127,7 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 			log.Warn("[verifyHeader] Penalties shall not have values in non-epochSwitch block", "Hash", header.Hash(), "Number", header.Number, "header.Penalties", header.Penalties)
 			return utils.ErrInvalidFieldInNonEpochSwitch
 		}
+		masterNodes = x.GetMasternodes(chain, header)
 	}
 
 	// If all checks passed, validate any special fields for hard forks
@@ -133,7 +136,6 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 	}
 
 	// Check its validator
-	masterNodes := x.GetMasternodes(chain, header)
 	verified, validatorAddress, err := x.verifyMsgSignature(sigHash(header), header.Validator, masterNodes)
 	if err != nil {
 		for index, mn := range masterNodes {

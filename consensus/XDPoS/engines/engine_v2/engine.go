@@ -422,35 +422,16 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 }
 
 func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
-	x.lock.RLock()
-	defer x.lock.RUnlock()
-
-	_, round, _, err := x.getExtraFields(header)
+	snap, err := x.GetSnapshot(chain, header)
 	if err != nil {
-		log.Error("[IsAuthorisedAddress] Fail to decode v2 extra data", "Hash", header.Hash().Hex(), "Extra", header.Extra, "Error", err)
+		log.Error("[IsAuthorisedAddress] Can't get snapshot with at ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
 		return false
 	}
-	blockRound := round
-
-	masterNodes := x.GetMasternodes(chain, header)
-
-	if len(masterNodes) == 0 {
-		log.Error("[IsAuthorisedAddress] Fail to find any master nodes from current block round epoch", "Hash", header.Hash().Hex(), "Round", blockRound, "Number", header.Number)
-		return false
-	}
-
-	for index, masterNodeAddress := range masterNodes {
-		if masterNodeAddress == address {
-			log.Debug("[IsAuthorisedAddress] Found matching master node address", "index", index, "Address", address, "MasterNodes", masterNodes)
+	for _, mn := range snap.NextEpochMasterNodes {
+		if mn == address {
 			return true
 		}
 	}
-
-	log.Warn("Not authorised address", "Address", address.Hex(), "Hash", header.Hash().Hex(), "round", round)
-	for index, mn := range masterNodes {
-		log.Warn("Master node list item", "mn", mn.Hex(), "index", index)
-	}
-
 	return false
 }
 

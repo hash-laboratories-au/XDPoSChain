@@ -958,7 +958,7 @@ func (pm *ProtocolManager) BroadcastVote(vote *types.Vote) {
 		for _, peer := range peers {
 			err := peer.SendVote(vote)
 			if err != nil {
-				log.Error("[BroadcastVote] Fail to broadcast vote message", "NumberOfPeers", len(peers), "peerId", peer.id, "vote", vote, "Error", err)
+				log.Error("[BroadcastVote] Fail to broadcast vote message", "err", err, "peerId", peer.id, "blockNum", vote.ProposedBlockInfo.Number)
 				log.Error("[BroadcastVote] Remove Peer", "id", peer.id, "version", peer.version)
 				pm.removePeer(peer.id)
 			}

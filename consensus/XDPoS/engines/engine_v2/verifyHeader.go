@@ -110,14 +110,16 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 			return err
 		}
 
-		isLegit, err := x.isValidatorsLegit(chain, header, localPenalties)
-		if err != nil {
-			log.Error("[verifyHeader] Error while trying to check if the validators are legit", "Hash", header.Hash(), "Number", header.Number, "ValidatorsLength", len(header.Validators))
-			return err
-		}
-		if !isLegit {
+		validatorsAddress := common.ExtractAddressFromBytes(header.Validators)
+		if !utils.CompareSignersLists(localMasterNodes, validatorsAddress) {
 			return utils.ErrValidatorsNotLegit
 		}
+
+		penaltiesAddress := common.ExtractAddressFromBytes(header.Penalties)
+		if !utils.CompareSignersLists(localPenalties, penaltiesAddress) {
+			return utils.ErrPenaltiesNotLegit
+		}
+
 	} else {
 		if len(header.Validators) != 0 {
 			log.Warn("[verifyHeader] Validators shall not have values in non-epochSwitch block", "Hash", header.Hash(), "Number", header.Number, "header.Validators", header.Validators)
@@ -162,35 +164,4 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 
 	x.verifiedHeaders.Add(header.Hash(), true)
 	return nil
-}
-
-// Verify the header validators address is legit by checking against its snapshot masternode list minutes the penalty list, we also ensure the order matches
-func (x *XDPoS_v2) isValidatorsLegit(chain consensus.ChainReader, header *types.Header, penalties []common.Address) (bool, error) {
-
-	if header.Number.Cmp(x.config.V2.SwitchBlock) == 0 {
-		log.Info("[isValidatorsLegit] examing last v1 block")
-		return true, nil
-	}
-
-	snap, err := x.getSnapshot(chain, header.Number.Uint64(), false)
-	if err != nil {
-		log.Error("[isValidatorsLegit] Error while trying to get snapshot", "BlockNumber", header.Number.Int64(), "Hash", header.Hash().Hex(), "error", err)
-		return false, err
-	}
-	// snap.NextEpochMasterNodes
-	penaltyMap := make(map[common.Address]bool)
-	for _, item := range penalties {
-		penaltyMap[item] = true
-	}
-
-	var finalValidMasternodes []common.Address
-	for _, mn := range snap.NextEpochMasterNodes {
-		if penaltyMap[mn] {
-			continue
-		} else {
-			finalValidMasternodes = append(finalValidMasternodes, mn)
-		}
-	}
-	validatorsAddress := common.ExtractAddressFromBytes(header.Validators)
-	return utils.CompareSignersLists(finalValidMasternodes, validatorsAddress), nil
 }

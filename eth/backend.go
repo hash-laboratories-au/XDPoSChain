@@ -452,12 +452,11 @@ func (self *Ethereum) SetEtherbase(etherbase common.Address) {
 	self.etherbase = etherbase
 	self.lock.Unlock()
 
-	log.Info("")
 	self.miner.SetEtherbase(etherbase)
 }
 
 // ValidateMasternode checks if node's address is in set of masternodes
-func (s *Ethereum) peeValidateMasternode() (bool, error) {
+func (s *Ethereum) ValidateMasternode() (bool, error) {
 	eb, err := s.Etherbase()
 	if err != nil {
 		return false, err
@@ -508,7 +507,7 @@ func (s *Ethereum) StartStaking(local bool) error {
 	if XDPoS, ok := s.engine.(*XDPoS.XDPoS); ok {
 		wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 		if wallet == nil || err != nil {
-			log.Error("Etherbase account unavailable locally", "err", err, "address", eb)
+			log.Error("Etherbase account unavailable locally", "err", err, "address", eb.Hex())
 			return fmt.Errorf("signer missing: %v", err)
 		}
 		XDPoS.Authorize(eb, wallet.SignHash)

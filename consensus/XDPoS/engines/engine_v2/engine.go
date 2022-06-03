@@ -134,7 +134,7 @@ func (x *XDPoS_v2) Initial(chain consensus.ChainReader, header *types.Header) er
 	log.Info("[Initial] initial v2 related parameters")
 
 	if x.highestQuorumCert.ProposedBlockInfo.Hash != (common.Hash{}) { // already initialized
-		log.Error("[Initial] Already initialized", "x.highestQuorumCert.ProposedBlockInfo.Hash", x.highestQuorumCert.ProposedBlockInfo.Hash)
+		log.Info("[Initial] Already initialized", "x.highestQuorumCert.ProposedBlockInfo.Hash", x.highestQuorumCert.ProposedBlockInfo.Hash)
 		return nil
 	}
 
@@ -672,7 +672,7 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 	if verified {
 		return x.sendVote(chain, blockInfo)
 	} else {
-		log.Info("Failed to pass the voting rule verification", "ProposeBlockHash", blockInfo.Hash)
+		log.Warn("Failed to pass the voting rule verification", "ProposeBlockHash", blockInfo.Hash)
 	}
 
 	return nil

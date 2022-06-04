@@ -248,7 +248,7 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 	x.lock.RUnlock()
 
 	if header.ParentHash != highestQC.ProposedBlockInfo.Hash {
-		log.Warn("[Prepare] parent hash and QC hash does not match", "blockNum", header.Number, "parentHash", header.ParentHash, "QCHash", highestQC.ProposedBlockInfo.Hash, "QCNumber", highestQC.ProposedBlockInfo.Number)
+		log.Warn("[Prepare] parent hash and QC hash does not match", "blockNum", header.Number, "QCNumber", highestQC.ProposedBlockInfo.Number, "blockHash", header.ParentHash, "QCHash", highestQC.ProposedBlockInfo.Hash)
 		return consensus.ErrNotReadyToPropose
 	}
 
@@ -477,7 +477,7 @@ func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.
 func (x *XDPoS_v2) VerifyHeader(chain consensus.ChainReader, header *types.Header, fullVerify bool) error {
 	err := x.verifyHeader(chain, header, nil, fullVerify)
 	if err != nil {
-		log.Warn("[VerifyHeader] Fail to verify header", "fullVerify", fullVerify, "blockNum", header.Number, "blockHash", header.Hash(), "error", err)
+		log.Debug("[VerifyHeader] Fail to verify header", "fullVerify", fullVerify, "blockNum", header.Number, "blockHash", header.Hash(), "error", err)
 	}
 	return err
 }
@@ -618,9 +618,6 @@ func (x *XDPoS_v2) VerifyTimeoutMessage(chain consensus.ChainReader, timeoutMsg 
 
 /*
 	Entry point for handling timeout message to process below:
-	1. checkRoundNumber()
-	2. Collect timeout
-	3. Once timeout pool reached threshold, it will trigger the call to the function "onTimeoutPoolThresholdReached"
 */
 func (x *XDPoS_v2) TimeoutHandler(blockChainReader consensus.ChainReader, timeout *types.Timeout) error {
 	x.lock.Lock()
@@ -635,13 +632,6 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 	x.lock.Lock()
 	defer x.lock.Unlock()
 
-	/*
-		1. Verify QC
-		2. Generate blockInfo
-		3. processQC(): process the QC inside the proposed block
-		4. verifyVotingRule(): the proposed block's info is extracted into BlockInfo and verified for voting
-		5. sendVote()
-	*/
 	// Get QC and Round from Extra
 	quorumCert, round, _, err := x.getExtraFields(blockHeader)
 	if err != nil {
@@ -671,8 +661,6 @@ func (x *XDPoS_v2) ProposedBlockHandler(chain consensus.ChainReader, blockHeader
 	}
 	if verified {
 		return x.sendVote(chain, blockInfo)
-	} else {
-		log.Warn("Failed to pass the voting rule verification", "ProposeBlockHash", blockInfo.Hash)
 	}
 
 	return nil

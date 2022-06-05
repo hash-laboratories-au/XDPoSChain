@@ -42,7 +42,7 @@ func (x *XDPoS_v2) yourturn(chain consensus.ChainReader, round types.Round, pare
 
 	curIndex := utils.Position(masterNodes, signer)
 	if curIndex == -1 {
-		log.Warn("[yourturn] Not authorised signer", "MN", masterNodes, "Hash", parent.Hash(), "signer", signer)
+		log.Warn("[yourturn] I am not in masternodes list", "Hash", parent.Hash(), "signer", signer)
 		return false, nil
 	}
 
@@ -56,6 +56,6 @@ func (x *XDPoS_v2) yourturn(chain consensus.ChainReader, round types.Round, pare
 		return false, nil
 	}
 
-	log.Debug("[yourturn] Yes, it's my turn based on parent block", "ParentHash", parent.Hash().Hex(), "ParentBlockNumber", parent.Number.Uint64())
+	log.Info("[yourturn] Yes, it's my turn based on parent block", "ParentHash", parent.Hash().Hex(), "ParentBlockNumber", parent.Number.Uint64())
 	return true, nil
 }

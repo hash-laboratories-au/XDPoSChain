@@ -958,8 +958,7 @@ func (pm *ProtocolManager) BroadcastVote(vote *types.Vote) {
 		for _, peer := range peers {
 			err := peer.SendVote(vote)
 			if err != nil {
-				log.Error("[BroadcastVote] Fail to broadcast vote message", "err", err, "peerId", peer.id, "blockNum", vote.ProposedBlockInfo.Number)
-				log.Error("[BroadcastVote] Remove Peer", "id", peer.id, "version", peer.version)
+				log.Error("[BroadcastVote] Fail to broadcast vote message", "err", err, "peerId", peer.id, "version", peer.version, "blockNum", vote.ProposedBlockInfo.Number)
 				pm.removePeer(peer.id)
 			}
 		}
@@ -976,8 +975,7 @@ func (pm *ProtocolManager) BroadcastTimeout(timeout *types.Timeout) {
 		for _, peer := range peers {
 			err := peer.SendTimeout(timeout)
 			if err != nil {
-				log.Error("[BroadcastTimeout] Fail to broadcast timeout message", "NumberOfPeers", len(peers), "peerId", peer.id, "timeout", timeout, "Error", err)
-				log.Error("[BroadcastTimeout] Remove Peer", "id", peer.id, "version", peer.version)
+				log.Error("[BroadcastTimeout] Fail to broadcast timeout message, remove peer", "err", err, "peerId", peer.id, "version", peer.version, "timeout", timeout)
 				pm.removePeer(peer.id)
 			}
 		}
@@ -994,8 +992,7 @@ func (pm *ProtocolManager) BroadcastSyncInfo(syncInfo *types.SyncInfo) {
 		for _, peer := range peers {
 			err := peer.SendSyncInfo(syncInfo)
 			if err != nil {
-				log.Error("[BroadcastSyncInfo] Fail to broadcast syncInfo message", "NumberOfPeers", len(peers), "peerId", peer.id, "syncInfo", syncInfo, "Error", err)
-				log.Error("[BroadcastSyncInfo] Remove Peer", "id", peer.id, "version", peer.version)
+				log.Error("[BroadcastSyncInfo] Fail to broadcast syncInfo message, remove peer", "err", err, "peerId", peer.id, "version", peer.version, "syncInfo", syncInfo)
 				pm.removePeer(peer.id)
 			}
 		}

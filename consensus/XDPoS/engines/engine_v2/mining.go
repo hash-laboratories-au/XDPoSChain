@@ -42,7 +42,7 @@ func (x *XDPoS_v2) yourturn(chain consensus.ChainReader, round types.Round, pare
 
 	curIndex := utils.Position(masterNodes, signer)
 	if curIndex == -1 {
-		log.Warn("[yourturn] Not authorised signer", "MN", masterNodes, "Hash", parent.Hash(), "signer", signer)
+		log.Warn("[yourturn] I am not in masternodes list", "Hash", parent.Hash(), "signer", signer)
 		return false, nil
 	}
 

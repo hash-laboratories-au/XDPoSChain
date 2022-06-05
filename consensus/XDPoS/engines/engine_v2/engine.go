@@ -781,7 +781,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	gapNumber := epochSwitchNumber - epochSwitchNumber%x.config.Epoch - x.config.Gap
 	if gapNumber != quorumCert.GapNumber {
 		log.Error("[verifyQC] gap number mismatch", "BlockInfoHash", quorumCert.ProposedBlockInfo.Hash, "Gap", quorumCert.GapNumber, "GapShouldBe", gapNumber)
-		return fmt.Errorf("gap number mismatch %v", quorumCert)
+		return fmt.Errorf("gap number mis-match QC Gap %d, shouldBe %d", quorumCert.GapNumber, gapNumber)
 	}
 
 	return x.VerifyBlockInfo(blockChainReader, quorumCert.ProposedBlockInfo, parentHeader)

@@ -1189,7 +1189,7 @@ func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
 
-	header.Time = new(big.Int).Add(big.NewInt(time.Now().Unix()), new(big.Int).SetUint64(worker.config.XDPoS.Period))
+	header.Time = new(big.Int).Add(parent.Time(), new(big.Int).SetUint64(uint64(worker.config.XDPoS.V2.MinePeriod)))
 
 	// ignore the error
 	err := worker.makeCurrent(parent, header)

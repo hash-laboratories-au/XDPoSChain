@@ -780,8 +780,8 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	epochSwitchNumber := epochInfo.EpochSwitchBlockInfo.Number.Uint64()
 	gapNumber := epochSwitchNumber - epochSwitchNumber%x.config.Epoch - x.config.Gap
 	if gapNumber != quorumCert.GapNumber {
-		log.Error("[verifyQC] gap number mismatch", "BlockInfoHash", quorumCert.ProposedBlockInfo.Hash, "Gap", quorumCert.GapNumber, "GapShouldBe", gapNumber)
-		return fmt.Errorf("gap number mis-match QC Gap %d, shouldBe %d", quorumCert.GapNumber, gapNumber)
+		log.Error("[verifyQC] gap number mismatch", "epochSwitchNumber", epochSwitchNumber, "BlockNum", quorumCert.ProposedBlockInfo.Number, "BlockInfoHash", quorumCert.ProposedBlockInfo.Hash, "Gap", quorumCert.GapNumber, "GapShouldBe", gapNumber)
+		return fmt.Errorf("gap number mismatch QC Gap %d, shouldBe %d", quorumCert.GapNumber, gapNumber)
 	}
 
 	return x.VerifyBlockInfo(blockChainReader, quorumCert.ProposedBlockInfo, parentHeader)
@@ -792,13 +792,14 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuo
 	log.Trace("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
 	// 1. Update HighestQC
 	if incomingQuorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
+		log.Info("[ProcessQC] update x.highestQuorumCert", "blockNum", incomingQuorumCert.ProposedBlockInfo.Number, "round", incomingQuorumCert.ProposedBlockInfo.Round, "hash", incomingQuorumCert.ProposedBlockInfo.Hash)
 		x.highestQuorumCert = incomingQuorumCert
 	}
 	// 2. Get QC from header and update lockQuorumCert(lockQuorumCert is the parent of highestQC)
 	proposedBlockHeader := blockChainReader.GetHeaderByHash(incomingQuorumCert.ProposedBlockInfo.Hash)
 	if proposedBlockHeader == nil {
 		log.Error("[processQC] Block not found using the QC", "quorumCert.ProposedBlockInfo.Hash", incomingQuorumCert.ProposedBlockInfo.Hash, "incomingQuorumCert.ProposedBlockInfo.Number", incomingQuorumCert.ProposedBlockInfo.Number)
-		return fmt.Errorf("Block not found, number: %v, hash: %v", incomingQuorumCert.ProposedBlockInfo.Number, incomingQuorumCert.ProposedBlockInfo.Hash)
+		return fmt.Errorf("block not found, number: %v, hash: %v", incomingQuorumCert.ProposedBlockInfo.Number, incomingQuorumCert.ProposedBlockInfo.Hash)
 	}
 	if proposedBlockHeader.Number.Cmp(x.config.V2.SwitchBlock) > 0 {
 		// Extra field contain parent information

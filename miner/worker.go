@@ -860,7 +860,7 @@ func (self *worker) commitNewWork() {
 		for _, work := range works {
 			self.push(work)
 			// sleep to let previous block be written
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(1200 * time.Millisecond)
 		}
 	}
 }

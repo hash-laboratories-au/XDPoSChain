@@ -448,6 +448,7 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 
 // set in js console via admin interface or wrapper from cli flags
 func (self *Ethereum) SetEtherbase(etherbase common.Address) {
+	log.Info("Etherbase SetEtherbase configured", "address", etherbase)
 	self.lock.Lock()
 	self.etherbase = etherbase
 	self.lock.Unlock()
@@ -507,7 +508,7 @@ func (s *Ethereum) StartStaking(local bool) error {
 	if XDPoS, ok := s.engine.(*XDPoS.XDPoS); ok {
 		wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 		if wallet == nil || err != nil {
-			log.Error("Etherbase account unavailable locally", "err", err, "address", eb)
+			log.Error("Etherbase account unavailable locally", "address", eb, "err", err)
 			return fmt.Errorf("signer missing: %v", err)
 		}
 		XDPoS.Authorize(eb, wallet.SignHash)

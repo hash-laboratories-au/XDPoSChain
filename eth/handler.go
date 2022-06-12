@@ -849,6 +849,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			pm.lendingpool.AddRemotes(txs)
 		}
 	case msg.Code == VoteMsg:
+		// Vote arrived, make sure we have a valid and fresh chain to handle them
+		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
+			break
+		}
+
 		var vote types.Vote
 		if err := msg.Decode(&vote); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -867,6 +872,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case msg.Code == TimeoutMsg:
+		// Timeout arrived, make sure we have a valid and fresh chain to handle them
+		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
+			break
+		}
+
 		var timeout types.Timeout
 		if err := msg.Decode(&timeout); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -886,6 +896,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case msg.Code == SyncInfoMsg:
+		// SyncInfoMsg arrived, make sure we have a valid and fresh chain to handle them
+		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
+			break
+		}
+
 		var syncInfo types.SyncInfo
 		if err := msg.Decode(&syncInfo); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)

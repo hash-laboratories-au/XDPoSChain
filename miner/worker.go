@@ -374,7 +374,9 @@ func (self *worker) wait() {
 			stat, err := self.chain.WriteBlockWithState(block, work.receipts, work.state, work.tradingState, work.lendingState)
 			self.currentMu.Unlock()
 			if err != nil {
-				log.Error("Failed writing block to chain", "err", err)
+				log.Error("Failed writing block to chain", "err", err, "hash", block.Hash().Hex())
+				// This is a Byzantine node, even tough has error, braodcast it
+				self.mux.Post(core.NewMinedBlockEvent{Block: block})
 				continue
 			}
 			// check if canon block and write transactions

@@ -669,7 +669,11 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 		}
 		fastBroadCast := true
 	again:
+		log.Info("fetcher verify block", "Hash", hash.Hex(), "Number", block.Number)
 		err := f.verifyHeader(block.Header())
+		if err != nil {
+			log.Info("fetcher verify block error", "Hash", hash.Hex(), "error", err)
+		}
 		// Quickly validate the header and propagate the block if it passes
 		switch err {
 		case nil:

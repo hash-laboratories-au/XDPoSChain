@@ -25,6 +25,7 @@ import (
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
+	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/p2p"
 	"github.com/XinFinOrg/XDPoSChain/rlp"
 	mapset "github.com/deckarep/golang-set"
@@ -173,6 +174,7 @@ func (p *peer) MarkLendingTransaction(hash common.Hash) {
 // will never be propagated to this particular peer.
 func (p *peer) MarkVote(hash common.Hash) {
 	// If we reached the memory allowance, drop a previously known transaction hash
+	log.Info("[MarkVote]")
 	for p.knownVote.Cardinality() >= maxKnownVote {
 		p.knownVote.Pop()
 	}
@@ -515,12 +517,16 @@ func (ps *peerSet) Register(p *peer) error {
 // Unregister removes a remote peer from the active set, disabling any further
 // actions to/from that particular entity.
 func (ps *peerSet) Unregister(id string) error {
+	log.Info("Unregister Peer", "peer", id)
+
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 
 	if _, ok := ps.peers[id]; !ok {
 		return errNotRegistered
 	}
+	log.Info("Delete Peer", "peer", id)
+
 	delete(ps.peers, id)
 	return nil
 }

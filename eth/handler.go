@@ -175,7 +175,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 			continue
 		}
 		// Compatible; initialise the sub-protocol
-		version := version // Closure for the run
+		version := version // Closure for the runewPeern
 		manager.SubProtocols = append(manager.SubProtocols, p2p.Protocol{
 			Name:    ProtocolName,
 			Version: version,
@@ -273,7 +273,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 	if peer == nil {
 		return
 	}
-	log.Debug("Removing Ethereum peer", "peer", id)
+	log.Info("Removing Ethereum peer", "peer", id)
 
 	// Unregister the peer from the downloader and Ethereum peer set
 	pm.downloader.UnregisterPeer(id)
@@ -856,6 +856,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		// Mark the peer as owning the vote and process it
 		// because peer has 2 address sender and receive, so use p.id to find the right address
 		p = pm.peers.Peer(p.id)
+		log.Info("[handleMsg] got peer", "id", p.id)
 		p.MarkVote(vote.Hash())
 
 		exist, _ := pm.knownVotes.ContainsOrAdd(vote.Hash(), true)

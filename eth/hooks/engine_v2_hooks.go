@@ -29,7 +29,8 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 		parentNumber := number.Uint64() - 1
 		parentHash := currentHash
 		for i := uint64(1); ; i++ {
-			parentHeader := chain.GetHeader(parentHash, parentNumber)
+			parentHeader := chain.GetHeaderByNumber(parentNumber)
+			// parentHeader := chain.GetHeader(parentHash, parentNumber)
 			isEpochSwitch, _, err := adaptor.EngineV2.IsEpochSwitch(parentHeader)
 			if err != nil {
 				log.Error("[HookPenalty] isEpochSwitch", "err", err)

@@ -789,10 +789,10 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
 func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuorumCert *types.QuorumCert) error {
-	log.Trace("[ProcessQC][Before]", "HighQC", x.highestQuorumCert)
+	log.Trace("[processQC][Before]", "HighQC", x.highestQuorumCert)
 	// 1. Update HighestQC
 	if incomingQuorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
-		log.Info("[ProcessQC] update x.highestQuorumCert", "blockNum", incomingQuorumCert.ProposedBlockInfo.Number, "round", incomingQuorumCert.ProposedBlockInfo.Round, "hash", incomingQuorumCert.ProposedBlockInfo.Hash)
+		log.Info("[processQC] update x.highestQuorumCert", "blockNum", incomingQuorumCert.ProposedBlockInfo.Number, "round", incomingQuorumCert.ProposedBlockInfo.Round, "hash", incomingQuorumCert.ProposedBlockInfo.Hash)
 		x.highestQuorumCert = incomingQuorumCert
 	}
 	// 2. Get QC from header and update lockQuorumCert(lockQuorumCert is the parent of highestQC)
@@ -823,7 +823,7 @@ func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuo
 	if incomingQuorumCert.ProposedBlockInfo.Round >= x.currentRound {
 		x.setNewRound(blockChainReader, incomingQuorumCert.ProposedBlockInfo.Round+1)
 	}
-	log.Trace("[ProcessQC][After]", "HighQC", x.highestQuorumCert)
+	log.Trace("[processQC][After]", "HighQC", x.highestQuorumCert)
 	return nil
 }
 
@@ -976,10 +976,12 @@ func (x *XDPoS_v2) GetPreviousPenaltyByHash(chain consensus.ChainReader, hash co
 }
 
 func (x *XDPoS_v2) FindParentBlockToAssign(chain consensus.ChainReader) *types.Block {
+	log.Info("[FindParentBlockToAssign]", "QCNum", x.highestQuorumCert.ProposedBlockInfo.Number.Uint64(), "QCHash", x.highestQuorumCert.ProposedBlockInfo.Hash)
 	parent := chain.GetBlock(x.highestQuorumCert.ProposedBlockInfo.Hash, x.highestQuorumCert.ProposedBlockInfo.Number.Uint64())
 	if parent == nil {
 		log.Error("[FindParentBlockToAssign] Can not find parent block from highestQC proposedBlockInfo", "x.highestQuorumCert.ProposedBlockInfo.Hash", x.highestQuorumCert.ProposedBlockInfo.Hash, "x.highestQuorumCert.ProposedBlockInfo.Number", x.highestQuorumCert.ProposedBlockInfo.Number.Uint64())
 	}
+	log.Info("[FindParentBlockToAssign] get parent block", "num", parent.Number(), "hash", parent.Hash())
 	return parent
 }
 

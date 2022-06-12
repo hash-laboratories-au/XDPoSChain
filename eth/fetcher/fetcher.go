@@ -306,6 +306,7 @@ func (f *Fetcher) loop() {
 		height := f.chainHeight()
 		for !f.queue.Empty() {
 			op := f.queue.PopItem().(*inject)
+			log.Info("fetcher loop get block", "hash", op.block.Hash().Hex())
 			if f.queueChangeHook != nil {
 				f.queueChangeHook(op.block.Hash(), false)
 			}
@@ -657,14 +658,14 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 	hash := block.Hash()
 
 	// Run the import on a new thread
-	log.Debug("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
+	log.Info("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
 	go func() {
 		defer func() { f.done <- hash }()
 
 		// If the parent's unknown, abort insertion
 		parent := f.getBlock(block.ParentHash())
 		if parent == nil {
-			log.Debug("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
+			log.Info("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
 			return
 		}
 		fastBroadCast := true

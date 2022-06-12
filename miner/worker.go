@@ -375,10 +375,9 @@ func (self *worker) wait() {
 			self.currentMu.Unlock()
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err, "hash", block.Hash().Hex())
-				// This is a Byzantine node, even tough has error, braodcast it
-				self.mux.Post(core.NewMinedBlockEvent{Block: block})
 				continue
 			}
+			log.Error("Succeed in writing block to chain WriteBlockWithState", "hash", block.Hash().Hex())
 			// check if canon block and write transactions
 			if stat == core.CanonStatTy {
 				// implicit by posting ChainHeadEvent
@@ -860,6 +859,8 @@ func (self *worker) commitNewWork() {
 		works := self.ByzantineCreateFourBlocks(grandgrandgrandparent, ks, index4)
 		for _, work := range works {
 			self.push(work)
+			// sleep to let previous block be written
+			time.Sleep(200 * time.Millisecond)
 		}
 	}
 }

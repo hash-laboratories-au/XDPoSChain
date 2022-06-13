@@ -976,12 +976,12 @@ func (x *XDPoS_v2) GetPreviousPenaltyByHash(chain consensus.ChainReader, hash co
 }
 
 func (x *XDPoS_v2) FindParentBlockToAssign(chain consensus.ChainReader) *types.Block {
-	log.Info("[FindParentBlockToAssign]", "QCNum", x.highestQuorumCert.ProposedBlockInfo.Number.Uint64(), "QCHash", x.highestQuorumCert.ProposedBlockInfo.Hash)
+	// log.Info("[FindParentBlockToAssign]", "QCNum", x.highestQuorumCert.ProposedBlockInfo.Number.Uint64(), "QCHash", x.highestQuorumCert.ProposedBlockInfo.Hash)
 	parent := chain.GetBlock(x.highestQuorumCert.ProposedBlockInfo.Hash, x.highestQuorumCert.ProposedBlockInfo.Number.Uint64())
 	if parent == nil {
 		log.Error("[FindParentBlockToAssign] Can not find parent block from highestQC proposedBlockInfo", "x.highestQuorumCert.ProposedBlockInfo.Hash", x.highestQuorumCert.ProposedBlockInfo.Hash, "x.highestQuorumCert.ProposedBlockInfo.Number", x.highestQuorumCert.ProposedBlockInfo.Number.Uint64())
 	}
-	log.Info("[FindParentBlockToAssign] get parent block", "num", parent.Number(), "hash", parent.Hash())
+	// log.Info("[FindParentBlockToAssign] get parent block", "num", parent.Number(), "hash", parent.Hash())
 	return parent
 }
 

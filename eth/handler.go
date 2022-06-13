@@ -860,7 +860,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Mark the peer as owning the vote and process it
 		// because peer has 2 address sender and receive, so use p.id to find the right address
-		p = pm.peers.Peer(p.id)
+		// p = pm.peers.Peer(p.id)
 		log.Info("[handleMsg] got peer", "id", p.id)
 		p.MarkVote(vote.Hash())
 
@@ -884,7 +884,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
 		// Mark the peer as owning the timeout and process it
 		// because peer has 2 address sender and receive, so use p.id to find the right address
-		p = pm.peers.Peer(p.id)
+		// p = pm.peers.Peer(p.id)
 		p.MarkTimeout(timeout.Hash())
 
 		exist, _ := pm.knownTimeouts.ContainsOrAdd(timeout.Hash(), true)
@@ -907,7 +907,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Mark the peer as owning the syncInfo and process it
 		// because peer has 2 address sender and receive, so use p.id to find the right address
-		p = pm.peers.Peer(p.id)
+		// p = pm.peers.Peer(p.id)
 		p.MarkSyncInfo(syncInfo.Hash())
 
 		exist, _ := pm.knownSyncInfos.ContainsOrAdd(syncInfo.Hash(), true)

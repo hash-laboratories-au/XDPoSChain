@@ -9,10 +9,11 @@ type ForensicsInfo struct {
 }
 
 type ForensicProof struct {
-	SmallerRoundInfo *ForensicsInfo
-	LargerRoundInfo  *ForensicsInfo
-	DivergingHash    common.Hash
-	AcrossEpochs     bool
+	SmallerRoundInfo     *ForensicsInfo
+	LargerRoundInfo      *ForensicsInfo
+	DivergingHash        common.Hash
+	DivergingBlockNumber int64
+	AcrossEpochs         bool
 }
 
 type ForensicsEvent struct {

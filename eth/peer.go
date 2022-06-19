@@ -174,7 +174,6 @@ func (p *peer) MarkLendingTransaction(hash common.Hash) {
 // will never be propagated to this particular peer.
 func (p *peer) MarkVote(hash common.Hash) {
 	// If we reached the memory allowance, drop a previously known transaction hash
-	log.Info("[MarkVote]")
 	for p.knownVote.Cardinality() >= maxKnownVote {
 		p.knownVote.Pop()
 	}

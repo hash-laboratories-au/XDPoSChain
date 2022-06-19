@@ -861,7 +861,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		// Mark the peer as owning the vote and process it
 		// because peer has 2 address sender and receive, so use p.id to find the right address
 		// p = pm.peers.Peer(p.id)
-		log.Info("[handleMsg] got peer", "id", p.id)
 		p.MarkVote(vote.Hash())
 
 		exist, _ := pm.knownVotes.ContainsOrAdd(vote.Hash(), true)

@@ -1150,17 +1150,18 @@ func (worker *worker) ByzantineCreateFourBlocks(grandgrandgrandparent *types.Blo
 		log.Error("[Byzantine miner] Failed to decode", "err", err)
 	}
 	round := decodedExtraField.Round
+	gapNumber := decodedExtraField.QuorumCert.GapNumber
 	proposer4 := ks.getAddrByIndex(index)
 	proposer3 := ks.getAddrByIndex(index - 1)
 	proposer2 := ks.getAddrByIndex(index - 2)
 	proposer1 := ks.getAddrByIndex(index - 3)
-	qc1 := ByzantineCreateQC(grandgrandgrandparent, ks)
+	qc1 := ByzantineCreateQC(grandgrandgrandparent, ks, gapNumber)
 	work1 := worker.ByzantineCreateBlock(grandgrandgrandparent, proposer1, round+1, qc1, ks)
-	qc2 := ByzantineCreateQC(work1.Block, ks)
+	qc2 := ByzantineCreateQC(work1.Block, ks, gapNumber)
 	work2 := worker.ByzantineCreateBlock(work1.Block, proposer2, round+2, qc2, ks)
-	qc3 := ByzantineCreateQC(work2.Block, ks)
+	qc3 := ByzantineCreateQC(work2.Block, ks, gapNumber)
 	work3 := worker.ByzantineCreateBlock(work2.Block, proposer3, round+3, qc3, ks)
-	qc4 := ByzantineCreateQC(work3.Block, ks)
+	qc4 := ByzantineCreateQC(work3.Block, ks, gapNumber)
 	work4 := worker.ByzantineCreateBlock(work3.Block, proposer4, round+4, qc4, ks)
 	// send these blocks out, block 1 should be committed and create forenscis alert
 	log.Warn("Byzantine creates 4 blocks, the first block, should be committed and create forensic alert", "blockNum", work1.Block.Number(), "blockHash", work1.Block.Hash().Hex(), "proposer1", proposer1, "round", round+1)
@@ -1225,7 +1226,7 @@ func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.
 	return nil
 }
 
-func ByzantineCreateQC(block *types.Block, ks *ByzantineKeyStore) *types.QuorumCert {
+func ByzantineCreateQC(block *types.Block, ks *ByzantineKeyStore, gapNumber uint64) *types.QuorumCert {
 	var decodedExtraField types.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(block.Header().Extra, &decodedExtraField)
 	if err != nil {
@@ -1239,7 +1240,7 @@ func ByzantineCreateQC(block *types.Block, ks *ByzantineKeyStore) *types.QuorumC
 	}
 	voteForSign := &types.VoteForSign{
 		ProposedBlockInfo: blockInfo,
-		GapNumber:         block.NumberU64() - block.NumberU64()%uint64(900) - uint64(450),
+		GapNumber:         gapNumber,
 	}
 
 	qc := &types.QuorumCert{

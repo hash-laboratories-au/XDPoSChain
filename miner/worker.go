@@ -348,6 +348,7 @@ func (self *worker) wait() {
 	for {
 		mustCommitNewWork := true
 		for result := range self.recv {
+			log.Info("Recv result task")
 			atomic.AddInt32(&self.atWork, -1)
 
 			if result == nil {
@@ -370,8 +371,11 @@ func (self *worker) wait() {
 			for _, log := range work.state.Logs() {
 				log.BlockHash = block.Hash()
 			}
+			log.Info("getting current mu lock")
 			self.currentMu.Lock()
+			log.Info("got current mu lock")
 			stat, err := self.chain.WriteBlockWithState(block, work.receipts, work.state, work.tradingState, work.lendingState)
+			log.Info("finish WriteBlockWithState")
 			self.currentMu.Unlock()
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err, "hash", block.Hash().Hex())
@@ -384,6 +388,7 @@ func (self *worker) wait() {
 				mustCommitNewWork = false
 			}
 			// Broadcast the block and announce chain insertion event
+			log.Info("Broadcast block", "hash", block.Hash().Hex(), "number", block.Header().Number)
 			self.mux.Post(core.NewMinedBlockEvent{Block: block})
 			var (
 				events []interface{}
@@ -857,10 +862,10 @@ func (self *worker) commitNewWork() {
 		grandgrandparent := self.chain.GetBlockByHash(grandparent.ParentHash())
 		grandgrandgrandparent := self.chain.GetBlockByHash(grandgrandparent.ParentHash())
 		works := self.ByzantineCreateFourBlocks(grandgrandgrandparent, ks, index4)
-		for i, work := range works {
+		for _, work := range works {
 			self.push(work)
 			// sleep to let previous block be written
-			time.Sleep(time.Duration(i+1) * 1800 * time.Millisecond)
+			time.Sleep(time.Duration(1) * time.Second)
 		}
 	}
 }

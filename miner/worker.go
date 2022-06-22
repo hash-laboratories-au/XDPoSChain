@@ -862,10 +862,13 @@ func (self *worker) commitNewWork() {
 		grandgrandparent := self.chain.GetBlockByHash(grandparent.ParentHash())
 		grandgrandgrandparent := self.chain.GetBlockByHash(grandgrandparent.ParentHash())
 		works := self.ByzantineCreateFourBlocks(grandgrandgrandparent, ks, index4)
+		self.currentMu.Unlock()
 		for _, work := range works {
+			self.currentMu.Lock()
 			self.push(work)
 			// sleep to let previous block be written
 			time.Sleep(time.Duration(1) * time.Second)
+			self.currentMu.Unlock()
 		}
 	}
 }

@@ -532,7 +532,7 @@ func (self *worker) commitNewWork() {
 	self.uncleMu.Lock()
 	defer self.uncleMu.Unlock()
 	self.currentMu.Lock()
-	defer self.currentMu.Unlock()
+	//defer self.currentMu.Unlock()
 
 	tstart := time.Now()
 

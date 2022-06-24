@@ -156,9 +156,19 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 		accrossEpoches = true
 	}
 
+	ancestorHashBlock := chain.GetHeaderByHash(ancestorHash)
+	// Set default to empty value of 0 if block not found
+	divergingBlockNumber := int64(0)
+	if ancestorHashBlock == nil {
+		log.Error("[SendForensicProof] Unable to find the block from provided ancestorHash", "ancestorHash", ancestorHash)
+	} else {
+		divergingBlockNumber = ancestorHashBlock.Number.Int64()
+	}
+
 	forensicsProof := &types.ForensicProof{
-		DivergingHash: ancestorHash,
-		AcrossEpochs:  accrossEpoches,
+		DivergingHash:        ancestorHash,
+		DivergingBlockNumber: divergingBlockNumber,
+		AcrossEpochs:         accrossEpoches,
 		SmallerRoundInfo: &types.ForensicsInfo{
 			HashPath:        ancestorToLowerRoundPath,
 			QuorumCert:      lowerRoundQC,

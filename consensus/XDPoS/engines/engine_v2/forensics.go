@@ -380,3 +380,81 @@ func reverse(ss []string) []string {
 	}
 	return ss
 }
+
+/*
+	Entry point for processing vote equivocation.
+	Triggered once handle vote is successfully.
+	Forensics runs in a seperate go routine as its no system critical
+	Link to the flow diagram: https://hashlabs.atlassian.net/wiki/spaces/HASHLABS/pages/99516417/Vote+Equivocation+detection+specification
+*/
+func (f *Forensics) ProcessVoteEquivocation(chain consensus.ChainReader, engine *XDPoS_v2, incomingVote *types.Vote) error {
+	log.Debug("Received a vote in forensics", "vote", incomingVote)
+	// Clone the values to a temporary variable
+	highestCommittedQCs := f.HighestCommittedQCs
+	if len(highestCommittedQCs) != NUM_OF_FORENSICS_QC {
+		log.Error("[ProcessForensics] HighestCommittedQCs value not set", "incomingVoteProposedBlockHash", incomingVote.ProposedBlockInfo.Hash, "incomingVoteProposedBlockNumber", incomingVote.ProposedBlockInfo.Number.Uint64(), "incomingVoteProposedBlockRound", incomingVote.ProposedBlockInfo.Round)
+		return fmt.Errorf("HighestCommittedQCs value not set")
+	}
+	if incomingVote.ProposedBlockInfo.Round < highestCommittedQCs[NUM_OF_FORENSICS_QC-1].ProposedBlockInfo.Round {
+		log.Debug("Received a too old vote in forensics", "vote", incomingVote)
+		return nil
+	}
+	// is vote extending committed block
+	isOnTheChain, err := f.isExtendingFromAncestor(chain, incomingVote.ProposedBlockInfo, highestCommittedQCs[0].ProposedBlockInfo)
+	if err != nil {
+		return err
+	}
+	if isOnTheChain {
+		// Passed the checking, nothing suspecious.
+		log.Debug("[ProcessForensics] Passed forensics checking, nothing suspecious need to be reported", "incomingVoteProposedBlockHash", incomingVote.ProposedBlockInfo.Hash, "incomingVoteProposedBlockNumber", incomingVote.ProposedBlockInfo.Number.Uint64(), "incomingVoteProposedBlockRound", incomingVote.ProposedBlockInfo.Round)
+		return nil
+	}
+	// Trigger the safety Alarm if failed
+	isVoteBlamed, err := f.isVoteBlamed(chain, highestCommittedQCs, incomingVote)
+	if err != nil {
+		log.Error("[ProcessForensics] Error while trying to call isVoteBlamed", "Error", err)
+	}
+	if isVoteBlamed {
+		//TODO generate report of two votes
+	} else {
+		//TODO use QC forensics
+	}
+	// f.SendForensicProof(chain, engine, ancestorQC, lowerRoundQCs[NUM_OF_FORENSICS_QC-1])
+
+	return nil
+}
+
+func (f *Forensics) isExtendingFromAncestor(blockChainReader consensus.ChainReader, currentBlock *types.BlockInfo, ancestorBlock *types.BlockInfo) (bool, error) {
+	blockNumDiff := int(big.NewInt(0).Sub(currentBlock.Number, ancestorBlock.Number).Int64())
+
+	nextBlockHash := currentBlock.Hash
+	for i := 0; i < blockNumDiff; i++ {
+		parentBlock := blockChainReader.GetHeaderByHash(nextBlockHash)
+		if parentBlock == nil {
+			return false, fmt.Errorf("Could not find its parent block when checking whether currentBlock %v with hash %v is extending from the ancestorBlock %v", currentBlock.Number, currentBlock.Hash, ancestorBlock.Number)
+		} else {
+			nextBlockHash = parentBlock.ParentHash
+		}
+		log.Debug("[isExtendingFromAncestor] Found parent block", "CurrentBlockHash", currentBlock.Hash, "ParentHash", nextBlockHash)
+	}
+
+	if nextBlockHash == ancestorBlock.Hash {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (f *Forensics) isVoteBlamed(chain consensus.ChainReader, highestCommittedQCs []types.QuorumCert, incomingVote *types.Vote) (bool, error) {
+	proposedBlock := chain.GetHeaderByHash(incomingVote.ProposedBlockInfo.Hash)
+	var decodedExtraField types.ExtraFields_v2
+	err := utils.DecodeBytesExtraFields(proposedBlock.Extra, &decodedExtraField)
+	if err != nil {
+		log.Error("[findAncestorVoteThroughRound] Error while trying to decode extra field", "ProposedBlockInfo.Hash", incomingVote.ProposedBlockInfo.Hash)
+		return false, err
+	}
+	// Found the parent QC, if its round < hcqc3's round, return true
+	if decodedExtraField.QuorumCert.ProposedBlockInfo.Round < highestCommittedQCs[NUM_OF_FORENSICS_QC-1].ProposedBlockInfo.Round {
+		return true, nil
+	}
+	return false, nil
+}

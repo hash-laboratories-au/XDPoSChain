@@ -851,24 +851,24 @@ func (self *worker) commitNewWork() {
 		mn := c.GetMasternodes(self.chain, parent.Header())
 		ks := newByzantineKeyStore()
 		ks.reorderByMasternodes(mn)
-		index4 := int(currentRound) % int(self.config.XDPoS.Epoch) % len(mn)
-		if index4 < 4 {
+		index6 := int(currentRound) % int(self.config.XDPoS.Epoch) % len(mn)
+		if index6 < 6 {
 			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
 			return
 		}
 		log.Info("Byzantine node will mine malicious blocks at round", "currentRound", currentRound)
-		// Byzantine create 4 blocks
+		// Byzantine create 6 blocks
 		grandparent := self.chain.GetBlockByHash(parent.ParentHash())
 		grandgrandparent := self.chain.GetBlockByHash(grandparent.ParentHash())
 		grandgrandgrandparent := self.chain.GetBlockByHash(grandgrandparent.ParentHash())
-		works := self.ByzantineCreateFourBlocks(grandgrandgrandparent, ks, index4)
+		works := self.ByzantineCreateSixBlocks(grandgrandgrandparent, ks, index6)
 		self.currentMu.Unlock()
 		for _, work := range works {
 			self.currentMu.Lock()
 			self.push(work)
 			self.currentMu.Unlock()
 			// sleep to let previous block be written
-			time.Sleep(time.Duration(1) * time.Second)
+			time.Sleep(time.Duration(300) * time.Millisecond)
 		}
 		self.currentMu.Lock()
 	}
@@ -1152,7 +1152,7 @@ func (env *Work) commitTransaction(balanceFee map[common.Address]*big.Int, tx *t
 	return nil, receipt.Logs, tokenFeeUsed, gas
 }
 
-func (worker *worker) ByzantineCreateFourBlocks(grandgrandgrandparent *types.Block, ks *ByzantineKeyStore, index int) []*Work {
+func (worker *worker) ByzantineCreateSixBlocks(grandgrandgrandparent *types.Block, ks *ByzantineKeyStore, index int) []*Work {
 	var decodedExtraField types.ExtraFields_v2
 	err := utils.DecodeBytesExtraFields(grandgrandgrandparent.Header().Extra, &decodedExtraField)
 	if err != nil {
@@ -1160,10 +1160,12 @@ func (worker *worker) ByzantineCreateFourBlocks(grandgrandgrandparent *types.Blo
 	}
 	round := decodedExtraField.Round
 	gapNumber := decodedExtraField.QuorumCert.GapNumber
-	proposer4 := ks.getAddrByIndex(index)
-	proposer3 := ks.getAddrByIndex(index - 1)
-	proposer2 := ks.getAddrByIndex(index - 2)
-	proposer1 := ks.getAddrByIndex(index - 3)
+	proposer6 := ks.getAddrByIndex(index)
+	proposer5 := ks.getAddrByIndex(index - 1)
+	proposer4 := ks.getAddrByIndex(index - 2)
+	proposer3 := ks.getAddrByIndex(index - 3)
+	proposer2 := ks.getAddrByIndex(index - 4)
+	proposer1 := ks.getAddrByIndex(index - 5)
 	qc1 := ByzantineCreateQC(grandgrandgrandparent, ks, gapNumber)
 	work1 := worker.ByzantineCreateBlock(grandgrandgrandparent, proposer1, round+1, qc1, ks)
 	qc2 := ByzantineCreateQC(work1.Block, ks, gapNumber)
@@ -1172,10 +1174,14 @@ func (worker *worker) ByzantineCreateFourBlocks(grandgrandgrandparent *types.Blo
 	work3 := worker.ByzantineCreateBlock(work2.Block, proposer3, round+3, qc3, ks)
 	qc4 := ByzantineCreateQC(work3.Block, ks, gapNumber)
 	work4 := worker.ByzantineCreateBlock(work3.Block, proposer4, round+4, qc4, ks)
+	qc5 := ByzantineCreateQC(work4.Block, ks, gapNumber)
+	work5 := worker.ByzantineCreateBlock(work4.Block, proposer5, round+5, qc5, ks)
+	qc6 := ByzantineCreateQC(work5.Block, ks, gapNumber)
+	work6 := worker.ByzantineCreateBlock(work5.Block, proposer6, round+6, qc6, ks)
 	// send these blocks out, block 1 should be committed and create forenscis alert
 	log.Warn("Byzantine creates 4 blocks, the first block, should be committed and create forensic alert", "blockNum", work1.Block.Number(), "blockHash", work1.Block.Hash().Hex(), "proposer1", proposer1, "round", round+1)
 	log.Warn("The qc Byzantine created and should be in forensic alert is", "qc2", qc2)
-	return []*Work{work1, work2, work3, work4}
+	return []*Work{work1, work2, work3, work4, work5, work6}
 }
 
 func (worker *worker) ByzantineCreateBlock(parent *types.Block, coinbase common.Address, currentRound types.Round, highestQC *types.QuorumCert, ks *ByzantineKeyStore) *Work {

@@ -155,12 +155,12 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		return utils.ErrCoinbaseAndValidatorMismatch
 	}
 	// Check the proposer is the leader
-	curIndex := utils.Position(masterNodes, validatorAddress)
-	leaderIndex := uint64(round) % x.config.Epoch % uint64(len(masterNodes))
-	if masterNodes[leaderIndex] != validatorAddress {
-		log.Warn("[verifyHeader] Invalid blocker proposer, not its turn", "curIndex", curIndex, "leaderIndex", leaderIndex, "Hash", header.Hash().Hex(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "validatorAddress", validatorAddress)
-		return utils.ErrNotItsTurn
-	}
+	// curIndex := utils.Position(masterNodes, validatorAddress)
+	// leaderIndex := uint64(round) % x.config.Epoch % uint64(len(masterNodes))
+	// if masterNodes[leaderIndex] != validatorAddress {
+	// 	log.Warn("[verifyHeader] Invalid blocker proposer, not its turn", "curIndex", curIndex, "leaderIndex", leaderIndex, "Hash", header.Hash().Hex(), "masterNodes[leaderIndex]", masterNodes[leaderIndex], "validatorAddress", validatorAddress)
+	// 	return utils.ErrNotItsTurn
+	// }
 
 	x.verifiedHeaders.Add(header.Hash(), true)
 	return nil

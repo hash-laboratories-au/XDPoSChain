@@ -849,7 +849,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			pm.lendingpool.AddRemotes(txs)
 		}
 	case msg.Code == VoteMsg:
-		// Vote arrived, make sure we have a valid and fresh chain to handle them
+		// VoteMsg arrived, make sure we have a valid and fresh chain to handle them
 		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
 			break
 		}
@@ -858,9 +858,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&vote); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
-		// Mark the peer as owning the vote and process it
-		// because peer has 2 address sender and receive, so use p.id to find the right address
-		// p = pm.peers.Peer(p.id)
 		p.MarkVote(vote.Hash())
 
 		exist, _ := pm.knownVotes.ContainsOrAdd(vote.Hash(), true)
@@ -871,7 +868,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case msg.Code == TimeoutMsg:
-		// Timeout arrived, make sure we have a valid and fresh chain to handle them
+		// TimeoutMsg arrived, make sure we have a valid and fresh chain to handle them
 		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
 			break
 		}
@@ -880,10 +877,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&timeout); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
-
-		// Mark the peer as owning the timeout and process it
-		// because peer has 2 address sender and receive, so use p.id to find the right address
-		// p = pm.peers.Peer(p.id)
 		p.MarkTimeout(timeout.Hash())
 
 		exist, _ := pm.knownTimeouts.ContainsOrAdd(timeout.Hash(), true)
@@ -904,9 +897,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if err := msg.Decode(&syncInfo); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
-		// Mark the peer as owning the syncInfo and process it
-		// because peer has 2 address sender and receive, so use p.id to find the right address
-		// p = pm.peers.Peer(p.id)
 		p.MarkSyncInfo(syncInfo.Hash())
 
 		exist, _ := pm.knownSyncInfos.ContainsOrAdd(syncInfo.Hash(), true)

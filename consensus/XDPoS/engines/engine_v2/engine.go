@@ -58,7 +58,7 @@ type XDPoS_v2 struct {
 	HookReward  func(chain consensus.ChainReader, state *state.StateDB, parentState *state.StateDB, header *types.Header) (map[string]interface{}, error)
 	HookPenalty func(chain consensus.ChainReader, number *big.Int, parentHash common.Hash, candidates []common.Address) ([]common.Address, error)
 
-	forensics *Forensics
+	ForensicsProcessor *Forensics
 }
 
 func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *XDPoS_v2 {
@@ -107,7 +107,7 @@ func New(config *params.XDPoSConfig, db ethdb.Database, waitPeriodCh chan int) *
 		},
 		highestVotedRound:  types.Round(0),
 		highestCommitBlock: nil,
-		forensics:          NewForensics(),
+		ForensicsProcessor: NewForensics(),
 	}
 	// Add callback to the timer
 	timeoutTimer.OnTimeoutFn = engine.OnCountdownTimeout
@@ -780,7 +780,7 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 	epochSwitchNumber := epochInfo.EpochSwitchBlockInfo.Number.Uint64()
 	gapNumber := epochSwitchNumber - epochSwitchNumber%x.config.Epoch - x.config.Gap
 	if gapNumber != quorumCert.GapNumber {
-		log.Error("[verifyQC] gap number mismatch", "epochSwitchNumber", epochSwitchNumber, "BlockNum", quorumCert.ProposedBlockInfo.Number, "BlockInfoHash", quorumCert.ProposedBlockInfo.Hash, "Gap", quorumCert.GapNumber, "GapShouldBe", gapNumber)
+		log.Error("[verifyQC] QC gap number mismatch", "epochSwitchNumber", epochSwitchNumber, "BlockNum", quorumCert.ProposedBlockInfo.Number, "BlockInfoHash", quorumCert.ProposedBlockInfo.Hash, "Gap", quorumCert.GapNumber, "GapShouldBe", gapNumber)
 		return fmt.Errorf("gap number mismatch QC Gap %d, shouldBe %d", quorumCert.GapNumber, gapNumber)
 	}
 
@@ -789,10 +789,10 @@ func (x *XDPoS_v2) verifyQC(blockChainReader consensus.ChainReader, quorumCert *
 
 // Update local QC variables including highestQC & lockQuorumCert, as well as commit the blocks that satisfy the algorithm requirements
 func (x *XDPoS_v2) processQC(blockChainReader consensus.ChainReader, incomingQuorumCert *types.QuorumCert) error {
-	log.Info("[processQC][Before]", "HighQC", x.highestQuorumCert)
+	log.Trace("[processQC][Before]", "HighQC", x.highestQuorumCert)
 	// 1. Update HighestQC
 	if incomingQuorumCert.ProposedBlockInfo.Round > x.highestQuorumCert.ProposedBlockInfo.Round {
-		log.Info("[processQC] update x.highestQuorumCert", "blockNum", incomingQuorumCert.ProposedBlockInfo.Number, "round", incomingQuorumCert.ProposedBlockInfo.Round, "hash", incomingQuorumCert.ProposedBlockInfo.Hash)
+		log.Debug("[processQC] update x.highestQuorumCert", "blockNum", incomingQuorumCert.ProposedBlockInfo.Number, "round", incomingQuorumCert.ProposedBlockInfo.Round, "hash", incomingQuorumCert.ProposedBlockInfo.Hash)
 		x.highestQuorumCert = incomingQuorumCert
 	}
 	// 2. Get QC from header and update lockQuorumCert(lockQuorumCert is the parent of highestQC)
@@ -896,7 +896,7 @@ func (x *XDPoS_v2) commitBlocks(blockChainReader consensus.ChainReader, proposed
 		// Perform forensics related operation
 		var headerQcToBeCommitted []types.Header
 		headerQcToBeCommitted = append(headerQcToBeCommitted, *parentBlock, *proposedBlockHeader)
-		go x.forensics.ForensicsMonitoring(blockChainReader, x, headerQcToBeCommitted, *incomingQc)
+		go x.ForensicsProcessor.ForensicsMonitoring(blockChainReader, x, headerQcToBeCommitted, *incomingQc)
 		return true, nil
 	}
 	// Everything else, fail to commit
@@ -999,7 +999,6 @@ func (x *XDPoS_v2) allowedToSend(chain consensus.ChainReader, blockHeader *types
 			return true
 		}
 	}
-
 	for _, mn := range masterNodes {
 		log.Debug("[allowedToSend] Master node list", "masterNodeAddress", mn.Hash())
 	}

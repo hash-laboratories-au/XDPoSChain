@@ -896,7 +896,7 @@ func (x *XDPoS_v2) commitBlocks(blockChainReader consensus.ChainReader, proposed
 		Hash:   grandParentBlock.Hash(),
 		Round:  round,
 	}
-	log.Info("Successfully committed block", "Committed block Hash", x.highestCommitBlock.Hash, "Committed round", x.highestCommitBlock.Round)
+	log.Info("Successfully committed block", "num", x.highestCommitBlock.Number, "round", x.highestCommitBlock.Round, "hash", x.highestCommitBlock.Hash)
 	// Perform forensics related operation
 	headerQcToBeCommitted := []types.Header{*parentBlock, *proposedBlockHeader}
 	go x.ForensicsProcessor.ForensicsMonitoring(blockChainReader, x, headerQcToBeCommitted, *incomingQc)

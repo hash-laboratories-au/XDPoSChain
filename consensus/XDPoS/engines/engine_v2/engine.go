@@ -886,21 +886,21 @@ func (x *XDPoS_v2) commitBlocks(blockChainReader consensus.ChainReader, proposed
 		return false, nil
 	}
 	// Commit the grandParent block
-	if x.highestCommitBlock == nil || (x.highestCommitBlock.Round < round && x.highestCommitBlock.Number.Cmp(grandParentBlock.Number) == -1) {
-		x.highestCommitBlock = &types.BlockInfo{
-			Number: grandParentBlock.Number,
-			Hash:   grandParentBlock.Hash(),
-			Round:  round,
-		}
-		log.Info("Successfully committed block", "Committed block Hash", x.highestCommitBlock.Hash, "Committed round", x.highestCommitBlock.Round)
-		// Perform forensics related operation
-		var headerQcToBeCommitted []types.Header
-		headerQcToBeCommitted = append(headerQcToBeCommitted, *parentBlock, *proposedBlockHeader)
-		go x.ForensicsProcessor.ForensicsMonitoring(blockChainReader, x, headerQcToBeCommitted, *incomingQc)
-		return true, nil
+	if x.highestCommitBlock != nil && (x.highestCommitBlock.Round >= round || x.highestCommitBlock.Number.Cmp(grandParentBlock.Number) == 1) {
+		return false, nil
 	}
-	// Everything else, fail to commit
-	return false, nil
+
+	// Process Commit
+	x.highestCommitBlock = &types.BlockInfo{
+		Number: grandParentBlock.Number,
+		Hash:   grandParentBlock.Hash(),
+		Round:  round,
+	}
+	log.Info("Successfully committed block", "Committed block Hash", x.highestCommitBlock.Hash, "Committed round", x.highestCommitBlock.Round)
+	// Perform forensics related operation
+	headerQcToBeCommitted := []types.Header{*parentBlock, *proposedBlockHeader}
+	go x.ForensicsProcessor.ForensicsMonitoring(blockChainReader, x, headerQcToBeCommitted, *incomingQc)
+	return true, nil
 }
 
 // Get master nodes over extra data of epoch switch block.

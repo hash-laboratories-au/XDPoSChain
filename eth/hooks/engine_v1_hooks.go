@@ -39,6 +39,10 @@ func AttachConsensusV1Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 				for i := prevEpoc; i < blockNumberEpoc; i++ {
 					if i%common.MergeSignRange == 0 || !chainConfig.IsTIP2019(big.NewInt(int64(i))) {
 						bheader := chain.GetHeaderByNumber(i)
+						log.Info("[V1 Hook Penalty]", "parentNumber", i)
+						if bheader == nil {
+							log.Info("[V1 Hook Penalty] parentHeader is nil", "parentNumber", i)
+						}
 						bhash := bheader.Hash()
 						block := chain.GetBlock(bhash, i)
 						if len(penSigners) > 0 {

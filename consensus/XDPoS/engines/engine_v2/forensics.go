@@ -170,7 +170,7 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 			SignerAddresses: f.getQcSignerAddresses(higherRoundQC),
 		},
 	}
-	log.Info("Forensics proof report generated, sending to the stats server", forensicsProof)
+	log.Info("Forensics proof report generated, sending to the stats server", "forensicsProof", forensicsProof)
 	go f.forensicsFeed.Send(types.ForensicsEvent{ForensicsProof: forensicsProof})
 	return nil
 }

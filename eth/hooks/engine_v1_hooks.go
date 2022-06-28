@@ -93,6 +93,10 @@ func AttachConsensusV1Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 			parentHash := header.ParentHash
 			for i := uint64(1); i < chain.Config().XDPoS.Epoch; i++ {
 				parentHeader := chain.GetHeader(parentHash, parentnumber)
+				log.Info("[V1 HookPenaltyTIPSigning]", "parentNumber", parentnumber)
+				if parentHeader == nil {
+					log.Info("[V1 HookPenaltyTIPSigning] parentHeader is nil", "parentNumber", parentnumber)
+				}
 				miner, _ := adaptor.RecoverSigner(parentHeader)
 				value, exist := statMiners[miner]
 				if exist {

@@ -295,6 +295,8 @@ func (x *XDPoS_v2) Prepare(chain consensus.ChainReader, header *types.Header) er
 		return err
 	}
 	if isEpochSwitchBlock {
+		log.Info("[prepare]")
+
 		masterNodes, penalties, err := x.calcMasternodes(chain, header.Number, header.ParentHash)
 		if err != nil {
 			return err

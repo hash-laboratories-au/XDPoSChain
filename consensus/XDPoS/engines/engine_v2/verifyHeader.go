@@ -102,7 +102,7 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 		if len(header.Validators)%common.AddressLength != 0 {
 			return utils.ErrInvalidCheckpointSigners
 		}
-
+		log.Info("[verifyHeader]")
 		localMasterNodes, localPenalties, err := x.calcMasternodes(chain, header.Number, header.ParentHash)
 		masterNodes = localMasterNodes
 		if err != nil {

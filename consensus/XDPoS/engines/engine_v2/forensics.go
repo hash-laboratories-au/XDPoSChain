@@ -47,7 +47,7 @@ func (f *Forensics) SetCommittedQCs(headers []types.Header, incomingQC types.Quo
 	// highestCommitQCs is an array, assign the parentBlockQc and its child as well as its grandchild QC into this array for forensics purposes.
 	if len(headers) != NUM_OF_FORENSICS_QC-1 {
 		log.Error("[SetCommittedQcs] Received input length not equal to 2", len(headers))
-		return fmt.Errorf("Received headers length not equal to 2 ")
+		return fmt.Errorf("received headers length not equal to 2 ")
 	}
 
 	var committedQCs []types.QuorumCert
@@ -56,13 +56,13 @@ func (f *Forensics) SetCommittedQCs(headers []types.Header, incomingQC types.Quo
 		// Decode the qc1 and qc2
 		err := utils.DecodeBytesExtraFields(h.Extra, &decodedExtraField)
 		if err != nil {
-			log.Error("[SetCommittedQCs] Fail to decode extra when committing QC to forensics", "Error", err, "Index", i)
+			log.Error("[SetCommittedQCs] Fail to decode extra when committing QC to forensics", "err", err, "index", i)
 			return err
 		}
 		if i != 0 {
 			if decodedExtraField.QuorumCert.ProposedBlockInfo.Hash != headers[i-1].Hash() {
-				log.Error("[SetCommittedQCs] Headers shall be on the same chain and in the right order", "ParentHash", h.ParentHash.Hex(), "headers[i-1].Hash()", headers[i-1].Hash().Hex())
-				return fmt.Errorf("Headers shall be on the same chain and in the right order")
+				log.Error("[SetCommittedQCs] Headers shall be on the same chain and in the right order", "parentHash", h.ParentHash.Hex(), "headers[i-1].Hash()", headers[i-1].Hash().Hex())
+				return fmt.Errorf("headers shall be on the same chain and in the right order")
 			} else if i == len(headers)-1 { // The last header shall be pointed by the incoming QC
 				if incomingQC.ProposedBlockInfo.Hash != h.Hash() {
 					log.Error("[SetCommittedQCs] incomingQc is not pointing at the last header received", "hash", h.Hash().Hex(), "incomingQC.ProposedBlockInfo.Hash", incomingQC.ProposedBlockInfo.Hash.Hex())
@@ -115,7 +115,7 @@ func (f *Forensics) ProcessForensics(chain consensus.ChainReader, engine *XDPoS_
 		// Not found, need a more complex approach to find the two QC
 		ancestorQC, lowerRoundQCs, _, err := f.findAncestorQcThroughRound(chain, highestCommittedQCs, incomingQuorunCerts)
 		if err != nil {
-			log.Error("[ProcessForensics] Error while trying to find ancestor QC through round number", "Error", err)
+			log.Error("[ProcessForensics] Error while trying to find ancestor QC through round number", "err", err)
 		}
 		f.SendForensicProof(chain, engine, ancestorQC, lowerRoundQCs[NUM_OF_FORENSICS_QC-1])
 	}
@@ -137,7 +137,7 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 	// Find common ancestor block
 	ancestorHash, ancestorToLowerRoundPath, ancestorToHigherRoundPath, err := f.FindAncestorBlockHash(chain, lowerRoundQC.ProposedBlockInfo, higherRoundQC.ProposedBlockInfo)
 	if err != nil {
-		log.Error("[SendForensicProof] Error while trying to find ancestor block hash", err)
+		log.Error("[SendForensicProof] Error while trying to find ancestor block hash", "err", err)
 		return err
 	}
 
@@ -173,7 +173,7 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 	})
 
 	if err != nil {
-		log.Error("[SendForensicProof] fail to json stringify forensics content", err)
+		log.Error("[SendForensicProof] fail to json stringify forensics content", "err", err)
 		return err
 	}
 
@@ -181,7 +181,7 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 		ForensicsType: "QC",
 		Content:       string(content),
 	}
-	log.Info("Forensics proof report generated, sending to the stats server", forensicsProof)
+	log.Info("Forensics proof report generated, sending to the stats server", "forensicsProof", forensicsProof)
 	go f.forensicsFeed.Send(types.ForensicsEvent{ForensicsProof: forensicsProof})
 	return nil
 }
@@ -198,7 +198,7 @@ func (f *Forensics) findAncestorQCs(chain consensus.ChainReader, currentQc types
 		parentHeader := chain.GetHeaderByHash(parentHash)
 		if parentHeader == nil {
 			log.Error("[findAncestorQCs] Forensics findAncestorQCs unable to find its parent block header", "BlockNum", parentHeader.Number.Int64(), "ParentHash", parentHash.Hex())
-			return nil, fmt.Errorf("Unable to find parent block header in forensics")
+			return nil, fmt.Errorf("unable to find parent block header in forensics")
 		}
 		var decodedExtraField types.ExtraFields_v2
 		err := utils.DecodeBytesExtraFields(parentHeader.Extra, &decodedExtraField)
@@ -232,7 +232,7 @@ func (f *Forensics) checkQCsOnTheSameChain(chain consensus.ChainReader, highestC
 		var decodedExtraField types.ExtraFields_v2
 		err := utils.DecodeBytesExtraFields(parentHeader.Extra, &decodedExtraField)
 		if err != nil {
-			log.Error("[checkQCsOnTheSameChain] Fail to decode extra when checking the two QCs set on the same chain", "Error", err)
+			log.Error("[checkQCsOnTheSameChain] Fail to decode extra when checking the two QCs set on the same chain", "err", err)
 			return false, err
 		}
 		proposedBlockInfo = decodedExtraField.QuorumCert.ProposedBlockInfo
@@ -333,7 +333,7 @@ func (f *Forensics) FindAncestorBlockHash(chain consensus.ChainReader, firstBloc
 	for i := 0; i < int(blockNumberDifference); i++ {
 		ph := chain.GetHeaderByHash(higherBlockNumberHash)
 		if ph == nil {
-			return common.Hash{}, ancestorToLowerBlockNumHashPath, ancestorToHigherBlockNumHashPath, fmt.Errorf("Unable to find parent block of hash %v", higherBlockNumberHash)
+			return common.Hash{}, ancestorToLowerBlockNumHashPath, ancestorToHigherBlockNumHashPath, fmt.Errorf("unable to find parent block of hash %v", higherBlockNumberHash)
 		}
 		higherBlockNumberHash = ph.ParentHash
 		ancestorToHigherBlockNumHashPath = append(ancestorToHigherBlockNumHashPath, ph.ParentHash.Hex())

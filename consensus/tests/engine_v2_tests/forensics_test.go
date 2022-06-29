@@ -93,7 +93,7 @@ func TestSetCommittedQCsInOrder(t *testing.T) {
 	assert.Nil(t, err)
 	err = forensics.SetCommittedQCs(append(headers, *blockchain.GetHeaderByNumber(903), *blockchain.GetHeaderByNumber(902)), *decodedExtraField.QuorumCert)
 	assert.NotNil(t, err)
-	assert.Equal(t, "Headers shall be on the same chain and in the right order", err.Error())
+	assert.Equal(t, "headers shall be on the same chain and in the right order", err.Error())
 
 	err = forensics.SetCommittedQCs(append(headers, *blockchain.GetHeaderByNumber(903), *blockchain.GetHeaderByNumber(904)), *decodedExtraField.QuorumCert)
 	assert.Nil(t, err)

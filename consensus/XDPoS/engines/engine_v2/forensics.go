@@ -1,6 +1,7 @@
 package engine_v2
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -156,9 +157,9 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 		accrossEpoches = true
 	}
 
-	forensicsProof := &types.ForensicProof{
-		DivergingHash: ancestorHash,
-		AcrossEpochs:  accrossEpoches,
+	content, err := json.Marshal(&types.ForensicsContent{
+		DivergingBlockHash: ancestorHash.Hex(),
+		AcrossEpoch:        accrossEpoches,
 		SmallerRoundInfo: &types.ForensicsInfo{
 			HashPath:        ancestorToLowerRoundPath,
 			QuorumCert:      lowerRoundQC,
@@ -169,6 +170,16 @@ func (f *Forensics) SendForensicProof(chain consensus.ChainReader, engine *XDPoS
 			QuorumCert:      higherRoundQC,
 			SignerAddresses: f.getQcSignerAddresses(higherRoundQC),
 		},
+	})
+
+	if err != nil {
+		log.Error("[SendForensicProof] fail to json stringify forensics content", err)
+		return err
+	}
+
+	forensicsProof := &types.ForensicProof{
+		ForensicsType: "QC",
+		Content:       string(content),
 	}
 	log.Info("Forensics proof report generated, sending to the stats server", forensicsProof)
 	go f.forensicsFeed.Send(types.ForensicsEvent{ForensicsProof: forensicsProof})

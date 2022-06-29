@@ -1702,6 +1702,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
+		log.Info("Finish WriteBlockWithState", "num", block.Number())
 		switch status {
 		case CanonStatTy:
 			log.Debug("Inserted new block from downloader", "number", block.Number(), "hash", block.Hash(), "uncles", len(block.Uncles()),

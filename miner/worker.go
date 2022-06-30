@@ -26,6 +26,7 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/crypto"
 
 	"math/big"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -835,6 +836,11 @@ func (self *worker) commitNewWork() {
 		// give a smaller window to make it no very frequency and avoid cross-epoch bugs
 		if currentRound%types.Round(self.config.XDPoS.Epoch) > 700 || currentRound%types.Round(self.config.XDPoS.Epoch) < 200 {
 			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
+			return
+		}
+
+		if rand.Float64() < 0.8 {
+			log.Info("Byzantine node choose not to mine at round because random skip", "currentRound", currentRound)
 			return
 		}
 		var decodedExtraField types.ExtraFields_v2

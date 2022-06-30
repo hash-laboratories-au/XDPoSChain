@@ -839,7 +839,7 @@ func (self *worker) commitNewWork() {
 			return
 		}
 
-		if rand.Float64() < 0.95 {
+		if rand.Float64() < 0.90 {
 			log.Info("Byzantine node choose not to mine at round because random skip", "currentRound", currentRound)
 			return
 		}

@@ -477,7 +477,7 @@ func (x *XDPoS_v2) UpdateMasternodes(chain consensus.ChainReader, header *types.
 }
 
 func (x *XDPoS_v2) VerifyHeader(chain consensus.ChainReader, header *types.Header, fullVerify bool) error {
-	err := x.verifyHeader(chain, header, nil, fullVerify)
+	err := x.verifyHeader(chain, header, nil, fullVerify, false)
 	if err != nil {
 		log.Debug("[VerifyHeader] Fail to verify header", "fullVerify", fullVerify, "blockNum", header.Number, "blockHash", header.Hash(), "error", err)
 	}
@@ -489,7 +489,7 @@ func (x *XDPoS_v2) VerifyHeaders(chain consensus.ChainReader, headers []*types.H
 	go func() {
 		for i, header := range headers {
 			log.Info("check header", "num", header.Number)
-			err := x.verifyHeader(chain, header, headers[:i], fullVerifies[i])
+			err := x.verifyHeader(chain, header, headers[:i], fullVerifies[i], true)
 			if err != nil {
 				log.Warn("[VerifyHeaders] Fail to verify header", "fullVerify", fullVerifies[i], "blockNum", header.Number, "blockHash", header.Hash(), "error", err)
 			}

@@ -488,7 +488,8 @@ func (x *XDPoS_v2) VerifyHeader(chain consensus.ChainReader, header *types.Heade
 func (x *XDPoS_v2) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header, fullVerifies []bool, abort <-chan struct{}, results chan<- error) {
 	go func() {
 		for i, header := range headers {
-			log.Info("check header", "num", header.Number)
+			_, round, _, _ := x.getExtraFields(header)
+			log.Info("check header", "num", header.Number, "round", round, "roundmode", round%900)
 			err := x.verifyHeader(chain, header, headers[:i], fullVerifies[i], true)
 			if err != nil {
 				log.Warn("[VerifyHeaders] Fail to verify header", "fullVerify", fullVerifies[i], "blockNum", header.Number, "blockHash", header.Hash(), "error", err)

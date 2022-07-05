@@ -211,12 +211,16 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	switch {
 	case g != nil:
+		log.Info("[configOrDefault] load orignal config", "hash", ghash)
 		return g.Config
 	case ghash == params.MainnetGenesisHash:
+		log.Info("[configOrDefault] load mainnetconfig")
 		return params.XDCMainnetChainConfig
 	case ghash == params.TestnetGenesisHash:
+		log.Info("[configOrDefault] load TestnetGenesisHash")
 		return params.TestnetChainConfig
 	default:
+		log.Info("[configOrDefault] load AllEthashProtocolChanges", "hash", ghash)
 		return params.AllEthashProtocolChanges
 	}
 }

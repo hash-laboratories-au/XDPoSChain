@@ -29,12 +29,21 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 		listBlockHash[0] = currentHash
 		parentNumber := number.Uint64() - 1
 		parentHash := currentHash
-		for i := uint64(1); ; i++ {
+		i := uint64(1)
+		timeout := 0
+		for {
 			parentHeader := chain.GetHeaderByNumber(parentNumber)
 			if parentHeader == nil {
-				log.Info("[V2 Hook Penalty] parentHeader is nil", "parentNumber", parentNumber)
-				return []common.Address{}, fmt.Errorf("parentHeader is nil")
+				log.Info("[V2 Hook Penalty] parentHeader is nil, wait block to be writen in disk", "parentNumber", parentNumber)
+				time.Sleep(200 * time.Millisecond) // 0.2s
+				timeout++
+				if timeout > 50 { // wait over 10s
+					log.Error("[V2 Hook Penalty] parentHeader is nil, wait too long not writen in to disk", "parentNumber", parentNumber)
+					return []common.Address{}, fmt.Errorf("parentHeader is nil")
+				}
+				continue
 			}
+			timeout = 0
 			isEpochSwitch, _, err := adaptor.EngineV2.IsEpochSwitch(parentHeader)
 			if err != nil {
 				log.Error("[HookPenalty] isEpochSwitch", "err", err)
@@ -53,6 +62,7 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 			parentHash = parentHeader.ParentHash
 			listBlockHash[i] = parentHash
 			parentNumber--
+			i++
 		}
 
 		// add list not miner to penalties

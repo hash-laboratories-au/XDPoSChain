@@ -220,6 +220,9 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	case ghash == params.TestnetGenesisHash:
 		log.Info("[configOrDefault] load TestnetGenesisHash")
 		return params.TestnetChainConfig
+	case ghash == params.DevnetGenesisHash:
+		log.Info("[configOrDefault] load DevnetGenesisHash")
+		return params.DevnetChainConfig
 	default:
 		log.Info("[configOrDefault] load AllEthashProtocolChanges", "hash", ghash)
 		return params.AllEthashProtocolChanges

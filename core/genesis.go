@@ -214,7 +214,7 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	case g != nil:
 		log.Info("[configOrDefault] load orignal config", "hash", ghash)
 		return g.Config
-	case ghash == params.MainnetGenesisHash:
+	case ghash == params.XDCMainnetGenesisHash:
 		log.Info("[configOrDefault] load mainnetconfig")
 		return params.XDCMainnetChainConfig
 	case ghash == params.TestnetGenesisHash:

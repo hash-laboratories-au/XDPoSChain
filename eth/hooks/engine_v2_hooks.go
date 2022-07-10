@@ -33,7 +33,7 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 		// check and wait the latest block is already in the disk
 		// sometimes blocks are yet inserted into block
 		for timeout := 0; ; timeout++ {
-			parentHeader := chain.GetHeaderByNumber(parentNumber)
+			parentHeader := chain.GetHeader(parentHash, parentNumber)
 			if parentHeader != nil { // found the latest block in the disk
 				break
 			}
@@ -47,7 +47,7 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 		}
 
 		for i := uint64(1); ; i++ {
-			parentHeader := chain.GetHeaderByNumber(parentNumber)
+			parentHeader := chain.GetHeader(parentHash, parentNumber)
 			isEpochSwitch, _, err := adaptor.EngineV2.IsEpochSwitch(parentHeader)
 			if err != nil {
 				log.Error("[HookPenalty] isEpochSwitch", "err", err)

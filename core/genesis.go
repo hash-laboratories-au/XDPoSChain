@@ -22,9 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"os"
 	"strings"
 
 	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
@@ -322,47 +320,32 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 
 // DefaultGenesisBlock returns the Ethereum main net genesis block.
 func DefaultGenesisBlock() *Genesis {
-	file, err := os.Open("../genesis/mainnet.json")
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		log.Error("error open mainnet.json", "err", err)
-		return nil
+	config := params.XDCMainnetChainConfig
+	config.XDPoS.V2 = nil
+	return &Genesis{
+		Config:     config,
+		Nonce:      0,
+		ExtraData:  hexutil.MustDecode("0x000000000000000000000000000000000000000000000000000000000000000025c65b4b379ac37cf78357c4915f73677022eaffc7d49d0a2cf198deebd6ce581af465944ec8b2bbcfccdea1006a5cfa7d9484b5b293b46964c265c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   4700000,
+		Difficulty: big.NewInt(1),
+		Alloc:      DecodeAllocJson(XDCAllocData),
+		Timestamp:  1559211559,
 	}
-	log.Info("Successfully Opened mainnet.json")
-	// defer the closing of our file so that we can parse it later on
-	defer file.Close()
-
-	byteValue, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Error("error read mainnet.json", "err", err)
-		return nil
-	}
-	var genesis Genesis
-	json.Unmarshal([]byte(byteValue), &genesis)
-	return &genesis
 }
 
 // DefaultTestnetGenesisBlock returns the Ropsten network genesis block.
 func DefaultTestnetGenesisBlock() *Genesis {
-	file, err := os.Open("../genesis/testnet.json")
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		log.Error("error open testnet.json", "err", err)
-		return nil
+	config := params.TestnetChainConfig
+	config.XDPoS.V2 = nil
+	return &Genesis{
+		Config:     params.TestnetChainConfig,
+		Nonce:      0,
+		ExtraData:  hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000003ea0a3555f9b1de983572bff6444aeb1899ec58c4f7900282f3d371d585ab1361205b0940ab1789c942a5885a8844ee5587c8ac5e371fc39ffe618960000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		GasLimit:   4700000,
+		Difficulty: big.NewInt(1),
+		Alloc:      DecodeAllocJson(XDCTestAllocData),
+		Timestamp:  1560417871,
 	}
-	log.Info("Successfully Opened testnet.json")
-	// defer the closing of our file so that we can parse it later on
-	defer file.Close()
-
-	byteValue, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Error("error read testnet.json", "err", err)
-		return nil
-	}
-
-	var genesis Genesis
-	json.Unmarshal([]byte(byteValue), &genesis)
-	return &genesis
 }
 
 // DefaultRinkebyGenesisBlock returns the Rinkeby network genesis block.
@@ -416,8 +399,8 @@ func decodePrealloc(data string) GenesisAlloc {
 	return ga
 }
 
-func DecodeMainnet() GenesisAlloc {
-	mainnetAlloc := GenesisAlloc{}
-	json.Unmarshal([]byte(XDCAllocData), &mainnetAlloc)
-	return mainnetAlloc
+func DecodeAllocJson(s string) GenesisAlloc {
+	alloc := GenesisAlloc{}
+	json.Unmarshal([]byte(s), &alloc)
+	return alloc
 }

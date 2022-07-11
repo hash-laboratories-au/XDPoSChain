@@ -64,7 +64,7 @@ var (
 
 	// XDPoSChain mainnet config
 	XDCMainnetChainConfig = &ChainConfig{
-		ChainId:        big.NewInt(88),
+		ChainId:        big.NewInt(50),
 		HomesteadBlock: big.NewInt(1),
 		EIP150Block:    big.NewInt(2),
 		EIP150Hash:     common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
@@ -74,10 +74,10 @@ var (
 		XDPoS: &XDPoSConfig{
 			Period:              2,
 			Epoch:               900,
-			Reward:              250,
+			Reward:              5000,
 			RewardCheckpoint:    900,
-			Gap:                 5,
-			FoudationWalletAddr: common.HexToAddress("0x0000000000000000000000000000000000000068"),
+			Gap:                 450,
+			FoudationWalletAddr: common.HexToAddress("xdc92a289fe95a85c53b8d0d113cbaef0c1ec98ac65"),
 			V2:                  XDPoSV2Config,
 		},
 	}
@@ -99,17 +99,25 @@ var (
 
 	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainId:             big.NewInt(3),
-		HomesteadBlock:      big.NewInt(0),
+		ChainId:             big.NewInt(51),
+		HomesteadBlock:      big.NewInt(1),
 		DAOForkBlock:        nil,
-		DAOForkSupport:      true,
-		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.HexToHash("0x62e0fde86e34c263e250fbcd5ca4598ba8ca10a1d166c8526bb127e10b313311"),
-		EIP155Block:         big.NewInt(10),
-		EIP158Block:         big.NewInt(10),
-		ByzantiumBlock:      big.NewInt(1700000),
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(2),
+		EIP150Hash:          common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		EIP155Block:         big.NewInt(3),
+		EIP158Block:         big.NewInt(3),
+		ByzantiumBlock:      big.NewInt(4),
 		ConstantinopleBlock: nil,
-		Ethash:              new(EthashConfig),
+		XDPoS: &XDPoSConfig{
+			Period:              2,
+			Epoch:               900,
+			Reward:              5000,
+			RewardCheckpoint:    900,
+			Gap:                 450,
+			FoudationWalletAddr: common.HexToAddress("xdc746249c61f5832c5eed53172776b460491bdcd5c"),
+			V2:                  TestXDPoSV2Config,
+		},
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.

@@ -17,10 +17,11 @@
 package core
 
 import (
-	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 	"math/big"
 	"reflect"
 	"testing"
+
+	"github.com/XinFinOrg/XDPoSChain/core/rawdb"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
 	"github.com/XinFinOrg/XDPoSChain/consensus/ethash"
@@ -50,9 +51,13 @@ func TestSetupGenesis(t *testing.T) {
 				{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 			},
 		}
-		oldcustomg = customg
+		oldcustomg           = customg
+		mainnetGenesisConfig = params.XDCMainnetChainConfig
+		testnetGenesisConfig = params.TestnetChainConfig
 	)
 	oldcustomg.Config = &params.ChainConfig{HomesteadBlock: big.NewInt(2)}
+	mainnetGenesisConfig.XDPoS.V2 = nil
+	testnetGenesisConfig.XDPoS.V2 = nil
 	tests := []struct {
 		name       string
 		fn         func(ethdb.Database) (*params.ChainConfig, common.Hash, error)
@@ -74,7 +79,7 @@ func TestSetupGenesis(t *testing.T) {
 				return SetupGenesisBlock(db, nil)
 			},
 			wantHash:   params.XDCMainnetGenesisHash,
-			wantConfig: params.XDCMainnetChainConfig,
+			wantConfig: mainnetGenesisConfig,
 		},
 		{
 			name: "mainnet block in DB, genesis == nil",
@@ -102,7 +107,7 @@ func TestSetupGenesis(t *testing.T) {
 			},
 			wantErr:    &GenesisMismatchError{Stored: customghash, New: params.TestnetGenesisHash},
 			wantHash:   params.TestnetGenesisHash,
-			wantConfig: params.TestnetChainConfig,
+			wantConfig: testnetGenesisConfig,
 		},
 		{
 			name: "compatible config in DB",

@@ -74,11 +74,18 @@ func (x *XDPoS) SubscribeForensicsEvent(ch chan<- types.ForensicsEvent) event.Su
 // New creates a XDPoS delegated-proof-of-stake consensus engine with the initial
 // signers set to the ones provided by the user.
 func New(config *params.XDPoSConfig, db ethdb.Database) *XDPoS {
-	log.Info("[New] initial conensus engines", "v2Block", config.V2.SwitchBlock)
+	log.Info("[New] initial conensus engines")
 	// Set any missing consensus parameters to their defaults
 	if config.Epoch == 0 {
 		config.Epoch = utils.EpochLength
 	}
+
+	// For testing and testing project, default to mainnet config
+	if config.V2 == nil {
+		config.V2 = params.XDPoSV2Config
+	}
+
+	log.Info("xdc config loading", "config", config)
 
 	waitPeriodCh := make(chan int)
 

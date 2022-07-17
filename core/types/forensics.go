@@ -14,6 +14,11 @@ type ForensicsContent struct {
 	LargerRoundInfo      *ForensicsInfo `json:"largerRoundInfo"`
 }
 
+type VoteEquivocationContent struct {
+	SmallerRoundVote *Vote `json:"smallerRoundVote"`
+	LargerRoundVote  *Vote `json:"largerRoundVote"`
+}
+
 type ForensicProof struct {
 	Id            string `json:"id"`
 	ForensicsType string `json:"forensicsType"` // QC or VOTE

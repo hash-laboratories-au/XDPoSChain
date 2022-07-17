@@ -11,7 +11,6 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/consensus"
 	"github.com/XinFinOrg/XDPoSChain/consensus/XDPoS/utils"
 	"github.com/XinFinOrg/XDPoSChain/core/types"
-	"github.com/XinFinOrg/XDPoSChain/crypto"
 	"github.com/XinFinOrg/XDPoSChain/log"
 )
 
@@ -68,8 +67,7 @@ func (x *XDPoS_v2) voteHandler(chain consensus.ChainReader, voteMsg *types.Vote)
 	// Collect vote
 	thresholdReached, numberOfVotesInPool, pooledVotes := x.votePool.Add(voteMsg)
 	log.Debug("[voteHandler] collect votes", "number", numberOfVotesInPool)
-	x.detectEquivocationInVotePool(voteMsg)
-	log.Debug("[voteHandler] detectEquivocationInVotePool done")
+	go x.ForensicsProcessor.DetectEquivocationInVotePool(voteMsg, x.votePool)
 	if thresholdReached {
 		log.Info(fmt.Sprintf("[voteHandler] Vote pool threashold reached: %v, number of items in the pool: %v", thresholdReached, numberOfVotesInPool))
 
@@ -230,58 +228,4 @@ func (x *XDPoS_v2) hygieneVotePool() {
 			x.votePool.ClearByPoolKey(k)
 		}
 	}
-}
-
-func (x *XDPoS_v2) detectEquivocationInVotePool(vote *types.Vote) {
-	poolKey := vote.PoolKey()
-	votePoolKeys := x.votePool.PoolObjKeysList()
-	signer, err := GetVoteSignerAddresses(vote)
-	if err != nil {
-		log.Error("[detectEquivocationInVotePool]", "err", err)
-	}
-
-	for _, k := range votePoolKeys {
-		if k == poolKey {
-			continue
-		}
-		keyedRound, err := strconv.ParseInt(strings.Split(k, ":")[0], 10, 64)
-		if err != nil {
-			log.Error("[detectEquivocationInVotePool] Error while trying to get keyedRound inside pool", "Error", err)
-			continue
-		}
-		if types.Round(keyedRound) == vote.ProposedBlockInfo.Round {
-			votes := x.votePool.GetObjsByKey(k)
-			for _, v := range votes {
-				voteTransfered, ok := v.(*types.Vote)
-				if !ok {
-					log.Warn("[detectEquivocationInVotePool] obj type is not vote, potential a bug in votePool")
-					continue
-				}
-				signer2, err := GetVoteSignerAddresses(voteTransfered)
-				if err != nil {
-					log.Warn("[detectEquivocationInVotePool]", "err", err)
-					continue
-				}
-				if signer == signer2 {
-					log.Warn("[detectEquivocationInVotePool] equivocation! TODO: send report")
-					fmt.Println("[detectEquivocationInVotePool] equivocation! TODO: send report")
-				}
-			}
-		}
-	}
-}
-
-func GetVoteSignerAddresses(vote *types.Vote) (common.Address, error) {
-	// The QC signatures are signed by votes special struct VoteForSign
-	signHash := types.VoteSigHash(&types.VoteForSign{
-		ProposedBlockInfo: vote.ProposedBlockInfo,
-		GapNumber:         vote.GapNumber,
-	})
-	var signerAddress common.Address
-	pubkey, err := crypto.Ecrecover(signHash.Bytes(), vote.Signature)
-	if err != nil {
-		return signerAddress, fmt.Errorf("fail to Ecrecover signer from the vote: %v", vote)
-	}
-	copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
-	return signerAddress, nil
 }

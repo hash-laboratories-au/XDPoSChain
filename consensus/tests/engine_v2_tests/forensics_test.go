@@ -311,3 +311,62 @@ func TestForensicsAcrossEpoch(t *testing.T) {
 		}
 	}
 }
+
+func TestVoteEquivocationSameRound(t *testing.T) {
+	var numOfForks = new(int)
+	*numOfForks = 1
+	blockchain, _, currentBlock, signer, signFn, currentForkBlock := PrepareXDCTestBlockChainForV2Engine(t, 901, params.TestXDPoSMockChainConfig, &ForkedBlockOptions{numOfForkedBlocks: numOfForks})
+	engineV2 := blockchain.Engine().(*XDPoS.XDPoS).EngineV2
+	// Set up forensics events trigger
+	forensics := blockchain.Engine().(*XDPoS.XDPoS).EngineV2.GetForensicsFaker()
+	forensicsEventCh := make(chan types.ForensicsEvent)
+	forensics.SubscribeForensicsEvent(forensicsEventCh)
+	// Set round to 5
+	engineV2.SetNewRoundFaker(blockchain, types.Round(5), false)
+
+	blockInfo := &types.BlockInfo{
+		Hash:   currentBlock.Hash(),
+		Round:  types.Round(5),
+		Number: big.NewInt(901),
+	}
+	voteForSign := &types.VoteForSign{
+		ProposedBlockInfo: blockInfo,
+		GapNumber:         450,
+	}
+	voteSigningHash := types.VoteSigHash(voteForSign)
+	signedHash, err := signFn(accounts.Account{Address: signer}, voteSigningHash.Bytes())
+	assert.Nil(t, err)
+	voteMsg := &types.Vote{
+		ProposedBlockInfo: blockInfo,
+		Signature:         signedHash,
+		GapNumber:         450,
+	}
+	err = engineV2.VoteHandler(blockchain, voteMsg)
+	assert.Nil(t, err)
+	blockInfo = &types.BlockInfo{
+		Hash:   currentForkBlock.Hash(),
+		Round:  types.Round(5),
+		Number: big.NewInt(901),
+	}
+	voteForSign = &types.VoteForSign{
+		ProposedBlockInfo: blockInfo,
+		GapNumber:         450,
+	}
+	voteSigningHash = types.VoteSigHash(voteForSign)
+	signedHash, err = signFn(accounts.Account{Address: signer}, voteSigningHash.Bytes())
+	assert.Nil(t, err)
+	voteMsg = &types.Vote{
+		ProposedBlockInfo: blockInfo,
+		Signature:         signedHash,
+		GapNumber:         450,
+	}
+	err = engineV2.VoteHandler(blockchain, voteMsg)
+	assert.Nil(t, err)
+	msg := <-forensicsEventCh
+	assert.NotNil(t, msg.ForensicsProof)
+	assert.Equal(t, "Vote", msg.ForensicsProof.ForensicsType)
+	content := &types.VoteEquivocationContent{}
+	json.Unmarshal([]byte(msg.ForensicsProof.Content), &content)
+	assert.Equal(t, types.Round(5), content.SmallerRoundVote.ProposedBlockInfo.Round)
+	assert.Equal(t, types.Round(5), content.LargerRoundVote.ProposedBlockInfo.Round)
+}

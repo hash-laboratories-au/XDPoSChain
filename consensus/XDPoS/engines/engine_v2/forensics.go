@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/XinFinOrg/XDPoSChain/common"
@@ -381,6 +382,10 @@ func reverse(ss []string) []string {
 	return ss
 }
 
+func generateVoteEquivocationId(signer common.Address, round1, round2 types.Round) string {
+	return fmt.Sprintf("%x:%d:%d", signer, round1, round2)
+}
+
 /*
 	Entry point for processing vote equivocation.
 	Triggered once handle vote is successfully.
@@ -457,4 +462,82 @@ func (f *Forensics) isVoteBlamed(chain consensus.ChainReader, highestCommittedQC
 		return true, nil
 	}
 	return false, nil
+}
+
+func (f *Forensics) DetectEquivocationInVotePool(vote *types.Vote, votePool *utils.Pool) {
+	poolKey := vote.PoolKey()
+	votePoolKeys := votePool.PoolObjKeysList()
+	signer, err := GetVoteSignerAddresses(vote)
+	if err != nil {
+		log.Error("[detectEquivocationInVotePool]", "err", err)
+	}
+
+	for _, k := range votePoolKeys {
+		if k == poolKey {
+			continue
+		}
+		keyedRound, err := strconv.ParseInt(strings.Split(k, ":")[0], 10, 64)
+		if err != nil {
+			log.Error("[detectEquivocationInVotePool] Error while trying to get keyedRound inside pool", "Error", err)
+			continue
+		}
+		if types.Round(keyedRound) == vote.ProposedBlockInfo.Round {
+			votes := votePool.GetObjsByKey(k)
+			for _, v := range votes {
+				voteTransfered, ok := v.(*types.Vote)
+				if !ok {
+					log.Warn("[detectEquivocationInVotePool] obj type is not vote, potential a bug in votePool")
+					continue
+				}
+				signer2, err := GetVoteSignerAddresses(voteTransfered)
+				if err != nil {
+					log.Warn("[detectEquivocationInVotePool]", "err", err)
+					continue
+				}
+				if signer == signer2 {
+					f.SendVoteEquivocationProof(vote, voteTransfered, signer)
+				}
+			}
+		}
+	}
+}
+
+func (f *Forensics) SendVoteEquivocationProof(vote1, vote2 *types.Vote, signer common.Address) error {
+	smallerRoundVote := vote1
+	largerRoundVote := vote2
+	if vote1.ProposedBlockInfo.Round > vote2.ProposedBlockInfo.Round {
+		smallerRoundVote = vote2
+		largerRoundVote = vote1
+	}
+	content, err := json.Marshal(&types.VoteEquivocationContent{
+		SmallerRoundVote: smallerRoundVote,
+		LargerRoundVote:  largerRoundVote,
+	})
+	if err != nil {
+		log.Error("[SendVoteEquivocationProof] fail to json stringify forensics content", "err", err)
+		return err
+	}
+	forensicsProof := &types.ForensicProof{
+		Id:            generateVoteEquivocationId(signer, smallerRoundVote.ProposedBlockInfo.Round, largerRoundVote.ProposedBlockInfo.Round),
+		ForensicsType: "Vote",
+		Content:       string(content),
+	}
+	log.Info("Forensics proof report generated, sending to the stats server", "forensicsProof", forensicsProof)
+	go f.forensicsFeed.Send(types.ForensicsEvent{ForensicsProof: forensicsProof})
+	return nil
+}
+
+func GetVoteSignerAddresses(vote *types.Vote) (common.Address, error) {
+	// The QC signatures are signed by votes special struct VoteForSign
+	signHash := types.VoteSigHash(&types.VoteForSign{
+		ProposedBlockInfo: vote.ProposedBlockInfo,
+		GapNumber:         vote.GapNumber,
+	})
+	var signerAddress common.Address
+	pubkey, err := crypto.Ecrecover(signHash.Bytes(), vote.Signature)
+	if err != nil {
+		return signerAddress, fmt.Errorf("fail to Ecrecover signer from the vote: %v", vote)
+	}
+	copy(signerAddress[:], crypto.Keccak256(pubkey[1:])[12:])
+	return signerAddress, nil
 }

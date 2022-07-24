@@ -834,12 +834,12 @@ func (self *worker) commitNewWork() {
 	{
 		currentRound := c.EngineV2.GetCurrentRoundFaker()
 		// give a smaller window to make it no very frequency and avoid cross-epoch bugs
-		if currentRound%types.Round(self.config.XDPoS.Epoch) > 700 || currentRound%types.Round(self.config.XDPoS.Epoch) < 200 {
+		if currentRound%types.Round(self.config.XDPoS.Epoch) > 850 || currentRound%types.Round(self.config.XDPoS.Epoch) < 50 {
 			log.Info("Byzantine node choose not to mine at round", "currentRound", currentRound)
 			return
 		}
 
-		if rand.Float64() < 0.95 {
+		if rand.Float64() < 0.90 {
 			log.Info("Byzantine node choose not to mine at round because random skip", "currentRound", currentRound)
 			return
 		}

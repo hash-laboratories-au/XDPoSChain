@@ -58,8 +58,8 @@ var (
 		CertThreshold:        6,
 		TimeoutSyncThreshold: 5,
 		TimeoutPeriod:        10,
-		WaitPeriod:           2,
-		MinePeriod:           2,
+		WaitPeriod:           5,
+		MinePeriod:           5,
 	}
 
 	// XDPoSChain mainnet config

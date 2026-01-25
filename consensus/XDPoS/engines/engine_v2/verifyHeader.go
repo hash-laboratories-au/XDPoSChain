@@ -150,6 +150,8 @@ func (x *XDPoS_v2) verifyHeader(chain consensus.ChainReader, header *types.Heade
 				}
 				return utils.ErrPenaltiesNotLegit
 			}
+		} else {
+			masterNodes = common.ExtractAddressFromBytes(header.Validators)
 		}
 
 	} else {

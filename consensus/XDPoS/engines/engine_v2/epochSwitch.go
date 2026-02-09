@@ -74,18 +74,18 @@ func (x *XDPoS_v2) getEpochSwitchInfo(chain consensus.ChainReader, header *types
 			log.Error("[getEpochSwitchInfo] get extra field", "err", err, "number", h.Number.Uint64())
 			return nil, err
 		}
+		penalties := common.ExtractAddressFromBytes(h.Penalties)
+		standbynodes := []common.Address{}
 		snap, err := x.getSnapshot(chain, h.Number.Uint64(), false)
 		if err != nil {
-			log.Error("[getEpochSwitchInfo] Adaptor v2 getSnapshot has error", "err", err)
-			return nil, err
-		}
-		penalties := common.ExtractAddressFromBytes(h.Penalties)
-		candidates := snap.NextEpochCandidates
-		standbynodes := []common.Address{}
-		if len(masternodes) != len(candidates) {
-			standbynodes = candidates
-			standbynodes = common.RemoveItemFromArray(standbynodes, masternodes)
-			standbynodes = common.RemoveItemFromArray(standbynodes, penalties)
+			log.Warn("[getEpochSwitchInfo] Adaptor v2 getSnapshot has error, cannot get standbynodes", "err", err)
+		} else {
+			candidates := snap.NextEpochCandidates
+			if len(masternodes) != len(candidates) {
+				standbynodes = candidates
+				standbynodes = common.RemoveItemFromArray(standbynodes, masternodes)
+				standbynodes = common.RemoveItemFromArray(standbynodes, penalties)
+			}
 		}
 
 		epochSwitchInfo := &types.EpochSwitchInfo{

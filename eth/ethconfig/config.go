@@ -71,6 +71,10 @@ type Config struct {
 	NetworkId uint64
 	SyncMode  downloader.SyncMode
 
+	// Fast sync pivot configuration
+	FastSyncPivotNumber uint64      // Pivot block number for fast sync (0 = use default calculation)
+	FastSyncPivotHash   common.Hash // Pivot block hash for fast sync verification (zero = skip verification)
+
 	NoPruning  bool // Whether to disable pruning and flush everything to disk
 	NoPrefetch bool // Whether to disable prefetching and only load state on demand
 

@@ -74,6 +74,7 @@ type Config struct {
 	// Fast sync pivot configuration
 	FastSyncPivotNumber uint64      // Pivot block number for fast sync (0 = use default calculation)
 	FastSyncPivotHash   common.Hash // Pivot block hash for fast sync verification (zero = skip verification)
+	FastSyncPivotRoot   common.Hash // State root of pivot block for state sync (zero = use latest.Root)
 
 	NoPruning  bool // Whether to disable pruning and flush everything to disk
 	NoPrefetch bool // Whether to disable prefetching and only load state on demand

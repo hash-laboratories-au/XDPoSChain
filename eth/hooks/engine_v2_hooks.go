@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -149,6 +150,9 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 					signingTxs, ok := adaptor.GetCachedSigningTxs(bhash)
 					if !ok {
 						block := chain.GetBlock(bhash, blockNumber)
+						if block == nil {
+							return nil, fmt.Errorf("cannot getBlock %s, number %d", bhash.Hex(), blockNumber)
+						}
 						txs := block.Transactions()
 						signingTxs = adaptor.CacheSigningTxs(bhash, txs)
 					}
@@ -221,6 +225,9 @@ func AttachConsensusV2Hooks(adaptor *XDPoS.XDPoS, bc *core.BlockChain, chainConf
 					signingTxs, ok := adaptor.GetCachedSigningTxs(bhash)
 					if !ok {
 						block := chain.GetBlock(bhash, blockNumber)
+						if block == nil {
+							return nil, fmt.Errorf("cannot getBlock %s, number %d", bhash.Hex(), blockNumber)
+						}
 						txs := block.Transactions()
 						signingTxs = adaptor.CacheSigningTxs(bhash, txs)
 					}
@@ -464,6 +471,9 @@ func GetSigningTxCount(c *XDPoS.XDPoS, chain consensus.ChainReader, header *type
 		if !ok {
 			log.Debug("Failed get from cached", "hash", h.Hash().String(), "number", i)
 			block := chain.GetBlock(h.Hash(), i)
+			if block == nil {
+				return nil, fmt.Errorf("cannot getBlock %s, number %d", h.Hash().Hex(), i)
+			}
 			txs := block.Transactions()
 			signingTxs = c.CacheSigningTxs(h.Hash(), txs)
 		}

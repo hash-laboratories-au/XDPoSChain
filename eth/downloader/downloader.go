@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -37,7 +38,6 @@ import (
 	"github.com/XinFinOrg/XDPoSChain/log"
 	"github.com/XinFinOrg/XDPoSChain/metrics"
 	"github.com/XinFinOrg/XDPoSChain/params"
-	"sort"
 )
 
 // proposeBlockHandlerFn is a callback type to handle a block by the consensus
@@ -1445,22 +1445,9 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int) er
 							unknown = append(unknown, header)
 						}
 					}
-					// If we're importing pure headers, verify based on their recentness
+					// If we're importing pure headers, verify with frequency=0.
+					// It's okay since in InsertChain, headers are verified again (full verify)
 					frequency := fsHeaderCheckFrequency
-					if chunk[len(chunk)-1].Number.Uint64()+uint64(fsHeaderForceVerify) > pivot {
-						// Wait until all gap pivot states are synced before allowing full verification
-						for {
-							d.pivotGapLock.RLock()
-							done := len(d.pivotGapNumbers) == 0
-							d.pivotGapLock.RUnlock()
-							if done {
-								break
-							}
-							log.Info("Waiting for gap pivot state syncs before header verification", "chunkEnd", chunk[len(chunk)-1].Number.Uint64())
-							time.Sleep(5 * time.Second)
-						}
-						frequency = 1
-					}
 					if n, err := d.lightchain.InsertHeaderChain(chunk, frequency); err != nil {
 						rollbackErr = err
 						// If some headers were inserted, add them too to the rollback list
@@ -1613,8 +1600,8 @@ func (d *Downloader) importBlockResults(results []*fetchResult) error {
 func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 	// Gap pivot tracking - only used when gap pivots are configured
 	var (
-		syncedGaps      = make(map[uint64]bool)        // Track which gap pivots are synced
-		pendingGapRoots = make(map[uint64]common.Hash) // Gap pivot roots found but not yet synced
+		syncedGaps       = make(map[uint64]bool)        // Track which gap pivots are synced
+		pendingGapRoots  = make(map[uint64]common.Hash) // Gap pivot roots found but not yet synced
 		pendingGapHashes = make(map[uint64]common.Hash) // Gap pivot block hashes found but not yet synced
 	)
 	d.pivotGapLock.RLock()

@@ -108,6 +108,17 @@ const (
 	freezerDifficultyTable = "diffs"
 )
 
+// freezerNoSnappy configures whether compression is disabled for the ancient
+// tables. Hashes and difficulties don't compress well due to their small or
+// already-random nature, so they're stored raw.
+var freezerNoSnappy = map[string]bool{
+	freezerHeaderTable:     false,
+	freezerHashTable:       true,
+	freezerBodiesTable:     false,
+	freezerReceiptTable:    false,
+	freezerDifficultyTable: true,
+}
+
 // LegacyTxLookupEntry is the legacy TxLookupEntry definition with some unnecessary
 // fields.
 type LegacyTxLookupEntry struct {

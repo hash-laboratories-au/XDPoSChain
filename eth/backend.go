@@ -125,10 +125,22 @@ func New(stack *node.Node, config *ethconfig.Config, XDCXServ *XDCx.XDCX, lendin
 		config.Miner.GasPrice = new(big.Int).Set(ethconfig.Defaults.Miner.GasPrice)
 	}
 
-	chainDb, err := stack.OpenDatabase("chaindata", config.DatabaseCache, config.DatabaseHandles, "eth/db/chaindata/", false)
+	chainDb, err := stack.OpenDatabaseWithFreezer("chaindata", config.DatabaseCache, config.DatabaseHandles, config.DatabaseFreezer, "eth/db/chaindata/", false)
 	if err != nil {
 		return nil, err
 	}
+	// Force a full LevelDB compaction on startup so that space left behind by
+	// freezer migrations (which only writes deletion tombstones, leaving the
+	// shadowed data on disk until enough write churn triggers size-based
+	// compactions) is reclaimed immediately. This blocks startup and rewrites
+	// the whole key-value store, so it can take a while on large databases.
+	log.Info("Compacting chain database to reclaim freed space")
+	cstart := time.Now()
+	if err := chainDb.Compact(nil, nil); err != nil {
+		chainDb.Close()
+		return nil, err
+	}
+	log.Info("Compacted chain database", "elapsed", common.PrettyDuration(time.Since(cstart)))
 	// Resolve the effective chain config (and persist it when compatible)
 	// before constructing the consensus engine so it initializes with final network settings.
 	chainConfig, _, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)

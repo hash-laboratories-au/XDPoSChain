@@ -78,10 +78,11 @@ type Config struct {
 	LightPeers int `toml:",omitempty"` // Maximum number of LES client peers
 
 	// Database options
-	SkipBcVersionCheck bool `toml:"-"`
-	DeleteAllBadBlocks bool `toml:"-"`
-	DatabaseHandles    int  `toml:"-"`
+	SkipBcVersionCheck bool   `toml:"-"`
+	DeleteAllBadBlocks bool   `toml:"-"`
+	DatabaseHandles    int    `toml:"-"`
 	DatabaseCache      int
+	DatabaseFreezer    string
 	TrieCleanCache     int
 	TrieDirtyCache     int
 	TrieTimeout        time.Duration

@@ -348,7 +348,7 @@ func (x *XDPoS_v1) checkSignersOnCheckpoint(chain consensus.ChainReader, header 
 func (x *XDPoS_v1) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
 	snap, err := x.GetSnapshot(chain, header)
 	if err != nil {
-		log.Error("[IsAuthorisedAddress] Can't get snapshot with at ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
+		log.Debug("[IsAuthorisedAddress] Can't get snapshot with at ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
 		return false
 	}
 	if _, ok := snap.Signers[address]; ok {

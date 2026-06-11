@@ -569,7 +569,7 @@ func (x *XDPoS_v2) CalcDifficulty(chain consensus.ChainReader, time uint64, pare
 func (x *XDPoS_v2) IsAuthorisedAddress(chain consensus.ChainReader, header *types.Header, address common.Address) bool {
 	snap, err := x.GetSnapshot(chain, header)
 	if err != nil {
-		log.Error("[IsAuthorisedAddress] Can't get snapshot with at ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
+		log.Debug("[IsAuthorisedAddress] Can't get snapshot with at ", "number", header.Number, "hash", header.Hash().Hex(), "err", err)
 		return false
 	}
 	for _, mn := range snap.NextEpochCandidates {

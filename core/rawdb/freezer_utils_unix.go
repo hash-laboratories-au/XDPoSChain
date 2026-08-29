@@ -1,4 +1,4 @@
-// Copyright 2014 The go-ethereum Authors
+// Copyright 2022 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,37 +14,36 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package common
+//go:build !windows
+// +build !windows
+
+package rawdb
 
 import (
 	"errors"
-	"io/fs"
 	"os"
-	"path/filepath"
+	"syscall"
 )
 
-// FileExist checks if a file exists at filePath.
-func FileExist(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return !errors.Is(err, fs.ErrNotExist)
-}
-
-// AbsolutePath returns datadir + filename, or filename if it is absolute.
-func AbsolutePath(datadir string, filename string) string {
-	if filepath.IsAbs(filename) {
-		return filename
-	}
-	return filepath.Join(datadir, filename)
-}
-
-// IsNonEmptyDir reports whether the given path is a directory containing at
-// least one entry.
-func IsNonEmptyDir(dir string) bool {
-	f, err := os.Open(dir)
+// syncDir ensures that the directory metadata (e.g. newly renamed files)
+// is flushed to durable storage.
+func syncDir(name string) error {
+	f, err := os.Open(name)
 	if err != nil {
-		return false
+		return err
 	}
 	defer f.Close()
-	names, _ := f.Readdirnames(1)
-	return len(names) > 0
+
+	// Some file systems do not support fsyncing directories (e.g. some FUSE
+	// mounts). Ignore EINVAL in those cases.
+	if err := f.Sync(); err != nil {
+		if errors.Is(err, os.ErrInvalid) {
+			return nil
+		}
+		if patherr, ok := err.(*os.PathError); ok && patherr.Err == syscall.EINVAL {
+			return nil
+		}
+		return err
+	}
+	return nil
 }

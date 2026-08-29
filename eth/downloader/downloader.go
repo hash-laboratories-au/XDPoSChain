@@ -126,6 +126,7 @@ type Downloader struct {
 	synchronising   int32
 	notified        int32
 	committed       int32
+	ancientLimit    uint64 // The maximum block number which can be regarded as ancient data.
 
 	// Pivot block configuration (set before sync starts)
 	pivotNumber uint64      // Fixed pivot block number (0 = use default calculation)
@@ -216,7 +217,12 @@ type BlockChain interface {
 	InterruptInsert(on bool)
 
 	// InsertReceiptChain inserts a batch of receipts into the local chain.
-	InsertReceiptChain(types.Blocks, []types.Receipts) (int, error)
+	// Blocks older than the specified ancientLimit are written directly into
+	// the ancient store, bypassing the key-value store.
+	InsertReceiptChain(types.Blocks, []types.Receipts, uint64) (int, error)
+
+	// SetHead rewinds the local chain to a new head.
+	SetHead(uint64) error
 
 	// TrieDB retrieves the low level trie database used for interacting
 	// with trie nodes.
@@ -536,6 +542,44 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 	}
 	if mode == FastSync && d.pivotNumber != 0 && pivot <= origin {
 		d.committed = 1
+	}
+	// Set the ancient data limitation. When running fast sync, all block data older
+	// than ancientLimit is written straight into the ancient store; more recent data
+	// goes to the active database and waits for the freezer to migrate it.
+	//
+	// Deviation from upstream go-ethereum: upstream prefers the beacon-announced
+	// finalized block as the limit, and can further extend it with a configured
+	// chain cutoff. XDPoS announces no finality marker to the downloader and has no
+	// cutoff setting, so the limit is derived purely from the advertised remote
+	// height, which is upstream's fallback path for non-merged networks.
+	d.ancientLimit = 0
+	if mode == FastSync {
+		if height > MaxForkAncestry+1 {
+			d.ancientLimit = height - MaxForkAncestry - 1
+		}
+		// Ignore the error here since a light client can also reach this point.
+		frozen, _ := d.stateDB.Ancients()
+
+		// If a part of the blockchain data has already been written into the active
+		// store, disable the ancient style insertion explicitly: mixing the two
+		// would leave a gap between the freezer and leveldb.
+		if origin >= frozen && origin != 0 {
+			d.ancientLimit = 0
+			ancient := "null"
+			if frozen != 0 {
+				ancient = fmt.Sprintf("%d", frozen-1)
+			}
+			log.Info("Disabling direct-ancient mode", "origin", origin, "ancient", ancient)
+		} else if d.ancientLimit > 0 {
+			log.Debug("Enabling direct-ancient mode", "ancient", d.ancientLimit)
+		}
+		// Rewind the ancient store and blockchain if a reorg reaches below it.
+		if origin+1 < frozen {
+			if err := d.blockchain.SetHead(origin); err != nil {
+				return err
+			}
+			log.Info("Truncated excess ancient chain segment", "oldhead", frozen-1, "newhead", origin)
+		}
 	}
 	// Initiate the sync using a concurrent header and content retrieval algorithm
 	d.queue.Prepare(origin+1, mode)
@@ -1884,7 +1928,7 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.body())
 		receipts[i] = result.Receipts
 	}
-	if index, err := d.blockchain.InsertReceiptChain(blocks, receipts); err != nil {
+	if index, err := d.blockchain.InsertReceiptChain(blocks, receipts, d.ancientLimit); err != nil {
 		log.Debug("Downloaded item processing failed", "number", results[index].Header.Number, "hash", results[index].Header.Hash(), "err", err)
 		return fmt.Errorf("%w: %v", errInvalidChain, err)
 	}
@@ -1894,7 +1938,7 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 func (d *Downloader) commitPivotBlock(result *fetchResult) error {
 	block := types.NewBlockWithHeader(result.Header).WithBody(result.body())
 	log.Debug("Committing fast sync pivot as new head", "number", block.Number(), "hash", block.Hash())
-	if _, err := d.blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}); err != nil {
+	if _, err := d.blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}, d.ancientLimit); err != nil {
 		return err
 	}
 	if err := d.blockchain.FastSyncCommitHead(block.Hash()); err != nil {

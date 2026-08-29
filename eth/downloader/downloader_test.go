@@ -71,7 +71,9 @@ type downloadTester struct {
 	ownHeaders  map[common.Hash]*types.Header  // Headers belonging to the tester
 	ownBlocks   map[common.Hash]*types.Block   // Blocks belonging to the tester
 	ownReceipts map[common.Hash]types.Receipts // Receipts belonging to the tester
-	ownChainTd  map[common.Hash]*big.Int       // Total difficulties of the blocks in the local chain
+
+	ancientLimit uint64                   // Last ancientLimit the downloader passed to InsertReceiptChain
+	ownChainTd   map[common.Hash]*big.Int // Total difficulties of the blocks in the local chain
 
 	insertHeaderChainHook func([]*types.Header) error
 
@@ -323,9 +325,14 @@ func (dl *downloadTester) InsertChain(blocks types.Blocks) (i int, err error) {
 }
 
 // InsertReceiptChain injects a new batch of receipts into the simulated chain.
-func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts) (i int, err error) {
+//
+// ancientLimit is recorded so tests can assert which limit the downloader chose,
+// but the simulated chain has no freezer so both groups are stored identically.
+func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (i int, err error) {
 	dl.lock.Lock()
 	defer dl.lock.Unlock()
+
+	dl.ancientLimit = ancientLimit
 
 	for i := 0; i < len(blocks) && i < len(receipts); i++ {
 		if _, ok := dl.ownHeaders[blocks[i].Hash()]; !ok {
@@ -338,6 +345,26 @@ func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []typ
 		dl.ownReceipts[blocks[i].Hash()] = receipts[i]
 	}
 	return len(blocks), nil
+}
+
+// SetHead rewinds the simulated chain to the given block number.
+func (dl *downloadTester) SetHead(head uint64) error {
+	dl.lock.Lock()
+	defer dl.lock.Unlock()
+
+	for len(dl.ownHashes) > 0 {
+		hash := dl.ownHashes[len(dl.ownHashes)-1]
+		header, ok := dl.ownHeaders[hash]
+		if !ok || header.Number.Uint64() <= head {
+			break
+		}
+		dl.ownHashes = dl.ownHashes[:len(dl.ownHashes)-1]
+		delete(dl.ownChainTd, hash)
+		delete(dl.ownHeaders, hash)
+		delete(dl.ownReceipts, hash)
+		delete(dl.ownBlocks, hash)
+	}
+	return nil
 }
 
 // Rollback removes some recently added elements from the chain.

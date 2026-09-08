@@ -72,10 +72,12 @@ type downloadTester struct {
 	ownBlocks   map[common.Hash]*types.Block   // Blocks belonging to the tester
 	ownReceipts map[common.Hash]types.Receipts // Receipts belonging to the tester
 
-	ancientLimit uint64                   // Last ancientLimit the downloader passed to InsertReceiptChain
-	ownChainTd   map[common.Hash]*big.Int // Total difficulties of the blocks in the local chain
+	ancientLimit     uint64                   // Last ancientLimit the downloader passed to InsertReceiptChain
+	receiptCheckFreq int                      // Last checkFreq the downloader passed to InsertReceiptChain
+	ownChainTd       map[common.Hash]*big.Int // Total difficulties of the blocks in the local chain
 
-	insertHeaderChainHook func([]*types.Header) error
+	insertHeaderChainHook  func([]*types.Header) error
+	insertReceiptChainHook func(types.Blocks) error
 
 	// headHeaderCap, when non-zero, caps the height reported by CurrentHeader.
 	// It models the real chain, where importing blocks moves the header head
@@ -326,23 +328,37 @@ func (dl *downloadTester) InsertChain(blocks types.Blocks) (i int, err error) {
 
 // InsertReceiptChain injects a new batch of receipts into the simulated chain.
 //
-// ancientLimit is recorded so tests can assert which limit the downloader chose,
-// but the simulated chain has no freezer so both groups are stored identically.
-func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (i int, err error) {
+// Like the real implementation it is the sole writer of fast-synced data: the
+// header arrives with the block content rather than through a preceding header
+// insertion phase.
+//
+// ancientLimit and checkFreq are recorded so tests can assert what the downloader
+// chose, but the simulated chain has no freezer so both groups are stored
+// identically, and the fake engine verifies every header regardless of checkFreq.
+func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64, checkFreq int) (i int, err error) {
 	dl.lock.Lock()
 	defer dl.lock.Unlock()
 
+	if dl.insertReceiptChainHook != nil {
+		if err := dl.insertReceiptChainHook(blocks); err != nil {
+			return 0, err
+		}
+	}
 	dl.ancientLimit = ancientLimit
+	dl.receiptCheckFreq = checkFreq
 
 	for i := 0; i < len(blocks) && i < len(receipts); i++ {
-		if _, ok := dl.ownHeaders[blocks[i].Hash()]; !ok {
-			return i, errors.New("unknown owner")
-		}
+		hash := blocks[i].Hash()
 		if _, ok := dl.ownBlocks[blocks[i].ParentHash()]; !ok {
 			return i, errors.New("InsertReceiptChain: unknown parent")
 		}
-		dl.ownBlocks[blocks[i].Hash()] = blocks[i]
-		dl.ownReceipts[blocks[i].Hash()] = receipts[i]
+		if _, ok := dl.ownHeaders[hash]; !ok {
+			dl.ownHashes = append(dl.ownHashes, hash)
+			dl.ownHeaders[hash] = blocks[i].Header()
+			dl.ownChainTd[hash] = new(big.Int).Add(dl.getTd(blocks[i].ParentHash()), blocks[i].Difficulty())
+		}
+		dl.ownBlocks[hash] = blocks[i]
+		dl.ownReceipts[hash] = receipts[i]
 	}
 	return len(blocks), nil
 }
@@ -531,6 +547,16 @@ func assertOwnForkedChain(t *testing.T, tester *downloadTester, common int, leng
 	}
 	if rs := len(tester.ownReceipts); rs != receipts {
 		t.Fatalf("synchronised receipts mismatch: have %v, want %v", rs, receipts)
+	}
+	// Outside light sync no phase stores a header on its own any more: headers
+	// arrive with the block they belong to. This is what makes the header
+	// rollback unnecessary for fast sync.
+	if SyncMode(tester.downloader.mode) != LightSync {
+		for hash, header := range tester.ownHeaders {
+			if _, ok := tester.ownBlocks[hash]; !ok {
+				t.Fatalf("header #%d [%x..] stored without block content", header.Number, hash[:4])
+			}
+		}
 	}
 }
 
@@ -1057,10 +1083,13 @@ func testShiftedHeaderAttack(t *testing.T, protocol int, mode SyncMode) {
 // Tests that upon detecting an invalid header, the recent ones are rolled back
 // for various failure scenarios. Afterwards a full sync is attempted to make
 // sure no state was corrupted.
-func TestInvalidHeaderRollback100Fast(t *testing.T)  { testInvalidHeaderRollback(t, xdc100, FastSync) }
-func TestInvalidHeaderRollback164Fast(t *testing.T)  { testInvalidHeaderRollback(t, xdc164, FastSync) }
+//
+// Only light sync inserts headers on its own and therefore needs the rollback
+// safety net. Fast sync writes a header only once its body and receipts have
+// arrived, so there is nothing to unwind; the equivalent guarantee is asserted
+// by assertOwnChain, which rejects any stored header whose block content is
+// missing.
 func TestInvalidHeaderRollback164Light(t *testing.T) { testInvalidHeaderRollback(t, xdc164, LightSync) }
-func TestInvalidHeaderRollback165Fast(t *testing.T)  { testInvalidHeaderRollback(t, xdc165, FastSync) }
 func TestInvalidHeaderRollback165Light(t *testing.T) { testInvalidHeaderRollback(t, xdc165, LightSync) }
 
 func testInvalidHeaderRollback(t *testing.T, protocol int, mode SyncMode) {
@@ -1178,13 +1207,13 @@ func testHighTDStarvationAttack(t *testing.T, protocol int, mode SyncMode) {
 }
 
 // Tests that a header head lagging behind the headers the peer already delivered
-// is not mistaken for a stalling peer. Importing the post-pivot blocks moves the
-// header head back to the block being inserted, so it can trail the synced head
-// while the terminating header batch is processed. Both fast and light sync run
-// the lag-sensitive check, hence both modes are covered.
-func TestFastSyncHeaderHeadLag100(t *testing.T)  { testHeaderHeadLag(t, xdc100, FastSync) }
-func TestFastSyncHeaderHeadLag164(t *testing.T)  { testHeaderHeadLag(t, xdc164, FastSync) }
-func TestFastSyncHeaderHeadLag165(t *testing.T)  { testHeaderHeadLag(t, xdc165, FastSync) }
+// is not mistaken for a stalling peer. Importing blocks moves the header head
+// back to the block being inserted, so it can trail the synced head while the
+// terminating header batch is processed.
+//
+// Only light sync is covered: it is the sole mode that still measures the peer's
+// promise against the header head. Fast sync inserts no headers of its own, so
+// the check does not apply to it.
 func TestLightSyncHeaderHeadLag164(t *testing.T) { testHeaderHeadLag(t, xdc164, LightSync) }
 func TestLightSyncHeaderHeadLag165(t *testing.T) { testHeaderHeadLag(t, xdc165, LightSync) }
 
@@ -1271,11 +1300,23 @@ func TestSyncBatchAncestorErrDropPeer(t *testing.T) {
 				t.Fatalf("failed to register peer: %v", err)
 			}
 
-			tester.insertHeaderChainHook = func(headers []*types.Header) error {
-				if len(headers) > 0 {
-					return errors.New("unknown ancestor")
+			// Light sync inserts the headers itself, fast sync gets them written
+			// as part of the block content, so the failure has to be injected
+			// into whichever call actually stores the chain.
+			if mode == LightSync {
+				tester.insertHeaderChainHook = func(headers []*types.Header) error {
+					if len(headers) > 0 {
+						return errors.New("unknown ancestor")
+					}
+					return nil
 				}
-				return nil
+			} else {
+				tester.insertReceiptChainHook = func(blocks types.Blocks) error {
+					if len(blocks) > 0 {
+						return errors.New("unknown ancestor")
+					}
+					return nil
+				}
 			}
 
 			head := chain.headBlock()
